@@ -20,6 +20,7 @@ vi.mock('@/lib/cs/tools', () => ({
 
 vi.mock('@/lib/cs/cs-context', () => ({
   stripSuggestions: (t: string) => (t || '').replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim(),
+  parseSuggestions: (t: string) => { const m = /<<SUGGESTIONS>>([\s\S]*?)<<\/SUGGESTIONS>>/.exec(t || ''); return m ? m[1].split('|').map((s: string) => s.trim()).filter(Boolean).slice(0, 4) : []; },
   buildContextDigest: async () => ({ knownName: null, boundBrand: null, warm: false, openThreads: [] }),
   buildCsSystemPrompt: async () => 'SYS',
 }));
@@ -306,6 +307,14 @@ describe('runCsTurn (brain-led loop)', () => {
     const res = await runCsTurn(job('היי'), { callModel });
     expect(res.reply.kind).toBe('text');
     expect(sessionLoadCalls).toContainEqual(['whatsapp', '972501112222']);
+  });
+
+  it('parses <<SUGGESTIONS>> into CsTurnResult.suggestions AND strips them from the body (spec §5)', async () => {
+    callModel.mockResolvedValueOnce({ toolCalls: [], text: 'בשמחה!<<SUGGESTIONS>>איפה ההזמנה?|פתיחת פנייה<</SUGGESTIONS>>' });
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('היי'), { callModel });
+    expect(res.reply).toEqual({ kind: 'text', body: 'בשמחה!' });
+    expect(res.suggestions).toEqual(['איפה ההזמנה?', 'פתיחת פנייה']);
   });
 
   // --- CS-engine M2 (spec §5, §7): web-channel readiness ---

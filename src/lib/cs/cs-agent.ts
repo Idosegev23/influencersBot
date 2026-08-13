@@ -15,7 +15,7 @@ import { loadCsSessionByChannel, createCsSession, saveCsSession, type CsSessionR
 import { buildCsToolset } from '@/lib/cs/tools/registry';
 import { derivePayload, type CsUiPayload } from '@/lib/cs/payloads';
 import type { CsProductCard, CsToolCtx, CsToolResult, OpenAIFunctionDef } from '@/lib/cs/tools/types';
-import { buildCsSystemPrompt, buildContextDigest, stripSuggestions, type CsRecentTurn } from '@/lib/cs/cs-context';
+import { buildCsSystemPrompt, buildContextDigest, stripSuggestions, parseSuggestions, type CsRecentTurn } from '@/lib/cs/cs-context';
 import { laneModel } from '@/lib/llm/config';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
 import { whatsappIdentity, identityKey, withClaimedPhone, CS_TICKET_SOURCES, type CsIdentity } from '@/lib/cs/identity';
@@ -37,6 +37,9 @@ export interface CsTurnResult {
   // Structured CS screens (spec §6) derived from tool results — web surfaces render components,
   // WhatsApp ignores (the prose is the text projection). Additive, never load-bearing.
   payloads?: CsUiPayload[];
+  // Parsed from the reply's <<SUGGESTIONS>> marker BEFORE stripping (spec §5): web/IG render
+  // these as quick-reply chips; WhatsApp keeps ignoring them (its text was already stripped).
+  suggestions?: string[];
 }
 
 // content is `string` for text turns and an OpenAI multimodal content-part array (text + image_url)
@@ -302,7 +305,9 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   // header), so the reply is always text. On a hand-off, if the model produced no closing text we fall
   // back to an empathetic ack — NEVER the rephrase fallback, which reads as nonsense after an escalation.
   const HANDOFF_ACK = 'אני מעבירה את זה לנציג/ה אנושי/ת שיחזרו אליך בהקדם 🙏';
-  const replyBody = stripSuggestions(finalText || (handedOff ? HANDOFF_ACK : 'סליחה, אפשר לנסח שוב? 🙏'));
+  const rawReply = finalText || (handedOff ? HANDOFF_ACK : 'סליחה, אפשר לנסח שוב? 🙏');
+  const suggestions = parseSuggestions(rawReply);
+  const replyBody = stripSuggestions(rawReply);
   if (replyBody) recentTurns.push({ role: 'assistant', text: replyBody });
   // A hand-off means something went wrong for this shopper. Whatever the brain queued earlier in
   // the turn, following an escalation ack with product cards would read as selling to someone who
@@ -312,5 +317,5 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   if (input.claimedPhone?.trim()) contextPatch.claimedPhone = input.claimedPhone.trim(); // asked once, kept forever (spec §7)
   await saveCsSession(session, { context: contextPatch, last_activity_at: new Date().toISOString() });
   if (session.active_chat_session_id) await persistTurn(session.active_chat_session_id, userMessage, replyBody, cards);
-  return { reply: { kind: 'text', body: replyBody }, phase: session.phase, ...(cards.length ? { cards } : {}), ...(payloads.size ? { payloads: [...payloads.values()] } : {}) };
+  return { reply: { kind: 'text', body: replyBody }, phase: session.phase, ...(cards.length ? { cards } : {}), ...(payloads.size ? { payloads: [...payloads.values()] } : {}), ...(suggestions.length ? { suggestions } : {}) };
 }

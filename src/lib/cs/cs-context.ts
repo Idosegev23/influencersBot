@@ -9,6 +9,13 @@ export function stripSuggestions(text: string): string {
   return (text || '').replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '').trim();
 }
 
+// Spec §5: web/IG PARSE the same marker into quick-reply chips where WhatsApp strips it.
+export function parseSuggestions(text: string): string[] {
+  const m = /<<SUGGESTIONS>>([\s\S]*?)<<\/SUGGESTIONS>>/.exec(text || '');
+  if (!m) return [];
+  return m[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 4);
+}
+
 export interface CsRecentTurn { role: 'user' | 'assistant'; text: string; }
 
 export interface CsContextDigest {
