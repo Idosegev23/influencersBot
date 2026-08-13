@@ -50,14 +50,15 @@ export async function loadCsSession(waId: string): Promise<CsSessionRow | null> 
   return loadCsSessionByChannel('whatsapp', waId);
 }
 
-export async function createCsSession(waId: string, contactId: string | null): Promise<CsSessionRow> {
+export async function createCsSession(waId: string, contactId: string | null, channel: CsChannel = 'whatsapp'): Promise<CsSessionRow> {
   const { data } = await supabaseAdmin
     .from('whatsapp_cs_sessions')
     .insert({
       // Migration 074 step 1: wa_id is still the PK and keeps being populated; the channel
-      // pair is what code reads. Only WhatsApp reaches creation in M1, so wa_id = channel_user_id.
+      // pair is what code reads. For web channels wa_id carries the channel user id too —
+      // ids are namespaced by generation scheme (waId digits / aw_* / a_*), so they can't collide.
       wa_id: waId,
-      channel: 'whatsapp',
+      channel,
       channel_user_id: waId,
       contact_id: contactId,
       phase: 'onboarding',

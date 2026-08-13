@@ -67,7 +67,10 @@ async function defaultCallModel(params: { system: string; messages: CsChatMessag
     messages: [{ role: 'system', content: params.system }, ...(params.messages as any)],
     tools: params.tools as any,
     tool_choice: 'auto',
-  });
+    // OpenAI (observed live 2026-08-13): gpt-5.6-sol rejects function tools on
+    // /v1/chat/completions unless reasoning_effort is explicitly 'none'.
+    reasoning_effort: 'none',
+  } as any);
   const msg: any = res.choices?.[0]?.message;
   const toolCalls = (msg?.tool_calls || []).map((tc: any) => ({ id: tc.id, name: tc.function?.name, args: safeJson(tc.function?.arguments) }));
   return { toolCalls, text: msg?.content ?? null };
@@ -192,7 +195,7 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   // detectHandoff and the escalation transcript; the ACTUAL photo is threaded to the model below.
   const img = input.image ?? null;
   const userMessage = (img ? (img.caption ? `[תמונה] ${img.caption}` : '[הלקוח/ה שלח/ה תמונה]') : (input.text || '')).trim();
-  let session = (await loadCsSessionByChannel(channel, channelUserId)) || (await createCsSession(channelUserId, input.contactId ?? null));
+  let session = (await loadCsSessionByChannel(channel, channelUserId)) || (await createCsSession(channelUserId, input.contactId ?? null, channel));
 
   // Effective identity (spec §7): a phone claimed THIS turn, or one stored on the session from an
   // earlier turn, upgrades a claimed-channel identity to phone_claimed. WhatsApp is untouched.

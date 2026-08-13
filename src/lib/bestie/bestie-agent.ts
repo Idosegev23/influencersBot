@@ -84,7 +84,10 @@ async function defaultCallModel(params: {
     messages: [{ role: 'system', content: params.system }, ...(params.messages as any)],
     tools: params.tools as any,
     tool_choice: 'auto',
-  });
+    // OpenAI (observed live 2026-08-13): gpt-5.6-sol rejects function tools on
+    // /v1/chat/completions unless reasoning_effort is explicitly 'none'.
+    reasoning_effort: 'none',
+  } as any);
 
   const msg: any = res.choices?.[0]?.message;
   const toolCalls = (msg?.tool_calls || []).map((tc: any) => ({
