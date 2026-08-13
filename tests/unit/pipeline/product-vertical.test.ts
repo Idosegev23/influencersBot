@@ -16,7 +16,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     from: () => ({
       select: () => ({
-        eq: () => ({ single: async () => ({ data: { config: storedConfig } }) }),
+        // Finalize re-reads the config before its second (branding/widget) write —
+        // serve back whatever the previous update wrote, like the real DB does,
+        // so the merge preserves fields from the first write (e.g. product_vertical).
+        eq: () => ({ single: async () => ({ data: { config: updatedConfig ?? storedConfig } }) }),
       }),
       update: (row: any) => ({
         eq: async () => {
