@@ -1823,18 +1823,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           </button>
                         </div>
                       )}
-                      {/* Starter pills — unified for ALL account types.
-                          Spec §5: the support starter is ALWAYS first when CS is enabled. */}
-                      {(csWebEnabled || quickReplies.length > 0) && (
+                      {/* Starter pills — unified for ALL account types. When CS is enabled the
+                          CS choice button above IS the first support entry (Ido's design note:
+                          don't stack a duplicate support starter on top of the content pills). */}
+                      {quickReplies.length > 0 && (
                         <StarterPills
-                          items={csWebEnabled ? [chatStrings(influencer).csStarter, ...quickReplies] : quickReplies}
+                          items={quickReplies}
                           onSelect={(q) => {
-                            if (csWebEnabled && q === chatStrings(influencer).csStarter) {
-                              track('cs_support_starter_clicked', {});
-                              enterCsMode();
-                              sendQuickMessage(q);
-                              return;
-                            }
                             track('starter_pill_clicked', {
                               pill_label: q,
                               pill_index: quickReplies.indexOf(q),

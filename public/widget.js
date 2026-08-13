@@ -68,6 +68,10 @@
   var csMode = false;
   var csDetailsPending = null;
   var csSuggestions = [];
+  // Opening-choice dismissal: clicking "chat with the brand" reveals the normal widget
+  // (smart chips) instead of stacking choice buttons AND chips together (Ido's design note:
+  // the cold-start panel must never show 6-7 buttons at once).
+  var csChoiceDismissed = false;
   var supportForm = { name: '', email: '', phone: '', orderNumber: '', category: '', message: '', urgent: false, attachment: null, attachmentUploading: false, error: null, submitting: false };
   var leadForm = { name: '', email: '', phone: '', interest: '', error: null, submitting: false };
   var bookDemoForm = { name: '', email: '', company: '', teamSize: '', message: '', preferredTime: '', error: null, submitting: false };
@@ -1341,6 +1345,7 @@
     csMode = false;
     csDetailsPending = null;
     csSuggestions = [];
+    csChoiceDismissed = false;
     animatedUpTo = 0;       // fresh thread → let the new welcome slide in
     view = 'chat';
     fetchChips('initial');
@@ -1635,8 +1640,10 @@
       msgsHtml +
       '</div>' +
 
-      // ---- CS opening choice (spec §5): two big buttons before the first user message ----
-      ((modules.customerService.enabled && !csMode && !messages.some(function (mm) { return mm.role === 'user'; }))
+      // ---- CS opening choice (spec §5): the ONLY thing on cold start — two clean buttons.
+      // Smart chips stay hidden until the visitor picks "chat" (csChoiceDismissed) so the
+      // panel never stacks choice buttons + 4 chips together.
+      ((modules.customerService.enabled && !csMode && !csChoiceDismissed && !messages.some(function (mm) { return mm.role === 'user'; }))
         ? renderCsChoiceRow(pc)
         : '') +
 
@@ -1646,7 +1653,7 @@
         : '') +
 
       // ---- Smart chips row (only when no user message yet AND chips loaded) ----
-      ((!csMode && chips.length > 0 && !messages.some(function (mm) { return mm.role === 'user'; }))
+      ((!csMode && (!modules.customerService.enabled || csChoiceDismissed) && chips.length > 0 && !messages.some(function (mm) { return mm.role === 'user'; }))
         ? renderChipsRow(chips, pc)
         : '') +
 
@@ -2011,19 +2018,17 @@
   // realize there was more behind a horizontal scroll. Wrap + cap keeps
   // everything visible in the small surface.
   // ---- CS opening choice row (spec §5): "customer service" / "chat with the brand".
-  // The support starter is ALWAYS the first pill (twice-emphasized spec requirement).
+  // Exactly TWO buttons — the CS button IS the first support entry (spec's starter-first,
+  // folded into the choice so the cold-start panel stays clean). Chips come only after
+  // the visitor picks "chat".
   function renderCsChoiceRow(pc) {
     var mob = window.innerWidth < 640;
     var brand = config.brandName || locale.brandName;
     var btnBase = 'cursor:pointer;border-radius:14px;padding:' + (mob ? '13px 14px' : '11px 12px') + ';font-size:' + (mob ? '14.5px' : '13px') + ';font-weight:600;font-family:inherit;line-height:1.3;text-align:center;flex:1;min-width:0;transition:transform 0.15s;';
     return (
-      '<div style="padding:' + (mob ? '8px 16px' : '6px 16px') + ';display:flex;flex-direction:column;gap:8px;direction:' + locale.dir + ';flex-shrink:0;">' +
-        '<div style="display:flex;gap:8px;">' +
-          '<button onclick="window.__ibotCsStart(\'choice\')" style="' + btnBase + 'background:' + pc + ';border:1px solid ' + pc + ';color:#fff;">' + escapeHtml(locale.cs.choiceCs) + '</button>' +
-          '<button onclick="window.__ibotCsContent()" style="' + btnBase + 'background:var(--ibot-surface);border:1px solid var(--ibot-border);color:var(--ibot-text-primary);">' + escapeHtml(locale.cs.choiceContent.replace('{brand}', brand)) + '</button>' +
-        '</div>' +
-        '<button onclick="window.__ibotCsStarter()" style="background:var(--ibot-surface);border:1px solid ' + pc + ';color:var(--ibot-text-primary);cursor:pointer;border-radius:999px;padding:' + (mob ? '9px 15px' : '7px 12px') + ';font-size:' + (mob ? '14px' : '12.5px') + ';font-family:inherit;line-height:1.3;">' +
-          escapeHtml(locale.cs.supportStarter) + '</button>' +
+      '<div style="padding:' + (mob ? '8px 16px' : '6px 16px') + ';display:flex;gap:8px;direction:' + locale.dir + ';flex-shrink:0;">' +
+        '<button onclick="window.__ibotCsStart(\'choice\')" style="' + btnBase + 'background:' + pc + ';border:1px solid ' + pc + ';color:#fff;">' + escapeHtml(locale.cs.choiceCs) + '</button>' +
+        '<button onclick="window.__ibotCsContent()" style="' + btnBase + 'background:var(--ibot-surface);border:1px solid var(--ibot-border);color:var(--ibot-text-primary);">' + escapeHtml(locale.cs.choiceContent.replace('{brand}', brand)) + '</button>' +
       '</div>'
     );
   }
@@ -2962,13 +2967,10 @@
   };
   window.__ibotCsContent = function () {
     widgetTrack('widget_cs_content_chosen', {});
+    csChoiceDismissed = true; // reveal the normal widget (smart chips) in place of the choice
+    render();
     var inputEl = document.getElementById('ibot-input');
     if (inputEl) inputEl.focus();
-  };
-  window.__ibotCsStarter = function () {
-    csMode = true;
-    widgetTrack('widget_cs_started', { from: 'support_starter' });
-    csSendText(locale.cs.supportStarter);
   };
   window.__ibotCsSuggestion = function (i) {
     var s = csSuggestions[i];
