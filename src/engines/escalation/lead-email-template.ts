@@ -5,7 +5,7 @@ export interface LeadBriefEmailParts {
   contactLabel?: string | null; // "Full Name (@username)" from resolveSenderIdentity
   igUsername?: string | null;   // for the instagram.com profile link
   fields: LeadFields;
-  briefType: 'full' | 'partial';
+  briefType: 'full' | 'partial' | 'updated';
   lastMessages: { role: string; content: string }[];
   sessionId?: string | null;
 }
@@ -28,13 +28,19 @@ const FIELD_LABELS: Record<keyof LeadFields, string> = {
 
 export function buildLeadBriefEmail(p: LeadBriefEmailParts): { subject: string; html: string } {
   const partial = p.briefType === 'partial';
+  const updated = p.briefType === 'updated';
   const subject = partial
     ? `🟡 ליד מאינסטגרם (בריף חלקי) — ${p.brandName}`
-    : `🟢 ליד חדש מאינסטגרם — ${p.brandName}`;
-  const headColor = partial ? '#f59e0b' : '#16a34a';
+    : updated
+      ? `🔵 עדכון ליד מאינסטגרם — ${p.brandName}`
+      : `🟢 ליד חדש מאינסטגרם — ${p.brandName}`;
+  const headColor = partial ? '#f59e0b' : updated ? '#2563eb' : '#16a34a';
+  const headIcon = partial ? '🟡' : updated ? '🔵' : '🟢';
   const headTitle = partial
     ? 'ליד שהתחיל שיחה ולא השלים — מה שנאסף עד כה'
-    : 'ליד חדש נכנס בהודעות האינסטגרם';
+    : updated
+      ? 'הליד המשיך לשוחח אחרי הבריף — פרטים חדשים נוספו'
+      : 'ליד חדש נכנס בהודעות האינסטגרם';
 
   const rows = (Object.keys(FIELD_LABELS) as (keyof LeadFields)[])
     .filter((k) => k !== 'summary' && p.fields[k])
@@ -58,7 +64,7 @@ export function buildLeadBriefEmail(p: LeadBriefEmailParts): { subject: string; 
   const html = `
     <div dir="rtl" style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;">
       <div style="background:${headColor};color:#fff;padding:16px 24px;border-radius:12px 12px 0 0;">
-        <h2 style="margin:0;font-size:18px;">${partial ? '🟡' : '🟢'} ${esc(headTitle)}</h2>
+        <h2 style="margin:0;font-size:18px;">${headIcon} ${esc(headTitle)}</h2>
       </div>
       <div style="background:#fff;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;">
         <p style="font-size:15px;color:#111;"><b>הפונה:</b> ${esc(p.contactLabel || 'לא ידוע')} ${profileLink}</p>

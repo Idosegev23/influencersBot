@@ -80,20 +80,48 @@ describe('runLeadCaptureCheck', () => {
     expect(classify).not.toHaveBeenCalled();
   });
 
-  it('dedupes: a session whose brief was already sent is never reprocessed', async () => {
-    const classify = vi.fn();
+  it('post-brief turn with NEW details → fields merged + flagged for updated brief, no immediate email', async () => {
+    const supabase = makeSupabase({
+      config: enabledConfig,
+      existingLeadRow: {
+        id: 'r1',
+        session_id: 'sess',
+        metadata: { lead: { state: 'sent', fields: { service: 'קמפיין משפיענים', contact_phone: '050-1' } } },
+      },
+    });
     const sendEmail = vi.fn();
     const out = await runLeadCaptureCheck(baseInput, {
-      supabase: makeSupabase({
-        config: enabledConfig,
-        existingLeadRow: { id: 'r1', session_id: 'sess', metadata: { lead: { state: 'sent' } } },
-      }) as any,
+      supabase: supabase as any,
       sendEmail: sendEmail as any,
-      classify,
+      classify: async () => verdict('gathering', { budget: '15,000 ₪', brand: 'ילדים בע״מ' }),
+    });
+    expect(out.isLead).toBe(true);
+    expect(sendEmail).not.toHaveBeenCalled(); // no per-message spam
+    const upd = supabase.updates.find((u) => u.table === 'support_requests');
+    expect(upd.patch.metadata.lead.fields.budget).toBe('15,000 ₪');
+    expect(upd.patch.metadata.lead.fields.service).toBe('קמפיין משפיענים'); // preserved
+    expect(upd.patch.metadata.lead.fields_changed_after_brief).toBe(true);
+    expect(upd.patch.metadata.lead.state).toBe('sent'); // stays sent
+  });
+
+  it('post-brief turn with nothing new → no write, no email', async () => {
+    const supabase = makeSupabase({
+      config: enabledConfig,
+      existingLeadRow: {
+        id: 'r1',
+        session_id: 'sess',
+        metadata: { lead: { state: 'sent', fields: { service: 'קמפיין משפיענים' } } },
+      },
+    });
+    const sendEmail = vi.fn();
+    const out = await runLeadCaptureCheck(baseInput, {
+      supabase: supabase as any,
+      sendEmail: sendEmail as any,
+      classify: async () => verdict('gathering', {}),
     });
     expect(out.skipped).toBe('already_sent');
-    expect(classify).not.toHaveBeenCalled();
     expect(sendEmail).not.toHaveBeenCalled();
+    expect(supabase.updates).toHaveLength(0);
   });
 
   it('writes nothing for a non-lead (fan) message', async () => {
@@ -168,6 +196,7 @@ describe('runLeadCaptureCheck', () => {
     expect(sentUpdate).toBeTruthy();
     expect(sentUpdate.patch.status).toBe('new');
     expect(sentUpdate.patch.metadata.lead.brief_type).toBe('full');
+    expect(sentUpdate.patch.metadata.lead.email.success).toBe(true); // delivery recorded
   });
 
   it('merges newly extracted fields over prior ones without erasing them', async () => {
@@ -211,6 +240,38 @@ describe('flushStaleLeads', () => {
     const call: any = sendEmail.mock.calls[0][0];
     expect(call.subject).toContain('בריף חלקי');
     expect(call.to).toEqual(['pnina@x.com', 'gili@x.com']);
+  });
+
+  it('sent lead with post-brief changes → ONE updated-brief email, flag cleared', async () => {
+    const supabase = makeSupabase({
+      config: enabledConfig,
+      leadRows: [
+        {
+          id: 'upd',
+          account_id: 'acc',
+          session_id: 's1',
+          metadata: {
+            lead: {
+              state: 'sent',
+              fields_changed_after_brief: true,
+              last_activity_at: staleIso,
+              fields: { service: 'קמפיין משפיענים', budget: '15,000 ₪' },
+              ig: { username: 'triroars' },
+            },
+          },
+        },
+        { id: 'quiet-sent', account_id: 'acc', session_id: 's2', metadata: { lead: { state: 'sent', fields_changed_after_brief: false, last_activity_at: staleIso } } },
+      ],
+    });
+    const sendEmail = vi.fn(async (_opts: any) => ({ success: true }));
+    const out = await flushStaleLeads({ supabase: supabase as any, sendEmail: sendEmail as any, classify: async () => null });
+    expect(out.flushed).toBe(1);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    const call: any = sendEmail.mock.calls[0][0];
+    expect(call.subject).toContain('עדכון ליד');
+    expect(call.html).toContain('15,000 ₪');
+    const upd = supabase.updates.find((u) => u.patch?.metadata?.lead);
+    expect(upd.patch.metadata.lead.fields_changed_after_brief).toBe(false); // one update per quiet period
   });
 
   it('does nothing when the account has lead_capture disabled', async () => {
@@ -263,6 +324,8 @@ describe('leadDiggingInstruction', () => {
     expect(s.endsWith(']')).toBe(true);
     expect(s).toContain('LDRS');
     expect(s).toContain('שאלה מבררת אחת');
+    // chips: every qualifying question must ship quick-reply suggestions
+    expect(s).toContain('<<SUGGESTIONS>>');
   });
 });
 

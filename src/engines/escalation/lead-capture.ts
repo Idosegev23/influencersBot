@@ -75,6 +75,8 @@ export interface LeadCaptureOutcome {
 /**
  * Injected into the DM conversation context when lead capture is on — Yoav's
  * "בוט חופר": answer briefly, then dig ONE qualifying question per turn.
+ * Every qualifying question must carry <<SUGGESTIONS>> so the DM shows
+ * quick-reply chips with ready answers (dm-handler converts them to buttons).
  */
 export function leadDiggingInstruction(brandName: string): string {
   return (
@@ -82,6 +84,8 @@ export function leadDiggingInstruction(brandName: string): string {
     `זהו ליד עסקי. ענה/י קצר ולעניין, ובכל תשובה שאל/י שאלה מבררת אחת בלבד, לפי הסדר וממה שעוד חסר: ` +
     `איזה שירות מעניין אותם · לאיזה מותג/חברה · מה לוח הזמנים · מה המטרה (לידים/מודעות/מכירות) · מה סדר גודל התקציב · ` +
     `ולבסוף שם + טלפון או אימייל לחזרה. אל תשאל/י את כל השאלות בבת אחת, ואל תבטיח/י מחירים. ` +
+    `לכל שאלה מבררת צרף/י בסוף התשובה שורת <<SUGGESTIONS>>אפשרות 1|אפשרות 2|אפשרות 3<</SUGGESTIONS>> ` +
+    `עם 2-4 תשובות קצרות (עד 20 תווים) שמתאימות בדיוק לשאלה ששאלת. ` +
     `כשיש שם ופרטי קשר — אמור/אמרי שנציג/ה יחזרו בהקדם.]`
   );
 }
@@ -160,7 +164,7 @@ async function sendBrief(params: {
   leadConfig: LeadCaptureConfig;
   brandName: string;
   row: any;
-  briefType: 'full' | 'partial';
+  briefType: 'full' | 'partial' | 'updated';
   transcript: { role: string; content: string }[];
 }): Promise<boolean> {
   const { deps, leadConfig, brandName, row, briefType, transcript } = params;
@@ -204,6 +208,10 @@ async function sendBrief(params: {
           state: 'sent',
           brief_type: briefType,
           brief_sent_at: new Date(deps.now()).toISOString(),
+          fields_changed_after_brief: false,
+          // Delivery evidence — without this a failed send still flips the state
+          // and the lead silently dies (learned from the first live test).
+          email: { success: sent, at: new Date(deps.now()).toISOString() },
         },
       },
       updated_at: new Date(deps.now()).toISOString(),
@@ -234,7 +242,10 @@ export async function runLeadCaptureCheck(
   if (leadConfig.enabled !== true) return { isLead: false, skipped: 'disabled' };
   const brandName = config.brandName || config.display_name || config.username || 'Account';
 
-  // 2) existing lead row for this session (also the dedup: one brief per session)
+  // 2) existing lead row for this session. A sent brief does NOT stop processing:
+  // the conversation often keeps going (budget, timeline arrive late) — we keep
+  // merging fields and the flush cron emails ONE "updated brief" once it goes
+  // quiet. Only immediate re-emailing is suppressed (no per-message spam).
   const { data: row } = await supabase
     .from('support_requests')
     .select('id, session_id, metadata')
@@ -242,7 +253,7 @@ export async function runLeadCaptureCheck(
     .eq('source', 'ig_lead')
     .limit(1)
     .maybeSingle();
-  if (row?.metadata?.lead?.state === 'sent') return { isLead: true, skipped: 'already_sent' };
+  const briefAlreadySent = row?.metadata?.lead?.state === 'sent';
 
   // 3) transcript (excludes the current turn — it isn't saved yet; passed separately)
   const { data: msgs } = await supabase
@@ -260,6 +271,31 @@ export async function runLeadCaptureCheck(
   if (!verdict.is_lead && !row) return { isLead: false };
 
   const fields = mergeFields(priorFields, verdict.fields || {});
+  const fieldsChanged = JSON.stringify(fields) !== JSON.stringify(priorFields);
+
+  // Post-brief turns: silently absorb new details; the flush cron sends the update.
+  if (briefAlreadySent) {
+    if (row && fieldsChanged) {
+      const nowIso = new Date(deps.now()).toISOString();
+      await supabase
+        .from('support_requests')
+        .update({
+          metadata: {
+            ...(row.metadata || {}),
+            lead: {
+              ...(row.metadata?.lead || {}),
+              fields,
+              fields_changed_after_brief: true,
+              last_activity_at: nowIso,
+            },
+          },
+          updated_at: nowIso,
+        })
+        .eq('id', row.id);
+    }
+    return { isLead: true, briefSent: false, skipped: fieldsChanged ? undefined : 'already_sent' };
+  }
+
   const contactLabel = [input.contact?.name?.trim() || '', input.contact?.username ? `@${input.contact.username.trim()}` : '']
     .filter(Boolean)
     .join(' ');
@@ -334,12 +370,19 @@ export async function flushStaleLeads(
     .gte('created_at', weekAgo)
     .limit(200);
 
-  const gathering = (rows || []).filter((r: any) => r.metadata?.lead?.state === 'gathering');
+  // Two kinds of stale work: leads that never reached "ready" (→ partial brief),
+  // and leads whose brief went out but the conversation kept adding details
+  // (→ one "updated brief" per quiet period).
+  const pending = (rows || []).filter(
+    (r: any) =>
+      r.metadata?.lead?.state === 'gathering' ||
+      (r.metadata?.lead?.state === 'sent' && r.metadata?.lead?.fields_changed_after_brief === true),
+  );
   let flushed = 0;
 
   // per-account config cache
   const configs: Record<string, Record<string, any>> = {};
-  for (const row of gathering) {
+  for (const row of pending) {
     try {
       if (!configs[row.account_id]) {
         const { data: acct } = await supabase.from('accounts').select('config').eq('id', row.account_id).single();
@@ -362,12 +405,13 @@ export async function flushStaleLeads(
       const transcript = (msgs || []).reverse().map((m: any) => ({ role: m.role, content: m.content }));
 
       const brandName = config.brandName || config.display_name || config.username || 'Account';
-      await sendBrief({ deps, leadConfig, brandName, row, briefType: 'partial', transcript });
+      const briefType = row.metadata?.lead?.state === 'sent' ? 'updated' : 'partial';
+      await sendBrief({ deps, leadConfig, brandName, row, briefType, transcript });
       flushed++;
     } catch (e) {
       console.error('[lead-capture] flush failed for row', row.id, (e as Error).message);
     }
   }
 
-  return { flushed, scanned: gathering.length };
+  return { flushed, scanned: pending.length };
 }

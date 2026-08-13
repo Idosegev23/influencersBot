@@ -211,6 +211,14 @@ export async function processInstagramGraphDM(
     if (!fullText && sandwichResult.response) {
       fullText = sandwichResult.response;
     }
+    // Streaming path gap: sandwichBot appends fallback <<SUGGESTIONS>> AFTER
+    // generation, so they reach sandwichResult.response but never the onToken
+    // stream — quick-reply chips silently vanished on every streamed DM reply
+    // where the LLM omitted them. Recover the block from the final response.
+    if (!fullText.includes('<<SUGGESTIONS>>') && sandwichResult.response?.includes('<<SUGGESTIONS>>')) {
+      const m = sandwichResult.response.match(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/);
+      if (m) fullText += `\n${m[0]}`;
+    }
     responseId = sandwichResult.responseId || null;
 
     // Extract suggestions for quick reply buttons, then strip markdown
