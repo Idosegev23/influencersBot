@@ -274,6 +274,17 @@ describe('runCsTurn (brain-led loop)', () => {
     expect(res.cards).toBeUndefined();
   });
 
+  it('collects structured payloads from tool results (spec §6) — order card rides the turn result', async () => {
+    handlers['lookup_order'] = vi.fn().mockResolvedValue({ ok: true, data: { kind: 'found', orderNumber: '1042', status: 'fulfilled', trackingUrls: ['https://t/1'] } });
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'lookup_order', args: { orderNumber: '1042' } }], text: null })
+      .mockResolvedValueOnce({ toolCalls: [], text: 'ההזמנה נשלחה!' });
+    store['972501112222'] = bound();
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('איפה 1042'), { callModel });
+    expect(res.payloads).toEqual([{ kind: 'order_status_card', order: expect.objectContaining({ orderNumber: '1042', status: 'fulfilled', trackingUrl: 'https://t/1' }) }]);
+  });
+
   // --- CS-engine M1 (spec §1, §8): the channel-agnostic entry ---
 
   it('runCsTurnCore accepts a channel identity and loads the session by (channel, channel_user_id)', async () => {
