@@ -84,6 +84,22 @@ export async function finalizeStep(ctx: StepContext): Promise<StepResult> {
         .single();
       const bcfg: Record<string, any> = { ...(fresh?.config ?? {}) };
       const widget: Record<string, any> = { ...(bcfg.widget ?? {}) };
+      let widgetChanged = false;
+      // The widget-demo proxy (/api/widget/preview) refuses accounts without
+      // config.widget.domain — register it from the scanned site so the
+      // demo_ready_v2 widget button works without manual SQL. host+path (not
+      // just host) so scoped scans (e.g. factory54.co.il/pages/lululemon)
+      // preview the scanned section rather than the retailer's homepage.
+      if (!widget.domain) {
+        try {
+          const u = new URL(ctx.state.websiteUrl);
+          widget.domain = (u.host + u.pathname).replace(/\/$/, '');
+          widgetChanged = true;
+        } catch { /* malformed url — leave unset */ }
+      }
+      // Cover fetch gets its own try so a timeout can't discard the domain
+      // registration above.
+      try {
       if (!widget.coverImage) {
         const res = await fetch(ctx.state.websiteUrl, {
           signal: AbortSignal.timeout(4000),
@@ -103,9 +119,13 @@ export async function finalizeStep(ctx: StepContext): Promise<StepResult> {
         if (cover) {
           try { cover = new URL(cover, ctx.state.websiteUrl).href; } catch { /* keep raw */ }
           widget.coverImage = cover;
-          bcfg.widget = widget;
-          await supabase.from('accounts').update({ config: bcfg }).eq('id', ctx.accountId);
+          widgetChanged = true;
         }
+      }
+      } catch { /* cover is best-effort; domain registration below still persists */ }
+      if (widgetChanged) {
+        bcfg.widget = widget;
+        await supabase.from('accounts').update({ config: bcfg }).eq('id', ctx.accountId);
       }
     }
   } catch {
