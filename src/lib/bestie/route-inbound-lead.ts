@@ -11,6 +11,7 @@
  * left to the caller passing the right arguments.
  */
 import { sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { createClient } from '@/lib/supabase/server';
 import { enqueueLeadMessage } from '@/lib/bestie/wa-lead-queue';
 import { publishLeadDrain } from '@/lib/bestie/wa-lead-publish';
@@ -25,8 +26,8 @@ export async function routeInboundToBestieLead(input: {
   // Instant feedback — fire-and-forget so it adds no latency. 👀 lands first;
   // the worker swaps it once the reply is out. Typing also marks as read.
   if (input.msg?.id) {
-    void sendReaction({ to: input.waId, messageId: input.msg.id, emoji: '👀' }).catch(() => {});
-    void sendTyping(input.msg.id).catch(() => {});
+    void sendReaction({ channel: await getBestieChannel(), to: input.waId, messageId: input.msg.id, emoji: '👀' }).catch(() => {});
+    void sendTyping(input.msg.id, await getBestieChannel()).catch(() => {});
   }
 
   try {

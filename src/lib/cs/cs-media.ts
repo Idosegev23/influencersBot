@@ -6,6 +6,7 @@
 //   • caption — the shopper's image caption, if any
 // Runs in the drain worker (300s budget), never on the webhook, so a slow download never blocks ACK.
 import { downloadMedia } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { supabase } from '@/lib/supabase';
 
 const BUCKET = 'support-attachments';
@@ -22,7 +23,7 @@ export async function materializeCsImage(msg: any): Promise<CsImage | null> {
   if (!mediaId) return null;
   const caption = typeof msg?.image?.caption === 'string' && msg.image.caption.trim() ? msg.image.caption.trim() : null;
   try {
-    const dl = await downloadMedia(mediaId);
+    const dl = await downloadMedia(mediaId, await getBestieChannel());
     if (!dl?.bytes) return null;
     const buf = Buffer.from(dl.bytes);
     const mime = dl.mimeType || msg?.image?.mime_type || 'image/jpeg';

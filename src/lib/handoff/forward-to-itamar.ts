@@ -17,6 +17,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { sendTemplate } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 
 const TEMPLATE_NAME = 'bestie_handoff_lead';
 const TEMPLATE_LANG = 'he';
@@ -117,7 +118,7 @@ export async function forwardToItamar(input: ForwardInput): Promise<ForwardResul
   }
 
   // 2. Fire the template
-  const result = await sendTemplate({
+  const result = await sendTemplate({ channel: await getBestieChannel(),
     to: targetPhone,
     templateName: TEMPLATE_NAME,
     languageCode: TEMPLATE_LANG,

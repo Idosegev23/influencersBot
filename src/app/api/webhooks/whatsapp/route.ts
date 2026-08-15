@@ -27,6 +27,7 @@ import { createClient } from '@/lib/supabase';
 import { isItamarSender, processItamarReply } from '@/lib/handoff/process-itamar-reply';
 import { routeInboundToTicket } from '@/lib/support/route-inbound';
 import { toWaId, sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { publishDrain } from '@/lib/crm/wa-queue';
 import { enqueueAgentMessage } from '@/lib/crm/wa-agent-queue';
 import { routeInboundToCustomerService } from '@/lib/cs/route-inbound-cs';
@@ -389,8 +390,8 @@ async function maybeEnqueueAgentJob(args: { waId: string; msg: any; textBody: st
 
   // Instant feedback — fire-and-forget so they add no latency. 👀 lands first; the
   // worker swaps it to ✅/⚠️ when the reply is ready. Typing also marks-as-read.
-  void sendReaction({ to: args.waId, messageId: args.msg.id, emoji: '👀' }).catch(() => {});
-  void sendTyping(args.msg.id).catch(() => {});
+  void sendReaction({ channel: await getBestieChannel(), to: args.waId, messageId: args.msg.id, emoji: '👀' }).catch(() => {});
+  void sendTyping(args.msg.id, await getBestieChannel()).catch(() => {});
 
   const agentId = (agent as any).id;
   // Push onto the per-agent FIFO queue (arrival order). A burst of 15 messages lands here

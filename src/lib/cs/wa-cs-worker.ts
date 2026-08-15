@@ -3,6 +3,7 @@ import { dequeueCsMessage, csQueueLength, type CsJob } from '@/lib/cs/wa-cs-queu
 import { publishCsDrain } from '@/lib/cs/wa-cs-publish';
 import { runCsTurn, type CsTurnResult } from '@/lib/cs/cs-agent';
 import { sendText, sendInteractiveButtons, sendInteractiveList, sendReaction } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { redisGet, redisSetNx } from '@/lib/redis';
 
 // Exit ~70s before Vercel's 300s kill so the loop releases the lock and enqueues a continuation
@@ -38,11 +39,11 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
   for (let i = 0; i < 3; i++) {
     try {
       if (reply.kind === 'text') {
-        sent = await sendText({ to: job.waId, body: reply.body, contextMessageId: job.msg?.id });
+        sent = await sendText({ channel: await getBestieChannel(), to: job.waId, body: reply.body, contextMessageId: job.msg?.id });
       } else if (reply.kind === 'buttons') {
-        sent = await sendInteractiveButtons({ to: job.waId, body: reply.body, buttons: reply.buttons, header: reply.header, footer: reply.footer });
+        sent = await sendInteractiveButtons({ channel: await getBestieChannel(), to: job.waId, body: reply.body, buttons: reply.buttons, header: reply.header, footer: reply.footer });
       } else if (reply.kind === 'list') {
-        sent = await sendInteractiveList({ to: job.waId, body: reply.body, buttonLabel: reply.buttonLabel, sections: reply.sections, header: reply.header, footer: reply.footer });
+        sent = await sendInteractiveList({ channel: await getBestieChannel(), to: job.waId, body: reply.body, buttonLabel: reply.buttonLabel, sections: reply.sections, header: reply.header, footer: reply.footer });
       }
     } catch (e) { sent = { success: false }; console.warn('[cs-worker] send threw', e); }
     if (sent.success) break;
@@ -65,10 +66,10 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
     try { if (job.msg?.id) await redisSetNx(doneKey, '1', 900); } catch { /* ignore */ }
     // Promise.resolve(...) wraps the call so a fire-and-forget reaction can never throw
     // synchronously into the caller, even if the reaction backend doesn't return a promise.
-    if (job.msg?.id) void Promise.resolve(sendReaction({ to: job.waId, messageId: job.msg.id, emoji: '✅' })).catch(() => {});
+    if (job.msg?.id) void Promise.resolve(sendReaction({ channel: await getBestieChannel(), to: job.waId, messageId: job.msg.id, emoji: '✅' })).catch(() => {});
   } else {
     console.error('[cs-worker] reply delivery FAILED after 3 retries', job.msg?.id);
-    if (job.msg?.id) void Promise.resolve(sendReaction({ to: job.waId, messageId: job.msg.id, emoji: '⚠️' })).catch(() => {});
+    if (job.msg?.id) void Promise.resolve(sendReaction({ channel: await getBestieChannel(), to: job.waId, messageId: job.msg.id, emoji: '⚠️' })).catch(() => {});
   }
   return sent.success ? (sent.wa_message_id ?? null) : null;
 }

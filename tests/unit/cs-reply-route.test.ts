@@ -1,5 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Sends are channel-scoped now; unit tests must not perform real channel resolution.
+vi.mock('@/lib/whatsapp-cloud/channels', () => ({
+  getBestieChannel: vi.fn(async () => ({
+    id: 'ch-test', accountId: 'acc-test', wabaId: 'waba-test',
+    phoneNumberId: 'PNID_TEST', displayPhoneNumber: '+972 54-390-2030',
+    verifiedName: 'Bestie', token: 'TOK_TEST', status: 'active', paymentReady: true,
+  })),
+  resolveChannelByAccount: vi.fn(async () => null),
+  resolveChannelByPhoneNumberId: vi.fn(async () => null),
+  invalidateChannelCache: vi.fn(async () => {}),
+}));
+
+
 const sendText = vi.fn(async () => ({ success: true, wa_message_id: 'wamid.out.1' }));
 const pauseBot = vi.fn();
 const appendCsTicketHistory = vi.fn();
@@ -48,7 +61,7 @@ describe('POST /api/cs/reply', () => {
     const res = await POST(req({ waId: '972501234567', body: 'שלחנו לך שוב' }));
     const json = await res.json();
     expect(json.ok).toBe(true);
-    expect(sendText).toHaveBeenCalledWith({ to: '972501234567', body: 'שלחנו לך שוב' });
+    expect(sendText).toHaveBeenCalledWith(expect.objectContaining({ to: '972501234567', body: 'שלחנו לך שוב' }));
     expect(pauseBot).toHaveBeenCalledWith('cs1', 'human_reply');
     expect(appendCsTicketHistory).toHaveBeenCalledWith(
       expect.objectContaining({ ticketId: 't1', action: 'agent_message', actor: 'bestie_inbox' }),

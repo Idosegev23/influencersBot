@@ -16,6 +16,7 @@ import { dequeueLeadMessage, leadQueueLength, type BestieLeadJob } from '@/lib/b
 import { publishLeadDrain } from '@/lib/bestie/wa-lead-publish';
 import { runBestieTurn } from '@/lib/bestie/bestie-agent';
 import { sendText, sendReaction } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { redisGet, redisSetNx } from '@/lib/redis';
 
 // Exit well before Vercel's 300s kill so the loop releases the lock and enqueues
@@ -58,7 +59,7 @@ export async function processOneLeadInbound(job: BestieLeadJob): Promise<string 
   let sent: { success: boolean; wa_message_id?: string } = { success: false };
   for (let i = 0; i < 3; i++) {
     try {
-      sent = await sendText({
+      sent = await sendText({ channel: await getBestieChannel(),
         to: job.waId,
         body: turn.reply.body,
         contextMessageId: job.msg?.id,
@@ -75,7 +76,7 @@ export async function processOneLeadInbound(job: BestieLeadJob): Promise<string 
 
   try { if (job.msg?.id) await redisSetNx(doneKey, '1', 86_400); } catch { /* ignore */ }
   if (job.msg?.id) {
-    void sendReaction({ to: job.waId, messageId: job.msg.id, emoji: '✅' }).catch(() => {});
+    void sendReaction({ channel: await getBestieChannel(), to: job.waId, messageId: job.msg.id, emoji: '✅' }).catch(() => {});
   }
 
   return sent.wa_message_id ?? null;

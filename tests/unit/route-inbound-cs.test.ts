@@ -1,5 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Sends are channel-scoped now; unit tests must not perform real channel resolution.
+vi.mock('@/lib/whatsapp-cloud/channels', () => ({
+  getBestieChannel: vi.fn(async () => ({
+    id: 'ch-test', accountId: 'acc-test', wabaId: 'waba-test',
+    phoneNumberId: 'PNID_TEST', displayPhoneNumber: '+972 54-390-2030',
+    verifiedName: 'Bestie', token: 'TOK_TEST', status: 'active', paymentReady: true,
+  })),
+  resolveChannelByAccount: vi.fn(async () => null),
+  resolveChannelByPhoneNumberId: vi.fn(async () => null),
+  invalidateChannelCache: vi.fn(async () => {}),
+}));
+
+
 const sendReaction = vi.fn();
 const sendTyping = vi.fn();
 const enqueue = vi.fn();
@@ -24,8 +37,8 @@ describe('routeInboundToCustomerService', () => {
   it('claims the message: reaction + typing + enqueue + publish', async () => {
     const { routeInboundToCustomerService } = await import('@/lib/cs/route-inbound-cs');
     const r = await routeInboundToCustomerService({ waId: '972500000000', contactId: 'c1', msg: { id: 'm1' }, textBody: 'שלום' });
-    expect(sendReaction).toHaveBeenCalledWith({ to: '972500000000', messageId: 'm1', emoji: '👀' });
-    expect(sendTyping).toHaveBeenCalledWith('m1');
+    expect(sendReaction).toHaveBeenCalledWith(expect.objectContaining({ to: '972500000000', messageId: 'm1', emoji: '👀' }));
+    expect(sendTyping).toHaveBeenCalledWith('m1', expect.anything());
     expect(enqueue).toHaveBeenCalledWith({ waId: '972500000000', contactId: 'c1', msg: { id: 'm1' }, textBody: 'שלום' });
     expect(publish).toHaveBeenCalledWith('972500000000');
     expect(r).toEqual({ claimed: true });

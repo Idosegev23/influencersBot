@@ -1,5 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Sends are channel-scoped now; unit tests must not perform real channel resolution.
+vi.mock('@/lib/whatsapp-cloud/channels', () => ({
+  getBestieChannel: vi.fn(async () => ({
+    id: 'ch-test', accountId: 'acc-test', wabaId: 'waba-test',
+    phoneNumberId: 'PNID_TEST', displayPhoneNumber: '+972 54-390-2030',
+    verifiedName: 'Bestie', token: 'TOK_TEST', status: 'active', paymentReady: true,
+  })),
+  resolveChannelByAccount: vi.fn(async () => null),
+  resolveChannelByPhoneNumberId: vi.fn(async () => null),
+  invalidateChannelCache: vi.fn(async () => {}),
+}));
+
+
 const sendText = vi.fn();
 const sendButtons = vi.fn();
 const sendList = vi.fn();

@@ -10,12 +10,14 @@
  *
  * Docs: https://developers.facebook.com/docs/whatsapp/cloud-api
  *
- * Credentials are read from env. One central business number per app
- * (WHATSAPP_PHONE_NUMBER_ID). Multi-tenancy lives at the conversation
- * layer, not here.
+ * Credentials come from a WaChannel (whatsapp_channels row), never from env.
+ * Every function below REQUIRES one — see channelConfig(). Multi-tenancy is
+ * structural here: you cannot send without naming the number you send from.
  */
 
-const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION || 'v21.0';
+import type { WaChannel } from '@/lib/whatsapp-cloud/channels';
+
+const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION || 'v23.0';
 const GRAPH_BASE    = `https://graph.facebook.com/${GRAPH_VERSION}`;
 
 // -----------------------------------------------------------------------
@@ -49,15 +51,19 @@ export interface TemplateComponent {
 // Helpers
 // -----------------------------------------------------------------------
 
-function getConfig() {
-  const token           = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId   = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  if (!token || !phoneNumberId) {
+/**
+ * Every send is scoped to a channel. There is NO env fallback: a missing channel is a
+ * programming error, and silently sending from Bestie's number on a customer's behalf
+ * is the exact failure this design exists to prevent (spec D4).
+ */
+function channelConfig(channel: WaChannel | undefined): { token: string; phoneNumberId: string } {
+  if (!channel?.token || !channel?.phoneNumberId) {
     throw new Error(
-      'WhatsApp Cloud API not configured: set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID'
+      'WhatsApp send called without a channel. Pass channel: WaChannel — ' +
+      'use getBestieChannel() for Bestie-owned operations.',
     );
   }
-  return { token, phoneNumberId };
+  return { token: channel.token, phoneNumberId: channel.phoneNumberId };
 }
 
 /**
@@ -74,17 +80,17 @@ export function toWaId(phone: string): string {
 
 async function graphFetch<T = any>(
   path: string,
-  init: RequestInit & { phoneNumberIdOverride?: string } = {}
+  channel: WaChannel,
+  init: RequestInit = {}
 ): Promise<{ ok: boolean; status: number; data: T }> {
-  const { token } = getConfig();
-  const { phoneNumberIdOverride: _ignored, ...rest } = init;
+  const { token } = channelConfig(channel);
 
   const res = await fetch(`${GRAPH_BASE}${path}`, {
-    ...rest,
+    ...init,
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      ...(rest.headers || {}),
+      ...(init.headers || {}),
     },
   });
 
@@ -128,8 +134,9 @@ export async function sendText(params: {
   body: string;
   previewUrl?: boolean;
   contextMessageId?: string; // reply-to a specific inbound wamid
+  channel: WaChannel;
 }): Promise<WhatsAppSendResult> {
-  const { phoneNumberId } = getConfig();
+  const { phoneNumberId } = channelConfig(params.channel);
   const to = toWaId(params.to);
 
   const payload: any = {
@@ -146,7 +153,7 @@ export async function sendText(params: {
     payload.context = { message_id: params.contextMessageId };
   }
 
-  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, {
+  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, params.channel, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -161,8 +168,9 @@ export async function sendTemplate(params: {
   templateName: string;
   languageCode?: string;          // default 'en_US'
   components?: TemplateComponent[];
+  channel: WaChannel;
 }): Promise<WhatsAppSendResult> {
-  const { phoneNumberId } = getConfig();
+  const { phoneNumberId } = channelConfig(params.channel);
   const to = toWaId(params.to);
 
   const payload = {
@@ -176,7 +184,7 @@ export async function sendTemplate(params: {
     },
   };
 
-  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, {
+  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, params.channel, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -192,8 +200,9 @@ export async function sendMediaByLink(params: {
   link: string;
   caption?: string;
   filename?: string;  // document only
+  channel: WaChannel;
 }): Promise<WhatsAppSendResult> {
-  const { phoneNumberId } = getConfig();
+  const { phoneNumberId } = channelConfig(params.channel);
   const to = toWaId(params.to);
 
   const mediaPayload: any = { link: params.link };
@@ -212,7 +221,7 @@ export async function sendMediaByLink(params: {
     [params.type]: mediaPayload,
   };
 
-  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, {
+  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, params.channel, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -232,8 +241,9 @@ export async function sendInteractiveButtons(params: {
   buttons: InteractiveButton[]; // max 3
   header?: string;
   footer?: string;
+  channel: WaChannel;
 }): Promise<WhatsAppSendResult> {
-  const { phoneNumberId } = getConfig();
+  const { phoneNumberId } = channelConfig(params.channel);
   const to = toWaId(params.to);
   const interactive: any = {
     type: 'button',
@@ -248,7 +258,7 @@ export async function sendInteractiveButtons(params: {
   if (params.header) interactive.header = { type: 'text', text: params.header };
   if (params.footer) interactive.footer = { text: params.footer };
 
-  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, {
+  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, params.channel, {
     method: 'POST',
     body: JSON.stringify({
       messaging_product: 'whatsapp',
@@ -271,8 +281,9 @@ export async function sendInteractiveList(params: {
   sections: InteractiveSection[]; // <=10 rows total
   header?: string;
   footer?: string;
+  channel: WaChannel;
 }): Promise<WhatsAppSendResult> {
-  const { phoneNumberId } = getConfig();
+  const { phoneNumberId } = channelConfig(params.channel);
   const to = toWaId(params.to);
   const interactive: any = {
     type: 'list',
@@ -292,7 +303,7 @@ export async function sendInteractiveList(params: {
   if (params.header) interactive.header = { type: 'text', text: params.header };
   if (params.footer) interactive.footer = { text: params.footer };
 
-  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, {
+  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, params.channel, {
     method: 'POST',
     body: JSON.stringify({
       messaging_product: 'whatsapp',
@@ -322,8 +333,9 @@ export async function sendInteractiveCtaUrl(params: {
   imageUrl?: string;         // header image — public https jpeg/png
   headerText?: string;       // used only when no imageUrl; <=60
   footer?: string;           // <=60
+  channel: WaChannel;
 }): Promise<WhatsAppSendResult> {
-  const { phoneNumberId } = getConfig();
+  const { phoneNumberId } = channelConfig(params.channel);
   const to = toWaId(params.to);
   const interactive: any = {
     type: 'cta_url',
@@ -337,7 +349,7 @@ export async function sendInteractiveCtaUrl(params: {
   else if (params.headerText) interactive.header = { type: 'text', text: params.headerText.slice(0, 60) };
   if (params.footer) interactive.footer = { text: params.footer.slice(0, 60) };
 
-  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, {
+  const { ok, data } = await graphFetch(`/${phoneNumberId}/messages`, params.channel, {
     method: 'POST',
     body: JSON.stringify({
       messaging_product: 'whatsapp',
@@ -353,9 +365,9 @@ export async function sendInteractiveCtaUrl(params: {
 // -----------------------------------------------------------------------
 // Mark inbound message as read (shows blue ticks on the user's side)
 // -----------------------------------------------------------------------
-export async function markAsRead(waMessageId: string): Promise<boolean> {
-  const { phoneNumberId } = getConfig();
-  const { ok } = await graphFetch(`/${phoneNumberId}/messages`, {
+export async function markAsRead(waMessageId: string, channel: WaChannel): Promise<boolean> {
+  const { phoneNumberId } = channelConfig(channel);
+  const { ok } = await graphFetch(`/${phoneNumberId}/messages`, channel, {
     method: 'POST',
     body: JSON.stringify({
       messaging_product: 'whatsapp',
@@ -369,9 +381,9 @@ export async function markAsRead(waMessageId: string): Promise<boolean> {
 // -----------------------------------------------------------------------
 // React to an inbound message (👀 = "got it, working on it"). Empty emoji removes it.
 // -----------------------------------------------------------------------
-export async function sendReaction(params: { to: string; messageId: string; emoji: string }): Promise<boolean> {
-  const { phoneNumberId } = getConfig();
-  const { ok } = await graphFetch(`/${phoneNumberId}/messages`, {
+export async function sendReaction(params: { to: string; messageId: string; emoji: string; channel: WaChannel }): Promise<boolean> {
+  const { phoneNumberId } = channelConfig(params.channel);
+  const { ok } = await graphFetch(`/${phoneNumberId}/messages`, params.channel, {
     method: 'POST',
     body: JSON.stringify({
       messaging_product: 'whatsapp',
@@ -389,9 +401,9 @@ export async function sendReaction(params: { to: string; messageId: string; emoj
 // Auto-clears after ~25s or when the next message is sent. Requires a recent
 // inbound wamid. Gated by Graph API version — if it 400s, keep the 👀 reaction.
 // -----------------------------------------------------------------------
-export async function sendTyping(waMessageId: string): Promise<boolean> {
-  const { phoneNumberId } = getConfig();
-  const { ok } = await graphFetch(`/${phoneNumberId}/messages`, {
+export async function sendTyping(waMessageId: string, channel: WaChannel): Promise<boolean> {
+  const { phoneNumberId } = channelConfig(channel);
+  const { ok } = await graphFetch(`/${phoneNumberId}/messages`, channel, {
     method: 'POST',
     body: JSON.stringify({
       messaging_product: 'whatsapp',
@@ -406,18 +418,18 @@ export async function sendTyping(waMessageId: string): Promise<boolean> {
 // -----------------------------------------------------------------------
 // Media download: two-step — fetch metadata then download bytes.
 // -----------------------------------------------------------------------
-export async function getMediaUrl(mediaId: string): Promise<string | null> {
-  const { ok, data } = await graphFetch<{ url?: string }>(`/${mediaId}`);
+export async function getMediaUrl(mediaId: string, channel: WaChannel): Promise<string | null> {
+  const { ok, data } = await graphFetch<{ url?: string }>(`/${mediaId}`, channel);
   return ok ? data.url ?? null : null;
 }
 
-export async function downloadMedia(mediaId: string): Promise<{
+export async function downloadMedia(mediaId: string, channel: WaChannel): Promise<{
   bytes: ArrayBuffer;
   mimeType: string | null;
 } | null> {
-  const url = await getMediaUrl(mediaId);
+  const url = await getMediaUrl(mediaId, channel);
   if (!url) return null;
-  const { token } = getConfig();
+  const { token } = channelConfig(channel);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return null;
   return {

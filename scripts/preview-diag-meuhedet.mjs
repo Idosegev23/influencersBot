@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const errors = [];
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 160)); });
+page.on('pageerror', (e) => errors.push('PAGEERROR: ' + String(e).slice(0, 160)));
+const failed = [];
+page.on('requestfailed', (r) => failed.push(r.url().slice(0, 120) + ' :: ' + (r.failure()?.errorText || '')));
+await page.goto('https://influencers-bot.vercel.app/api/widget/preview/4214549f-813b-406b-8b71-6550268235bb', { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
+await page.waitForTimeout(6000);
+const textLen = await page.evaluate(() => document.body?.innerText?.length || 0);
+console.log('body text len:', textLen);
+console.log('console errors:', JSON.stringify(errors.slice(0, 8), null, 1));
+console.log('failed requests:', JSON.stringify(failed.slice(0, 10), null, 1));
+await browser.close();

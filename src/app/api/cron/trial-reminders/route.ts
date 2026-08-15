@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { sendTemplate } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    const res = await sendTemplate({
+    const res = await sendTemplate({ channel: await getBestieChannel(),
       to: trial.contact_phone,
       templateName: 'support_freeform_message',
       languageCode: 'he',

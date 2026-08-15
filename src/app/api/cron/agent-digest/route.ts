@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { sendText, toWaId } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { dispatchDigest, detectStuckSignatures, detectUnpricedBriefs, persistNudge } from '@/lib/crm/agent-nudges';
 
 export const runtime = 'nodejs';
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
     if (!a.whatsapp) continue;
     try {
       const text = await dispatchDigest(supabaseAdmin, a.id, mode);
-      await sendText({ to: toWaId(a.whatsapp), body: text });
+      await sendText({ channel: await getBestieChannel(), to: toWaId(a.whatsapp), body: text });
       sent++;
 
       for (const s of await detectStuckSignatures(supabaseAdmin, a.id)) {

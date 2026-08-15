@@ -25,6 +25,19 @@ vi.mock('@/lib/supabase/server', () => ({
 
 import { maybeRouteBestieLead } from '@/lib/bestie/route-inbound-lead';
 
+// Sends are channel-scoped now; unit tests must not perform real channel resolution.
+vi.mock('@/lib/whatsapp-cloud/channels', () => ({
+  getBestieChannel: vi.fn(async () => ({
+    id: 'ch-test', accountId: 'acc-test', wabaId: 'waba-test',
+    phoneNumberId: 'PNID_TEST', displayPhoneNumber: '+972 54-390-2030',
+    verifiedName: 'Bestie', token: 'TOK_TEST', status: 'active', paymentReady: true,
+  })),
+  resolveChannelByAccount: vi.fn(async () => null),
+  resolveChannelByPhoneNumberId: vi.fn(async () => null),
+  invalidateChannelCache: vi.fn(async () => {}),
+}));
+
+
 const knownLead = { wa_id: '972501234567', lead_id: 'L1', bot_paused: false };
 
 const base = {

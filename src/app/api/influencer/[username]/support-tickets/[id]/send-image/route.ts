@@ -18,6 +18,7 @@ import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
 import { getAgentSession } from '@/lib/auth/agent-auth';
 import { sendMediaByLink } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { getServiceWindow } from '@/lib/support/service-window';
 import { createClient } from '@supabase/supabase-js';
 
@@ -124,7 +125,7 @@ export async function POST(
 
   const agent = await getAgentSession(username);
 
-  const result = await sendMediaByLink({
+  const result = await sendMediaByLink({ channel: await getBestieChannel(),
     to: ticket.customer_phone,
     type: 'image',
     link: publicUrl,

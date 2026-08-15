@@ -7,6 +7,7 @@
  * name + price, and a button straight to the product page.
  */
 import { sendInteractiveCtaUrl, sendText } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import type { CsProductCard } from '@/lib/cs/tools/types';
 
 const BUTTON_LABEL = 'לצפייה במוצר';   // 12 chars — WhatsApp caps display_text at 20
@@ -51,7 +52,7 @@ export function formatCardBody(card: CsProductCard): string {
 async function sendOneCard(to: string, card: CsProductCard): Promise<boolean> {
   const body = formatCardBody(card);
   try {
-    const res = await sendInteractiveCtaUrl({
+    const res = await sendInteractiveCtaUrl({ channel: await getBestieChannel(),
       to,
       body,
       displayText: BUTTON_LABEL,
@@ -63,7 +64,7 @@ async function sendOneCard(to: string, card: CsProductCard): Promise<boolean> {
     console.warn('[cs-cards] cta_url send threw', card.productId, e);
   }
   try {
-    const res = await sendText({ to, body: `${body}\n${card.productUrl}` });
+    const res = await sendText({ channel: await getBestieChannel(), to, body: `${body}\n${card.productUrl}` });
     if (!res.success) console.warn('[cs-cards] text fallback failed', card.productId);
     return res.success;
   } catch (e) {

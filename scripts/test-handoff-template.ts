@@ -13,6 +13,7 @@ import { config as loadEnv } from 'dotenv';
 loadEnv({ path: '.env.local' });
 
 import { sendTemplate } from '../src/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '../src/lib/whatsapp-cloud/channels';
 
 async function main() {
   const to = (process.argv[2] || process.env.ITAMAR_WHATSAPP_NUMBER || '').trim();
@@ -22,7 +23,7 @@ async function main() {
   }
 
   console.log(`→ sending bestie_handoff_lead to ${to}`);
-  const res = await sendTemplate({
+  const res = await sendTemplate({ channel: await getBestieChannel(),
     to,
     templateName: 'bestie_handoff_lead',
     languageCode: 'he',

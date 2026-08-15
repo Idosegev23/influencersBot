@@ -1,4 +1,5 @@
 import { sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { enqueueCsMessage } from '@/lib/cs/wa-cs-queue';
 import { publishCsDrain } from '@/lib/cs/wa-cs-publish';
 
@@ -17,8 +18,8 @@ export async function routeInboundToCustomerService(input: {
   // Instant feedback — fire-and-forget so they add no latency. 👀 lands first; the worker swaps
   // it to ✅/⚠️ when the reply is ready. Typing also marks-as-read.
   if (input.msg?.id) {
-    void sendReaction({ to: input.waId, messageId: input.msg.id, emoji: '👀' }).catch(() => {});
-    void sendTyping(input.msg.id).catch(() => {});
+    void sendReaction({ channel: await getBestieChannel(), to: input.waId, messageId: input.msg.id, emoji: '👀' }).catch(() => {});
+    void sendTyping(input.msg.id, await getBestieChannel()).catch(() => {});
   }
 
   try {
