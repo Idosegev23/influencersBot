@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('@/lib/whatsapp-cloud/channels', () => ({
+  resolveWaChannelById: vi.fn(async () => ({
+    id: 'ch-1', accountId: 'acc-1', wabaId: 'waba-1', phoneNumberId: 'PNID_TEST',
+    displayPhoneNumber: '+972 54-390-2030', verifiedName: 'Bestie', token: 'TOK',
+    status: 'active', paymentReady: true,
+  })),
+  getBestieChannel: vi.fn(async () => ({ id: 'ch-1', accountId: 'acc-1', wabaId: 'w', phoneNumberId: 'PNID_TEST', displayPhoneNumber: null, verifiedName: null, token: 'TOK', status: 'active', paymentReady: true })),
+  resolveChannelByAccount: vi.fn(async () => null),
+  resolveChannelByPhoneNumberId: vi.fn(async () => null),
+  invalidateChannelCache: vi.fn(async () => {}),
+}));
+
 const routeCs = vi.fn();
 vi.mock('@/lib/cs/route-inbound-cs', () => ({ routeInboundToCustomerService: (...a: any[]) => routeCs(...a) }));
 // route.ts (and its transitive import src/lib/support/route-inbound.ts) import '@/lib/supabase',
@@ -12,20 +24,20 @@ describe('maybeRouteCs (webhook 4th branch decision)', () => {
 
   it('routes to CS when not Itamar, not agent, and no ticket matched', async () => {
     const { maybeRouteCs } = await import('@/app/api/webhooks/whatsapp/route');
-    await maybeRouteCs({ isItamar: false, handledAsAgent: false, ticketId: null, waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
-    expect(routeCs).toHaveBeenCalledWith({ waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
+    await maybeRouteCs({ channel: { id: 'ch-1', phoneNumberId: 'PNID', token: 'T' } as any, isItamar: false, handledAsAgent: false, ticketId: null, waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
+    expect(routeCs).toHaveBeenCalledWith(expect.objectContaining({ waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' }));
   });
 
   it('does NOT route to CS when a ticket matched', async () => {
     const { maybeRouteCs } = await import('@/app/api/webhooks/whatsapp/route');
-    await maybeRouteCs({ isItamar: false, handledAsAgent: false, ticketId: 'ticket-1', waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
+    await maybeRouteCs({ channel: { id: 'ch-1', phoneNumberId: 'PNID', token: 'T' } as any, isItamar: false, handledAsAgent: false, ticketId: 'ticket-1', waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
     expect(routeCs).not.toHaveBeenCalled();
   });
 
   it('does NOT route to CS for an agent or Itamar', async () => {
     const { maybeRouteCs } = await import('@/app/api/webhooks/whatsapp/route');
-    await maybeRouteCs({ isItamar: false, handledAsAgent: true, ticketId: null, waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
-    await maybeRouteCs({ isItamar: true, handledAsAgent: false, ticketId: null, waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
+    await maybeRouteCs({ channel: { id: 'ch-1', phoneNumberId: 'PNID', token: 'T' } as any, isItamar: false, handledAsAgent: true, ticketId: null, waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
+    await maybeRouteCs({ channel: { id: 'ch-1', phoneNumberId: 'PNID', token: 'T' } as any, isItamar: true, handledAsAgent: false, ticketId: null, waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
     expect(routeCs).not.toHaveBeenCalled();
   });
 });
@@ -46,14 +58,14 @@ describe('extractTicketId (routeInboundToTicket return capture)', () => {
   it('a matched ticketId captured from routeInboundToTicket suppresses CS routing', async () => {
     const { maybeRouteCs, extractTicketId } = await import('@/app/api/webhooks/whatsapp/route');
     const ticketMatch = extractTicketId({ ticketId: 'ticket-9' });   // stubbed routeInboundToTicket return
-    await maybeRouteCs({ isItamar: false, handledAsAgent: false, ticketId: ticketMatch, waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
+    await maybeRouteCs({ channel: { id: 'ch-1', phoneNumberId: 'PNID', token: 'T' } as any, isItamar: false, handledAsAgent: false, ticketId: ticketMatch, waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
     expect(routeCs).not.toHaveBeenCalled();
   });
 
   it('a null ticketId captured from routeInboundToTicket falls through to CS', async () => {
     const { maybeRouteCs, extractTicketId } = await import('@/app/api/webhooks/whatsapp/route');
     const ticketMatch = extractTicketId({ ticketId: null });          // stubbed no-match return
-    await maybeRouteCs({ isItamar: false, handledAsAgent: false, ticketId: ticketMatch, waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
-    expect(routeCs).toHaveBeenCalledWith({ waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
+    await maybeRouteCs({ channel: { id: 'ch-1', phoneNumberId: 'PNID', token: 'T' } as any, isItamar: false, handledAsAgent: false, ticketId: ticketMatch, waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' });
+    expect(routeCs).toHaveBeenCalledWith(expect.objectContaining({ waId: 'x', contactId: 'c1', msg: { id: 'm1' }, textBody: 'hi' }));
   });
 });

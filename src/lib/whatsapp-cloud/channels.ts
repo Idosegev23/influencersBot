@@ -22,7 +22,7 @@ export interface WaChannel {
 type CachedChannel = Omit<WaChannel, 'token'> & { tokenSecretId: string };
 
 const TTL_SECONDS = 60;
-const cacheKey = (kind: 'acct' | 'pnid', v: string) => `wa:chan:${kind}:${v}`;
+const cacheKey = (kind: 'acct' | 'pnid' | 'id', v: string) => `wa:chan:${kind}:${v}`;
 const RESOLVABLE = new Set(['active', 'pending']);
 
 function toCached(row: any): CachedChannel {
@@ -44,7 +44,7 @@ async function hydrate(cached: CachedChannel): Promise<WaChannel> {
   return { ...rest, token: await readToken(tokenSecretId) };
 }
 
-async function lookup(kind: 'acct' | 'pnid', column: string, value: string): Promise<WaChannel | null> {
+async function lookup(kind: 'acct' | 'pnid' | 'id', column: string, value: string): Promise<WaChannel | null> {
   const key = cacheKey(kind, value);
 
   const hit = await redisGet<string>(key).catch(() => null);
@@ -85,6 +85,17 @@ export async function resolveChannelByAccount(accountId: string): Promise<WaChan
 export async function resolveChannelByPhoneNumberId(pnid: string): Promise<WaChannel | null> {
   if (!pnid) return null;
   return lookup('pnid', 'phone_number_id', pnid);
+}
+
+/**
+ * Queued work carries the channel id, not the whole channel — the drain worker rehydrates
+ * it here. THROWS: a queued job whose channel vanished must fail loudly, never fall back
+ * to sending from Bestie's number on someone else's behalf.
+ */
+export async function resolveWaChannelById(waChannelId: string): Promise<WaChannel> {
+  const ch = await lookup('id', 'id', waChannelId);
+  if (!ch) throw new Error(`WhatsApp channel ${waChannelId} not found or not active`);
+  return ch;
 }
 
 /**

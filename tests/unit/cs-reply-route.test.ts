@@ -16,12 +16,12 @@ vi.mock('@/lib/whatsapp-cloud/channels', () => ({
 const sendText = vi.fn(async () => ({ success: true, wa_message_id: 'wamid.out.1' }));
 const pauseBot = vi.fn();
 const appendCsTicketHistory = vi.fn();
-const loadCsSession = vi.fn();
+const loadCsSessionByChannel = vi.fn();
 
 vi.mock('@/lib/whatsapp-cloud/client', () => ({ sendText }));
 vi.mock('@/lib/handoff/bot-pause', () => ({ pauseBot, isBotPaused: vi.fn(), resumeBot: vi.fn() }));
 vi.mock('@/lib/cs/cs-ticket', () => ({ appendCsTicketHistory, openOrAttachCsTicket: vi.fn() }));
-vi.mock('@/lib/cs/cs-session', () => ({ loadCsSession }));
+vi.mock('@/lib/cs/cs-session', () => ({ loadCsSessionByChannel }));
 vi.mock('@/lib/auth/admin-auth', () => ({ requireAdminAuth: vi.fn(async () => null) }));
 
 function req(body: any) {
@@ -35,7 +35,7 @@ function req(body: any) {
 describe('POST /api/cs/reply', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    loadCsSession.mockResolvedValue({
+    loadCsSessionByChannel.mockResolvedValue({
       wa_id: '972501234567',
       active_account_id: 'a1',
       active_chat_session_id: 'cs1',
@@ -50,7 +50,7 @@ describe('POST /api/cs/reply', () => {
   });
 
   it('404 when no active CS thread', async () => {
-    loadCsSession.mockResolvedValueOnce(null);
+    loadCsSessionByChannel.mockResolvedValueOnce(null);
     const { POST } = await import('@/app/api/cs/reply/route');
     const res = await POST(req({ waId: '972501234567', body: 'hi' }));
     expect(res.status).toBe(404);
@@ -76,7 +76,7 @@ describe('POST /api/cs/reply', () => {
     const { POST } = await import('@/app/api/cs/reply/route');
     const res = await POST(req({ waId: '972501234567', body: 'hi' }));
     expect(res.status).toBe(401);
-    expect(loadCsSession).not.toHaveBeenCalled();
+    expect(loadCsSessionByChannel).not.toHaveBeenCalled();
     expect(sendText).not.toHaveBeenCalled();
     expect(pauseBot).not.toHaveBeenCalled();
   });

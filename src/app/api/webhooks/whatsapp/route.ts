@@ -30,6 +30,8 @@ import { toWaId, sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
 import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { publishDrain } from '@/lib/crm/wa-queue';
 import { enqueueAgentMessage } from '@/lib/crm/wa-agent-queue';
+import { classifyInbound } from './routing';
+import type { WaChannel } from '@/lib/whatsapp-cloud/channels';
 import { routeInboundToCustomerService } from '@/lib/cs/route-inbound-cs';
 import { maybeRouteBestieLead } from '@/lib/bestie/route-inbound-lead';
 
@@ -150,6 +152,14 @@ async function processWebhook(payload: any): Promise<void> {
       const value = change.value ?? {};
       const phoneNumberId: string = value?.metadata?.phone_number_id;
       if (!phoneNumberId) continue;
+
+      // Spec §6: the first decision is WHICH NUMBER this arrived on, not who sent it.
+      const inbound = await classifyInbound(phoneNumberId, process.env.BESTIE_ACCOUNT_ID);
+      if (inbound.kind === 'unknown') {
+        console.warn('[whatsapp webhook] inbound for unknown phone_number_id — dropping', { phoneNumberId });
+        continue;  // the outer POST still returns 200; Meta retries forever otherwise
+      }
+      const waChannel = inbound.channel;
 
       // -----------------------------------------------------------------
       // Inbound messages
@@ -310,6 +320,7 @@ async function processWebhook(payload: any): Promise<void> {
 
         // 4th branch — unknown sender, no open ticket → customer-service bot.
         await maybeRouteCs({
+          channel: waChannel,
           isItamar: isItamarSender(waId),
           handledAsAgent,
           ticketId: ticketMatch,
@@ -435,10 +446,13 @@ export async function maybeRouteCs(args: {
   contactId: string | null;
   msg: any;
   textBody: string | null;
+  channel: WaChannel;
 }): Promise<void> {
   if (args.isItamar || args.handledAsAgent || args.ticketId) return;
   try {
     await routeInboundToCustomerService({
+      waChannelId: args.channel.id,
+      channel: args.channel,
       waId: args.waId,
       contactId: args.contactId,
       msg: args.msg,
