@@ -24,8 +24,15 @@ type Status =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'connecting' }
-  | { kind: 'connected'; paymentReady: boolean }
+  | { kind: 'connected' }
   | { kind: 'error'; message: string };
+
+interface Billing {
+  wabaId?: string;
+  displayPhoneNumber?: string | null;
+  paymentReady: boolean;
+  templateApproved: boolean;
+}
 
 // Meta returns machine codes; the wizard is customer-facing and Hebrew.
 function humanError(code?: string | number, step?: string): string {
@@ -80,6 +87,34 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
     }
   }, []);
 
+  const [billing, setBilling] = useState<Billing | null>(null);
+  const [probing, setProbing] = useState(false);
+
+  const refreshBilling = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/onboard/${token}/whatsapp/billing`);
+      if (res.ok) setBilling(await res.json());
+    } catch { /* the wizard simply keeps showing the previous state */ }
+  }, [token]);
+
+  // The customer leaves to Meta's billing screen and comes back — re-check on focus so they
+  // never have to guess whether we noticed.
+  useEffect(() => {
+    if (status.kind !== 'connected') return;
+    void refreshBilling();
+    const onFocus = () => void refreshBilling();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [status.kind, refreshBilling]);
+
+  const probe = useCallback(async () => {
+    setProbing(true);
+    try {
+      await fetch(`/api/onboard/${token}/whatsapp/billing`, { method: 'POST' });
+      await refreshBilling();
+    } finally { setProbing(false); }
+  }, [token, refreshBilling]);
+
   const launch = useCallback(() => {
     const configId = process.env.NEXT_PUBLIC_WA_ES_CONFIG_ID;
     const FB = (window as any).FB;
@@ -113,7 +148,8 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
             setStatus({ kind: 'error', message: map[out?.error] ?? humanError() });
             return;
           }
-          setStatus({ kind: 'connected', paymentReady: Boolean(out.paymentReady) });
+          setStatus({ kind: 'connected' });
+          void refreshBilling();
         } catch {
           setStatus({ kind: 'error', message: humanError() });
         }
@@ -158,13 +194,49 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
       {status.kind === 'connecting' && <p className="text-xs text-gray-500">ממתין לאישור בחלון של מטא…</p>}
 
       {status.kind === 'connected' && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-green-600">✅ המספר חובר.</p>
-          {!status.paymentReady && (
-            // Not a failure: templates need Meta's approval before the billing probe can run.
-            <p className="text-xs text-gray-500">
-              ממתין לאישור תבנית אצל מטא — זה יכול לקחת עד 24 שעות. אחרי זה נוודא שאמצעי התשלום פעיל.
-            </p>
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-green-600">
+            ✅ המספר חובר{billing?.displayPhoneNumber ? ` — ${billing.displayPhoneNumber}` : ''}.
+          </p>
+
+          {billing?.paymentReady ? (
+            <p className="text-sm font-medium text-green-600">✅ אמצעי התשלום פעיל. הכל מוכן.</p>
+          ) : (
+            <div className="rounded-xl bg-gray-50 border border-gray-200 p-3 space-y-2">
+              <div className="text-sm font-semibold text-gray-900">נשאר שלב אחד: אמצעי תשלום</div>
+              <p className="text-xs text-gray-500">
+                מטא מחייבת אתכם ישירות על ההודעות — אנחנו לא מעורבים בתשלום ולא רואים את הכרטיס.
+                בלי אמצעי תשלום מטא תחסום הודעות יוצאות.
+              </p>
+              {billing?.wabaId && (
+                <a
+                  href={`https://business.facebook.com/settings/whatsapp-business-accounts/${billing.wabaId}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="inline-block px-4 py-2 rounded-xl text-sm font-semibold text-white transition"
+                  style={{ background: '#883fe2' }}
+                >
+                  פתח את הגדרות התשלום במטא
+                </a>
+              )}
+              <p className="text-xs text-gray-400">
+                בעמוד שנפתח: <span className="font-medium">Payment settings</span> → <span className="font-medium">Add payment method</span>.
+              </p>
+
+              {billing && !billing.templateApproved ? (
+                // Not a failure — the probe needs an approved template before it can send anything.
+                <p className="text-xs text-gray-500">
+                  ממתין גם לאישור תבנית אצל מטא (עד 24 שעות). נבדוק אוטומטית ברגע שתאושר.
+                </p>
+              ) : (
+                <button
+                  onClick={probe}
+                  disabled={probing}
+                  className="text-xs font-semibold underline text-gray-700 disabled:opacity-40"
+                >
+                  {probing ? 'בודק…' : 'הוספתי כרטיס — בדקו שוב'}
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
