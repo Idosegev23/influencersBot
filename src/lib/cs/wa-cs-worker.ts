@@ -1,4 +1,5 @@
 import { resolveWaChannelById } from '@/lib/whatsapp-cloud/channels';
+import { noteNoCardFailure } from '@/lib/whatsapp-cloud/billing-probe';
 import { acquireCsLock, releaseCsLock } from '@/lib/cs/wa-cs-locks';
 import { dequeueCsMessage, csQueueLength, type CsJob } from '@/lib/cs/wa-cs-queue';
 import { publishCsDrain } from '@/lib/cs/wa-cs-publish';
@@ -34,9 +35,21 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
   // The channel the message actually arrived on — replaces Task 3's getBestieChannel() stand-in.
   const channel = await resolveWaChannelById(job.waChannelId);
 
+  // Pause check #1 — at dequeue. On coexistence the business answers from their own phone, and
+  // the bot must not talk over them. An expired human_reply pause clears itself here (spec D7).
+  const paused = await csPauseState(job);
+  if (paused.pausedNow) return null;
+
   const turn = await runCsTurn(job);
   const reply = turn.reply;
   if (!reply || reply.kind === 'none') return null;
+
+  // Pause check #2 — an echo can land WHILE the brain was thinking, so the state is re-read
+  // immediately before sending rather than trusted from before the turn.
+  if ((await csPauseState(job)).pausedNow) {
+    console.log('[cs-worker] human replied mid-turn — dropping the bot reply', { waId: job.waId });
+    return null;
+  }
 
   // Meta can return {success:false} WITHOUT throwing on 429/503 → retry the SEND 3x.
   let sent: { success: boolean; wa_message_id?: string } = { success: false };
@@ -50,6 +63,8 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
         sent = await sendInteractiveList({ channel, to: job.waId, body: reply.body, buttonLabel: reply.buttonLabel, sections: reply.sections, header: reply.header, footer: reply.footer });
       }
     } catch (e) { sent = { success: false }; console.warn('[cs-worker] send threw', e); }
+    // A card can expire long after onboarding — catch it on the live path, not just at connect.
+    await noteNoCardFailure(job.waChannelId, sent as any).catch(() => {});
     if (sent.success) break;
     await new Promise((r) => setTimeout(r, 400 * (i + 1)));
   }
@@ -108,4 +123,56 @@ export async function runCsDrain(waChannelId: string, waId: string): Promise<{ s
   } catch (e) { console.warn('[cs-drain] continuation publish failed', e); }
 
   return { status: 'ok', processed };
+}
+
+/**
+ * Is the bot currently muted for this shopper?
+ *
+ * Failure semantics are split deliberately:
+ *  • Can't even determine whether a pause exists → treat as NOT paused. This matches
+ *    isBotPaused's existing behaviour, and a transient DB blip must not mute the bot for
+ *    every shopper at once.
+ *  • Known to be paused but the expiry check fails → STAY paused. Once we know a human is
+ *    in the conversation, ambiguity resolves toward silence.
+ */
+async function csPauseState(job: CsJob): Promise<{ pausedNow: boolean }> {
+  let session: any;
+  let chatSessionId: string | null = null;
+  try {
+    const { loadCsSessionByChannel } = await import('@/lib/cs/cs-session');
+    session = await loadCsSessionByChannel('whatsapp', job.waId, job.waChannelId);
+    chatSessionId = session?.active_chat_session_id ?? null;
+    if (!chatSessionId) return { pausedNow: false };
+
+    const { isBotPaused } = await import('@/lib/handoff/bot-pause');
+    if (!(await isBotPaused(chatSessionId))) return { pausedNow: false };
+  } catch (e) {
+    console.error('[cs-worker] could not read pause state — proceeding as unpaused', e);
+    return { pausedNow: false };
+  }
+
+  // From here we KNOW a pause is in force. Anything that goes wrong keeps it in force.
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    const { data: chat } = await supabase
+      .from('chat_sessions').select('bot_paused_reason').eq('id', chatSessionId).maybeSingle();
+    const { data: acct } = session.active_account_id
+      ? await supabase.from('accounts').select('config').eq('id', session.active_account_id).maybeSingle()
+      : { data: null };
+
+    const { shouldAutoResume, idleResumeHours } = await import('@/lib/handoff/auto-resume');
+    const resume = shouldAutoResume(
+      { bot_paused_reason: (chat as any)?.bot_paused_reason ?? null,
+        human_last_reply_at: session.human_last_reply_at ?? null },
+      idleResumeHours((acct as any)?.config),
+    );
+    if (!resume) return { pausedNow: true };
+
+    const { resumeBot } = await import('@/lib/handoff/bot-pause');
+    await resumeBot(chatSessionId);
+    return { pausedNow: false };
+  } catch (e) {
+    console.error('[cs-worker] pause is in force and expiry could not be evaluated — staying silent', e);
+    return { pausedNow: true };
+  }
 }

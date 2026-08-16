@@ -147,6 +147,20 @@ async function processWebhook(payload: any): Promise<void> {
 
   for (const entry of payload?.entry ?? []) {
     for (const change of entry?.changes ?? []) {
+      // Coexistence history + contact sync: ACK and DISCARD. We keep a counter, never another
+      // business's chat history — what we don't store can't leak (spec D6).
+      if (change.field === 'history' || change.field === 'smb_app_state_sync') {
+        console.log('[whatsapp webhook] coexistence sync payload received and discarded', { field: change.field });
+        continue;
+      }
+
+      // A human replied from the WhatsApp Business app on the phone → pause the bot so it
+      // doesn't talk over them, and record WHEN so the pause can expire on its own (D7).
+      if (change.field === 'smb_message_echoes') {
+        await handleSmbEcho(change.value ?? {});
+        continue;
+      }
+
       if (change.field !== 'messages') continue;
 
       const value = change.value ?? {};
@@ -463,5 +477,41 @@ export async function maybeRouteCs(args: {
     });
   } catch (err) {
     console.error('[whatsapp webhook] CS routing failed', err);
+  }
+}
+
+/**
+ * Coexistence echo: the business answered from their own phone. Pausing on our side is what
+ * keeps the bot from replying on top of a live human conversation.
+ */
+async function handleSmbEcho(value: any): Promise<void> {
+  const phoneNumberId: string = value?.metadata?.phone_number_id;
+  if (!phoneNumberId) return;
+
+  const { resolveChannelByPhoneNumberId } = await import('@/lib/whatsapp-cloud/channels');
+  const channel = await resolveChannelByPhoneNumberId(phoneNumberId);
+  if (!channel) return;
+
+  const { loadCsSessionByChannel } = await import('@/lib/cs/cs-session');
+  const { pauseBot } = await import('@/lib/handoff/bot-pause');
+  const { supabase: db } = await import('@/lib/supabase');
+
+  const echoes = value?.message_echoes ?? value?.messages ?? [];
+  for (const echo of echoes) {
+    // The echo is OUTBOUND, so the shopper is the recipient.
+    const waId: string = echo?.to || echo?.recipient_id;
+    if (!waId) continue;
+    try {
+      const session = await loadCsSessionByChannel('whatsapp', waId, channel.id);
+      if (!session) continue;
+      await db.from('whatsapp_cs_sessions')
+        .update({ human_last_reply_at: new Date().toISOString() })
+        .eq('wa_id', session.wa_id);
+      if (session.active_chat_session_id) {
+        await pauseBot(session.active_chat_session_id, 'human_reply');
+      }
+    } catch (e) {
+      console.error('[whatsapp webhook] smb echo handling failed', { waId, e });
+    }
   }
 }
