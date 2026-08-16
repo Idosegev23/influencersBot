@@ -55,6 +55,26 @@ export async function assertWabaOwnership(token: string, wabaId: string): Promis
   }
 }
 
+/**
+ * Coexistence's FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING event carries ONLY a waba_id — unlike
+ * the standard flow, it never hands us a phone_number_id. We resolve it ourselves, after
+ * ownership has been proved, and take the single number on the WABA.
+ */
+export async function resolvePhoneNumberId(token: string, wabaId: string): Promise<string> {
+  const res = await fetch(`${GRAPH}/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(`phone_numbers lookup failed (status ${res.status})`);
+
+  const numbers: any[] = data?.data ?? [];
+  if (numbers.length === 0) throw new Error(`WABA ${wabaId} has no phone numbers`);
+  // v1 is one number per account (spec §2). More than one means a business we cannot model
+  // yet, and silently picking the first would bind the wrong number to the customer.
+  if (numbers.length > 1) throw new Error(`WABA ${wabaId} has ${numbers.length} phone numbers; v1 supports exactly one`);
+  return String(numbers[0].id);
+}
+
 // ---------------------------------------------------------------------------
 // Provisioning chain (spec §5)
 // ---------------------------------------------------------------------------

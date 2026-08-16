@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveDraftByToken } from '@/lib/onboarding/resolve';
-import { exchangeEsCode, assertWabaOwnership, runProvisioningChain } from '@/lib/whatsapp-cloud/provisioning';
+import { exchangeEsCode, assertWabaOwnership, resolvePhoneNumberId, runProvisioningChain } from '@/lib/whatsapp-cloud/provisioning';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,9 +22,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
   const code = body?.code;
   const wabaId = body?.waba_id;
-  const phoneNumberId = body?.phone_number_id;
-  if (!code || !wabaId || !phoneNumberId) {
-    return NextResponse.json({ error: 'code, waba_id and phone_number_id are required' }, { status: 400 });
+  // Coexistence's FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING event carries only waba_id, so
+  // phone_number_id is optional here and resolved from the WABA below when absent.
+  let phoneNumberId: string | undefined = body?.phone_number_id ? String(body.phone_number_id) : undefined;
+  if (!code || !wabaId) {
+    return NextResponse.json({ error: 'code and waba_id are required' }, { status: 400 });
   }
 
   // The ES code lives ~30 seconds — exchanged here, synchronously, never deferred to a queue.
@@ -45,11 +47,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     return NextResponse.json({ error: 'waba_not_owned' }, { status: 403 });
   }
 
+  if (!phoneNumberId) {
+    try {
+      phoneNumberId = await resolvePhoneNumberId(accessToken, String(wabaId));
+    } catch (e) {
+      console.error('[wa-connect] could not resolve a phone number', { wabaId, e });
+      return NextResponse.json({ error: 'phone_number_unresolved' }, { status: 400 });
+    }
+  }
+
   const result = await runProvisioningChain({
     accountId: draft.id,
     accessToken,
     wabaId: String(wabaId),
-    phoneNumberId: String(phoneNumberId),
+    phoneNumberId,
   });
 
   if (!result.ok) {

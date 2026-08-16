@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { onboardStrings, type OnboardLang } from '@/lib/i18n/onboard';
+import { WhatsAppConnectCard } from '@/components/onboard/WhatsAppConnectCard';
 
 interface StatusData {
   accountName: string;
@@ -156,6 +157,9 @@ export default function OnboardWizard({ token, lang }: { token: string; lang: On
                 </div>
                 {!data.connected && <p className="text-xs text-gray-400 mt-2">{t.form.igHint}</p>}
               </div>
+
+              {/* WhatsApp connect (optional like every other source — D1) */}
+              <WhatsAppConnectCard token={token} />
 
               {/* Fields */}
               <div className="space-y-3">

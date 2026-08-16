@@ -108,6 +108,16 @@ const envChecks: EnvCheck[] = [
 
   // WhatsApp channels
   {
+    name: 'NEXT_PUBLIC_FB_APP_ID',
+    required: false,
+    description: 'Meta app id used by the Embedded Signup popup (customer WhatsApp connect)',
+  },
+  {
+    name: 'NEXT_PUBLIC_WA_ES_CONFIG_ID',
+    required: false,
+    description: 'Facebook Login for Business config_id for Embedded Signup v4 (Coexistence)',
+  },
+  {
     name: 'BESTIE_ACCOUNT_ID',
     required: true,
     description: 'Account owning Bestie\'s WhatsApp number in whatsapp_channels — getBestieChannel() and inbound routing both key off it',
