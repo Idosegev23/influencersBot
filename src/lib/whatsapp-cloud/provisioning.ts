@@ -181,3 +181,56 @@ export async function runProvisioningChain(args: {
   await supabase.from('whatsapp_channels').update({ provision_state: { ...state } }).eq('id', channelId);
   return { ok: true, channelId, state };
 }
+
+/**
+ * Disconnect a customer's channel.
+ *
+ * Order matters: unsubscribe first so no further inbound arrives, then destroy the credential,
+ * then mark the row. The Vault secret is DELETED, not flagged — a disconnected channel that
+ * still holds a working token is a credential we have no reason to keep and no UI to see.
+ *
+ * A failed unsubscribe does NOT abort: leaving a live token behind because a remote call
+ * errored would be the worse of the two outcomes.
+ */
+export async function disconnectChannel(channelId: string): Promise<void> {
+  const { supabase } = await import('@/lib/supabase');
+  const { deleteToken, readToken } = await import('@/lib/whatsapp-cloud/channel-tokens');
+
+  const { data: row } = await supabase
+    .from('whatsapp_channels')
+    .select('id, waba_id, token_secret_id, account_id, phone_number_id')
+    .eq('id', channelId)
+    .maybeSingle();
+  if (!row) return;
+
+  const secretId = (row as any).token_secret_id as string | null;
+
+  if (secretId) {
+    try {
+      const token = await readToken(secretId);
+      const res = await fetch(`${GRAPH}/${(row as any).waba_id}/subscribed_apps`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) console.warn('[disconnect] unsubscribe failed; continuing to revoke', res.status);
+    } catch (e) {
+      console.warn('[disconnect] unsubscribe threw; continuing to revoke', e);
+    }
+
+    try { await deleteToken(secretId); }
+    catch (e) { console.error('[disconnect] VAULT SECRET NOT DELETED — revoke manually', { channelId, secretId, e }); }
+  }
+
+  await supabase
+    .from('whatsapp_channels')
+    .update({ status: 'disconnected', token_secret_id: null, payment_ready: false })
+    .eq('id', channelId);
+
+  // Without this the 60s resolver cache would keep serving the channel — and keep sending
+  // from a number we just revoked access to.
+  const { invalidateChannelCache } = await import('@/lib/whatsapp-cloud/channels');
+  await invalidateChannelCache({
+    accountId: (row as any).account_id,
+    phoneNumberId: (row as any).phone_number_id,
+  }).catch(() => {});
+}
