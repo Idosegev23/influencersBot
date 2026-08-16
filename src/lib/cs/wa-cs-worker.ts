@@ -1,8 +1,10 @@
+import { resolveWaChannelById } from '@/lib/whatsapp-cloud/channels';
 import { acquireCsLock, releaseCsLock } from '@/lib/cs/wa-cs-locks';
 import { dequeueCsMessage, csQueueLength, type CsJob } from '@/lib/cs/wa-cs-queue';
 import { publishCsDrain } from '@/lib/cs/wa-cs-publish';
 import { runCsTurn, type CsTurnResult } from '@/lib/cs/cs-agent';
 import { sendText, sendInteractiveButtons, sendInteractiveList, sendReaction } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { redisGet, redisSetNx } from '@/lib/redis';
 
 // Exit ~70s before Vercel's 300s kill so the loop releases the lock and enqueues a continuation
@@ -29,6 +31,9 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
     } catch (e) { console.warn('[cs-worker] image materialize failed', e); }
   }
 
+  // The channel the message actually arrived on — replaces Task 3's getBestieChannel() stand-in.
+  const channel = await resolveWaChannelById(job.waChannelId);
+
   const turn = await runCsTurn(job);
   const reply = turn.reply;
   if (!reply || reply.kind === 'none') return null;
@@ -38,11 +43,11 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
   for (let i = 0; i < 3; i++) {
     try {
       if (reply.kind === 'text') {
-        sent = await sendText({ to: job.waId, body: reply.body, contextMessageId: job.msg?.id });
+        sent = await sendText({ channel, to: job.waId, body: reply.body, contextMessageId: job.msg?.id });
       } else if (reply.kind === 'buttons') {
-        sent = await sendInteractiveButtons({ to: job.waId, body: reply.body, buttons: reply.buttons, header: reply.header, footer: reply.footer });
+        sent = await sendInteractiveButtons({ channel, to: job.waId, body: reply.body, buttons: reply.buttons, header: reply.header, footer: reply.footer });
       } else if (reply.kind === 'list') {
-        sent = await sendInteractiveList({ to: job.waId, body: reply.body, buttonLabel: reply.buttonLabel, sections: reply.sections, header: reply.header, footer: reply.footer });
+        sent = await sendInteractiveList({ channel, to: job.waId, body: reply.body, buttonLabel: reply.buttonLabel, sections: reply.sections, header: reply.header, footer: reply.footer });
       }
     } catch (e) { sent = { success: false }; console.warn('[cs-worker] send threw', e); }
     if (sent.success) break;
@@ -65,10 +70,10 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
     try { if (job.msg?.id) await redisSetNx(doneKey, '1', 900); } catch { /* ignore */ }
     // Promise.resolve(...) wraps the call so a fire-and-forget reaction can never throw
     // synchronously into the caller, even if the reaction backend doesn't return a promise.
-    if (job.msg?.id) void Promise.resolve(sendReaction({ to: job.waId, messageId: job.msg.id, emoji: '✅' })).catch(() => {});
+    if (job.msg?.id) void Promise.resolve(sendReaction({ channel, to: job.waId, messageId: job.msg.id, emoji: '✅' })).catch(() => {});
   } else {
     console.error('[cs-worker] reply delivery FAILED after 3 retries', job.msg?.id);
-    if (job.msg?.id) void Promise.resolve(sendReaction({ to: job.waId, messageId: job.msg.id, emoji: '⚠️' })).catch(() => {});
+    if (job.msg?.id) void Promise.resolve(sendReaction({ channel, to: job.waId, messageId: job.msg.id, emoji: '⚠️' })).catch(() => {});
   }
   return sent.success ? (sent.wa_message_id ?? null) : null;
 }
@@ -78,15 +83,15 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
  * in ARRIVAL ORDER. A concurrent drain that can't get the lock simply exits. On hitting the time
  * budget with items still queued, or on a release-race, it re-enqueues a forced continuation.
  */
-export async function runCsDrain(waId: string): Promise<{ status: string; processed: number }> {
-  const locked = await acquireCsLock(waId);
+export async function runCsDrain(waChannelId: string, waId: string): Promise<{ status: string; processed: number }> {
+  const locked = await acquireCsLock(waChannelId, waId);
   if (!locked) return { status: 'busy', processed: 0 };
 
   const deadline = Date.now() + DRAIN_BUDGET_MS;
   let processed = 0;
   try {
     while (Date.now() < deadline) {
-      const job = await dequeueCsMessage(waId);
+      const job = await dequeueCsMessage(waChannelId, waId);
       if (!job) break; // queue drained
       try { await processOneCsInbound(job); }
       catch (e) { console.warn('[cs-drain] item failed (dropped; dedup+done guards are the backstops)', e); }
@@ -95,11 +100,11 @@ export async function runCsDrain(waId: string): Promise<{ status: string; proces
   } catch (e) {
     console.warn('[cs-drain] drain failed', e);
   } finally {
-    await releaseCsLock(waId);
+    await releaseCsLock(waChannelId, waId);
   }
 
   try {
-    if (await csQueueLength(waId) > 0) await publishCsDrain(waId, { force: true });
+    if (await csQueueLength(waChannelId, waId) > 0) await publishCsDrain(waChannelId, waId, { force: true });
   } catch (e) { console.warn('[cs-drain] continuation publish failed', e); }
 
   return { status: 'ok', processed };

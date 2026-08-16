@@ -15,6 +15,7 @@ export interface CsSessionRow {
   wa_id: string;                 // legacy key (still PK — migration 074 step 1 keeps populating it)
   channel: CsChannel;
   channel_user_id: string;       // waId / IGSID / widget visitor id / web-chat session id (spec §8)
+  wa_channel_id: string | null;  // WHICH business number (migration 075); null for non-WhatsApp media
   contact_id: string | null;
   phase: CsPhase;
   active_account_id: string | null;
@@ -36,21 +37,29 @@ export function isWarm(row: CsSessionRow, now: number = Date.now()): boolean {
   return now - Date.parse(row.last_activity_at) < WARM_WINDOW_MS;
 }
 
-export async function loadCsSessionByChannel(channel: CsChannel, channelUserId: string): Promise<CsSessionRow | null> {
-  const { data } = await supabaseAdmin
+export async function loadCsSessionByChannel(
+  channel: CsChannel,
+  channelUserId: string,
+  waChannelId: string | null = null,
+): Promise<CsSessionRow | null> {
+  let q = supabaseAdmin
     .from('whatsapp_cs_sessions')
     .select('*')
     .eq('channel', channel)
-    .eq('channel_user_id', channelUserId)
-    .maybeSingle();
+    .eq('channel_user_id', channelUserId);
+  // Two partial unique indexes back this (migration 075): scoped rows match on the
+  // number, unscoped rows (non-WhatsApp media) match on IS NULL.
+  q = waChannelId ? q.eq('wa_channel_id', waChannelId) : q.is('wa_channel_id', null);
+  const { data } = await q.maybeSingle();
   return (data as CsSessionRow) ?? null;
 }
 
-export async function loadCsSession(waId: string): Promise<CsSessionRow | null> {
-  return loadCsSessionByChannel('whatsapp', waId);
-}
-
-export async function createCsSession(waId: string, contactId: string | null, channel: CsChannel = 'whatsapp'): Promise<CsSessionRow> {
+export async function createCsSession(
+  waId: string,
+  contactId: string | null,
+  channel: CsChannel = 'whatsapp',
+  waChannelId: string | null = null,
+): Promise<CsSessionRow> {
   const { data } = await supabaseAdmin
     .from('whatsapp_cs_sessions')
     .insert({
@@ -60,6 +69,7 @@ export async function createCsSession(waId: string, contactId: string | null, ch
       wa_id: waId,
       channel,
       channel_user_id: waId,
+      wa_channel_id: waChannelId,
       contact_id: contactId,
       phase: 'onboarding',
       context: {},

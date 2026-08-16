@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
 import { sendText } from '@/lib/whatsapp-cloud/client';
-import { loadCsSession } from '@/lib/cs/cs-session';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
+import { loadCsSessionByChannel } from '@/lib/cs/cs-session';
 import { pauseBot } from '@/lib/handoff/bot-pause';
 import { appendCsTicketHistory } from '@/lib/cs/cs-ticket';
 
@@ -32,13 +33,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Resolve the owning CS thread server-side from waId — never trust an account/session id from the body.
-  const cs = await loadCsSession(waId);
+  const cs = await loadCsSessionByChannel('whatsapp', waId);
   if (!cs || !cs.active_account_id) {
     return NextResponse.json({ error: 'no_active_thread' }, { status: 404 });
   }
 
   // customer-initiated CS conversations → free-form text is valid inside the 24h window.
-  const result = await sendText({ to: waId, body: messageBody });
+  const result = await sendText({ channel: await getBestieChannel(), to: waId, body: messageBody });
 
   // a human message takes over — pause the bot until manual resume.
   if (cs.active_chat_session_id) {

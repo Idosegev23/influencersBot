@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { csQueueLength } from '@/lib/cs/wa-cs-queue';
+import { csLockKey } from '@/lib/cs/wa-cs-keys';
 import { publishCsDrain } from '@/lib/cs/wa-cs-publish';
 import { redisExists } from '@/lib/redis';
 
@@ -19,19 +20,23 @@ export async function GET() {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { data: sessions } = await supabaseAdmin
     .from('whatsapp_cs_sessions')
-    .select('wa_id')
+    .select('wa_id, wa_channel_id')
     .gte('last_activity_at', since);
 
   const swept: { waId: string; queued: number }[] = [];
   for (const s of sessions || []) {
     const waId = (s as any).wa_id as string;
+    // Queues, locks and drains are all channel-scoped (migration 075). A session with no
+    // channel predates the backfill and has no queue under the new keys — skip it.
+    const waChannelId = (s as any).wa_channel_id as string | null;
+    if (!waChannelId) continue;
     let queued = 0;
-    try { queued = await csQueueLength(waId); } catch { continue; }
+    try { queued = await csQueueLength(waChannelId, waId); } catch { continue; }
     if (queued <= 0) continue;
     let locked = false;
-    try { locked = await redisExists(`cs:wa:${waId}:lock`); } catch { /* treat as unlocked */ }
+    try { locked = await redisExists(csLockKey(waChannelId, waId)); } catch { /* treat as unlocked */ }
     if (locked) { swept.push({ waId, queued: -queued }); continue; } // negative = seen-but-busy
-    try { await publishCsDrain(waId, { force: true }); swept.push({ waId, queued }); }
+    try { await publishCsDrain(waChannelId, waId, { force: true }); swept.push({ waId, queued }); }
     catch (e) { console.error('[cs-drain-sweep] publishCsDrain failed', waId, e); }
   }
   return NextResponse.json({ ok: true, sessions: (sessions || []).length, swept });

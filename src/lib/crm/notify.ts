@@ -6,6 +6,7 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { sendEmail } from '@/lib/email';
 import { sendText } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 
 export async function notifyAgent(
   agentId: string,
@@ -32,7 +33,7 @@ export async function notifyAgent(
   }
 
   if (agent.whatsapp) {
-    await sendText({ to: agent.whatsapp, body: `${opts.subject}\n\n${opts.text}` }).catch((e) =>
+    await sendText({ channel: await getBestieChannel(), to: agent.whatsapp, body: `${opts.subject}\n\n${opts.text}` }).catch((e) =>
       console.warn('[notifyAgent] whatsapp failed', e?.message)
     );
   }

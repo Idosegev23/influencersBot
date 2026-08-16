@@ -1,4 +1,5 @@
 import { getQStash } from '@/lib/pipeline/qstash';
+import { csDrainDedupId } from './wa-cs-keys';
 
 const BASE_URL =
   process.env.WA_WORKER_BASE_URL || process.env.PIPELINE_BASE_URL || 'https://influencers-bot.vercel.app';
@@ -9,12 +10,18 @@ const BASE_URL =
  * (a budget continuation / release-race closer / cron sweep) always fires with a unique id.
  * QStash REJECTS a deduplicationId containing ':' — use '_' separators only.
  */
-export async function publishCsDrain(waId: string, opts: { force?: boolean } = {}): Promise<void> {
+export async function publishCsDrain(
+  waChannelId: string,
+  waId: string,
+  opts: { force?: boolean } = {},
+): Promise<void> {
   const bucket = Math.floor(Date.now() / 10_000);
-  const deduplicationId = opts.force ? `csdrain_${waId}_f_${Date.now()}` : `csdrain_${waId}_${bucket}`;
+  const deduplicationId = opts.force
+    ? `csdrain_${waChannelId}_${waId}_f_${Date.now()}`
+    : csDrainDedupId(waChannelId, waId, bucket);
   const payload = {
     url: `${BASE_URL}/api/cs/wa-worker`,
-    body: { drain: true, waId },
+    body: { drain: true, waChannelId, waId },
     retries: 3,
     deduplicationId,
   };

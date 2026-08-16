@@ -445,8 +445,9 @@ export async function POST(req: NextRequest) {
             if (windowOpen) {
               try {
                 const { sendText } = await import('@/lib/whatsapp-cloud/client');
+                const { getBestieChannel } = await import('@/lib/whatsapp-cloud/channels');
                 const phone = (activeHandoff.target_phone || '').trim();
-                const r = await sendText({
+                const r = await sendText({ channel: await getBestieChannel(),
                   to: phone,
                   body: `[#${activeHandoff.ref_code}] ${displayMessage}`,
                   contextMessageId: activeHandoff.last_outbound_wa_message_id || undefined,

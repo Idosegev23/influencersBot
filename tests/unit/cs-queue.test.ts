@@ -17,13 +17,13 @@ vi.mock('@/lib/redis', () => ({
 describe('CS queue + locks', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it('enqueues onto cs:wa:<waId>:q behind a per-wamid SETNX dedup', async () => {
+  it('enqueues onto cs:<waChannelId>:wa:<waId>:q behind a per-wamid SETNX dedup', async () => {
     setnx.mockResolvedValue(true);
     rpush.mockResolvedValue(1);
     const { enqueueCsMessage } = await import('@/lib/cs/wa-cs-queue');
-    const r = await enqueueCsMessage({ waId: '972500000000', msg: { id: 'wamid.A' }, textBody: 'hi' });
-    expect(setnx).toHaveBeenCalledWith('cs:wa:wamid.A:queued', '1', 86_400);
-    expect(rpush).toHaveBeenCalledWith('cs:wa:972500000000:q', [expect.any(String)]);
+    const r = await enqueueCsMessage({ waChannelId: 'ch-1', waId: '972500000000', msg: { id: 'wamid.A' }, textBody: 'hi' });
+    expect(setnx).toHaveBeenCalledWith('cs:ch-1:wa:wamid.A:queued', '1', 86_400);
+    expect(rpush).toHaveBeenCalledWith('cs:ch-1:wa:972500000000:q', [expect.any(String)]);
     expect(r).toEqual({ enqueued: true, queueLen: 1 });
   });
 
@@ -31,7 +31,7 @@ describe('CS queue + locks', () => {
     setnx.mockResolvedValue(false);
     llen.mockResolvedValue(3);
     const { enqueueCsMessage } = await import('@/lib/cs/wa-cs-queue');
-    const r = await enqueueCsMessage({ waId: '972500000000', msg: { id: 'wamid.A' }, textBody: 'hi' });
+    const r = await enqueueCsMessage({ waChannelId: 'ch-1', waId: '972500000000', msg: { id: 'wamid.A' }, textBody: 'hi' });
     expect(rpush).not.toHaveBeenCalled();
     expect(r).toEqual({ enqueued: false, queueLen: 3 });
   });
@@ -39,17 +39,17 @@ describe('CS queue + locks', () => {
   it('dequeues FIFO (LPOP count=1) and parses JSON', async () => {
     lpop.mockResolvedValue([JSON.stringify({ waId: 'x', msg: { id: 'm' }, textBody: 't' })]);
     const { dequeueCsMessage } = await import('@/lib/cs/wa-cs-queue');
-    const j = await dequeueCsMessage('x');
-    expect(lpop).toHaveBeenCalledWith('cs:wa:x:q', 1);
+    const j = await dequeueCsMessage('ch-1', 'x');
+    expect(lpop).toHaveBeenCalledWith('cs:ch-1:wa:x:q', 1);
     expect(j?.textBody).toBe('t');
   });
 
-  it('acquireCsLock SETNX on cs:wa:<waId>:lock with TTL 300', async () => {
+  it('acquireCsLock SETNX on cs:<waChannelId>:wa:<waId>:lock with TTL 300', async () => {
     setnx.mockResolvedValue(true);
     const { acquireCsLock, releaseCsLock } = await import('@/lib/cs/wa-cs-locks');
-    expect(await acquireCsLock('x')).toBe(true);
-    expect(setnx).toHaveBeenCalledWith('cs:wa:x:lock', '1', 300);
-    await releaseCsLock('x');
-    expect(del).toHaveBeenCalledWith('cs:wa:x:lock');
+    expect(await acquireCsLock('ch-1', 'x')).toBe(true);
+    expect(setnx).toHaveBeenCalledWith('cs:ch-1:wa:x:lock', '1', 300);
+    await releaseCsLock('ch-1', 'x');
+    expect(del).toHaveBeenCalledWith('cs:ch-1:wa:x:lock');
   });
 });

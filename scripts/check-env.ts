@@ -105,6 +105,14 @@ const envChecks: EnvCheck[] = [
     description: 'Cron job authorization secret (min 16 chars)',
     validator: (val) => val.length >= 16,
   },
+
+  // WhatsApp channels
+  {
+    name: 'BESTIE_ACCOUNT_ID',
+    required: true,
+    description: 'Account owning Bestie\'s WhatsApp number in whatsapp_channels — getBestieChannel() and inbound routing both key off it',
+    validator: (val) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val),
+  },
 ];
 
 function checkEnv() {

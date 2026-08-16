@@ -1,5 +1,6 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { downloadMedia, sendText, sendReaction } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { acquireAgentLock, releaseAgentLock } from '@/lib/crm/wa-locks';
 import { publishAgentJob, publishDrain, type AgentJob } from '@/lib/crm/wa-queue';
 import { dequeueAgentMessage, agentQueueLength } from '@/lib/crm/wa-agent-queue';
@@ -61,7 +62,7 @@ export async function materializeInbound(msg: any, vocabulary?: string[]): Promi
 
   if (mediaId && (type === 'document' || type === 'image')) {
     try {
-      const dl = await downloadMedia(mediaId);
+      const dl = await downloadMedia(mediaId, await getBestieChannel());
       if (dl) {
         const mime = dl.mimeType || msg[type]?.mime_type || 'application/octet-stream';
         const ext = mime.split('/')[1] || 'bin';
@@ -73,7 +74,7 @@ export async function materializeInbound(msg: any, vocabulary?: string[]): Promi
   if (type === 'audio' && mediaId) {
     isVoice = true; // set NOW so a throw still triggers the "resend" guard downstream
     try {
-      const dl = await downloadMedia(mediaId);
+      const dl = await downloadMedia(mediaId, await getBestieChannel());
       if (dl) {
         const mime = dl.mimeType || msg.audio?.mime_type || 'audio/ogg';
         const { transcribeHebrew } = await import('@/lib/stt/transcribeHebrew');
@@ -110,7 +111,7 @@ async function processOneInbound(agent: WaAgent, job: AgentJob): Promise<string 
     // message "done" on a CONFIRMED delivery, so a genuine failure isn't silently swallowed.
     let sent = { success: false } as { success: boolean };
     for (let i = 0; i < 3; i++) {
-      try { sent = await sendText({ to: job.waId, body: result.reply, contextMessageId: job.msg.id }); }
+      try { sent = await sendText({ channel: await getBestieChannel(), to: job.waId, body: result.reply, contextMessageId: job.msg.id }); }
       catch (e) { sent = { success: false }; console.warn('[wa-worker] sendText threw', e); }
       if (sent.success) break;
       await new Promise((r) => setTimeout(r, 400 * (i + 1))); // back off a transient throttle
@@ -118,7 +119,7 @@ async function processOneInbound(agent: WaAgent, job: AgentJob): Promise<string 
     if (sent.success) {
       try { if (job.msg?.id) await redisSetNx(doneKey, '1', 900); } catch { /* ignore */ } // replied → dedup a retry
       const emoji = reactionForOutcome(result.outcome);
-      if (emoji) void sendReaction({ to: job.waId, messageId: job.msg.id, emoji }).catch(() => {});
+      if (emoji) void sendReaction({ channel: await getBestieChannel(), to: job.waId, messageId: job.msg.id, emoji }).catch(() => {});
     } else {
       console.error('[wa-worker] reply delivery FAILED after 3 retries', job.msg?.id);
     }

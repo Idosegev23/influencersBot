@@ -1,5 +1,25 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+const TEST_CHANNEL = {
+  id: 'ch-test', accountId: 'acc-test', wabaId: 'waba-test', phoneNumberId: 'PNID_TEST',
+  displayPhoneNumber: '+972 54-390-2030', verifiedName: 'Bestie', token: 'TOK_TEST',
+  status: 'active', paymentReady: true,
+} as any;
+
+
+// Sends are channel-scoped now; unit tests must not perform real channel resolution.
+vi.mock('@/lib/whatsapp-cloud/channels', () => ({
+  getBestieChannel: vi.fn(async () => ({
+    id: 'ch-test', accountId: 'acc-test', wabaId: 'waba-test',
+    phoneNumberId: 'PNID_TEST', displayPhoneNumber: '+972 54-390-2030',
+    verifiedName: 'Bestie', token: 'TOK_TEST', status: 'active', paymentReady: true,
+  })),
+  resolveChannelByAccount: vi.fn(async () => null),
+  resolveChannelByPhoneNumberId: vi.fn(async () => null),
+  invalidateChannelCache: vi.fn(async () => {}),
+}));
+
+
 describe('interactive WhatsApp sends', () => {
   beforeEach(() => {
     process.env.WHATSAPP_ACCESS_TOKEN = 'tok';
@@ -14,7 +34,7 @@ describe('interactive WhatsApp sends', () => {
 
   it('sendInteractiveButtons posts an interactive/button body and parses the result', async () => {
     const { sendInteractiveButtons } = await import('@/lib/whatsapp-cloud/client');
-    const res = await sendInteractiveButtons({
+    const res = await sendInteractiveButtons({ channel: TEST_CHANNEL,
       to: '0500000000',
       body: 'ממשיכים?',
       buttons: [{ id: 'yes', title: 'כן' }, { id: 'other', title: 'משהו אחר' }],
@@ -34,7 +54,7 @@ describe('interactive WhatsApp sends', () => {
 
   it('sendInteractiveList posts an interactive/list body with sections', async () => {
     const { sendInteractiveList } = await import('@/lib/whatsapp-cloud/client');
-    const res = await sendInteractiveList({
+    const res = await sendInteractiveList({ channel: TEST_CHANNEL,
       to: '972500000000',
       body: 'במה נמשיך?',
       buttonLabel: 'בחירה',

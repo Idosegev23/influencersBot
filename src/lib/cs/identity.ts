@@ -5,7 +5,7 @@
 export type CsChannel = 'whatsapp' | 'instagram' | 'widget' | 'web_chat';
 
 export type CsIdentity =
-  | { channel: 'whatsapp';  waId: string;                       trust: 'channel_verified' }
+  | { channel: 'whatsapp';  waId: string; waChannelId: string;  trust: 'channel_verified' }
   | { channel: 'instagram'; igsid: string;     phone?: string;  trust: 'unverified' | 'phone_claimed' }
   | { channel: 'widget';    visitorId: string; phone?: string;  trust: 'unverified' | 'phone_claimed' }
   | { channel: 'web_chat';  sessionId: string; phone?: string;  trust: 'unverified' | 'phone_claimed' };
@@ -16,18 +16,25 @@ export function identityPhone(id: CsIdentity): string | null {
   return id.phone?.trim() || null;
 }
 
-/** The (channel, channel_user_id) session key (spec §8). */
-export function identityKey(id: CsIdentity): { channel: CsChannel; channelUserId: string } {
+/**
+ * The (channel, channel_user_id, wa_channel_id) session key (spec §8 + migration 075).
+ *
+ * `channel` is the MEDIUM. `waChannelId` is WHICH BUSINESS NUMBER — null for every
+ * non-WhatsApp medium, because only WhatsApp has more than one inbound address.
+ */
+export function identityKey(id: CsIdentity): {
+  channel: CsChannel; channelUserId: string; waChannelId: string | null;
+} {
   switch (id.channel) {
-    case 'whatsapp':  return { channel: 'whatsapp',  channelUserId: id.waId };
-    case 'instagram': return { channel: 'instagram', channelUserId: id.igsid };
-    case 'widget':    return { channel: 'widget',    channelUserId: id.visitorId };
-    case 'web_chat':  return { channel: 'web_chat',  channelUserId: id.sessionId };
+    case 'whatsapp':  return { channel: 'whatsapp',  channelUserId: id.waId,      waChannelId: id.waChannelId };
+    case 'instagram': return { channel: 'instagram', channelUserId: id.igsid,     waChannelId: null };
+    case 'widget':    return { channel: 'widget',    channelUserId: id.visitorId, waChannelId: null };
+    case 'web_chat':  return { channel: 'web_chat',  channelUserId: id.sessionId, waChannelId: null };
   }
 }
 
-export function whatsappIdentity(waId: string): CsIdentity {
-  return { channel: 'whatsapp', waId, trust: 'channel_verified' };
+export function whatsappIdentity(waId: string, waChannelId: string): CsIdentity {
+  return { channel: 'whatsapp', waId, waChannelId, trust: 'channel_verified' };
 }
 
 /** support_requests.source per channel (spec §8). */

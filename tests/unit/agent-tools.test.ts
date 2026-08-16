@@ -1,6 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
 import { countContracts, sumSales, pipelineStatus, runTool, AGENT_TOOL_SCHEMAS } from '@/lib/crm/agent-tools';
 
+// Sends are channel-scoped now; unit tests must not perform real channel resolution.
+vi.mock('@/lib/whatsapp-cloud/channels', () => ({
+  getBestieChannel: vi.fn(async () => ({
+    id: 'ch-test', accountId: 'acc-test', wabaId: 'waba-test',
+    phoneNumberId: 'PNID_TEST', displayPhoneNumber: '+972 54-390-2030',
+    verifiedName: 'Bestie', token: 'TOK_TEST', status: 'active', paymentReady: true,
+  })),
+  resolveChannelByAccount: vi.fn(async () => null),
+  resolveChannelByPhoneNumberId: vi.fn(async () => null),
+  invalidateChannelCache: vi.fn(async () => {}),
+}));
+
+
 // Minimal chainable fake: records every .eq() and resolves to canned rows.
 function fakeSb(tableRows: Record<string, any[]>) {
   const eqCalls: [string, string, any][] = [];

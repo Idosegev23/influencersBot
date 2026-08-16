@@ -1,5 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Sends are channel-scoped now; unit tests must not perform real channel resolution.
+vi.mock('@/lib/whatsapp-cloud/channels', () => ({
+  resolveWaChannelById: vi.fn(async () => ({
+    id: 'ch-1', accountId: 'acc-1', wabaId: 'waba-1', phoneNumberId: 'PNID_TEST',
+    displayPhoneNumber: '+972 54-390-2030', verifiedName: 'Bestie', token: 'TOK',
+    status: 'active', paymentReady: true,
+  })),
+  getBestieChannel: vi.fn(async () => ({
+    id: 'ch-test', accountId: 'acc-test', wabaId: 'waba-test',
+    phoneNumberId: 'PNID_TEST', displayPhoneNumber: '+972 54-390-2030',
+    verifiedName: 'Bestie', token: 'TOK_TEST', status: 'active', paymentReady: true,
+  })),
+  resolveChannelByAccount: vi.fn(async () => null),
+  resolveChannelByPhoneNumberId: vi.fn(async () => null),
+  invalidateChannelCache: vi.fn(async () => {}),
+}));
+
+
 const acquire = vi.fn();
 const release = vi.fn();
 const dequeue = vi.fn();
@@ -38,7 +56,7 @@ describe('runCsDrain / processOneCsInbound', () => {
   it('busy when the lock is held', async () => {
     acquire.mockResolvedValue(false);
     const { runCsDrain } = await import('@/lib/cs/wa-cs-worker');
-    expect(await runCsDrain('x')).toEqual({ status: 'busy', processed: 0 });
+    expect(await runCsDrain('ch-1', 'x')).toEqual({ status: 'busy', processed: 0 });
   });
 
   it('drains FIFO in order, sends text replies, releases the lock', async () => {
@@ -48,11 +66,11 @@ describe('runCsDrain / processOneCsInbound', () => {
       .mockResolvedValueOnce(null);
     runCsTurn.mockResolvedValue({ reply: { kind: 'text', body: 'שלום' }, phase: 'onboarding' });
     const { runCsDrain } = await import('@/lib/cs/wa-cs-worker');
-    const r = await runCsDrain('x');
+    const r = await runCsDrain('ch-1', 'x');
     expect(r).toEqual({ status: 'ok', processed: 2 });
     expect(sendText).toHaveBeenCalledTimes(2);
     expect(sendText.mock.calls[0][0]).toMatchObject({ to: 'x', body: 'שלום' });
-    expect(release).toHaveBeenCalledWith('x');
+    expect(release).toHaveBeenCalledWith('ch-1', 'x');
     // Canonical invariant: the reply is sent BEFORE the done guard is set, so a crash
     // between them re-processes instead of losing the reply.
     expect(sendText.mock.invocationCallOrder[0]).toBeLessThan(redisSetNx.mock.invocationCallOrder[0]);

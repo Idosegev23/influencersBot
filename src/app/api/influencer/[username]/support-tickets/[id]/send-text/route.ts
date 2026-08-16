@@ -12,6 +12,7 @@ import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
 import { getAgentSession } from '@/lib/auth/agent-auth';
 import { sendText } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { getServiceWindow } from '@/lib/support/service-window';
 
 export const runtime = 'nodejs';
@@ -74,7 +75,7 @@ export async function POST(
 
   const agent = await getAgentSession(username);
 
-  const result = await sendText({ to: ticket.customer_phone, body: messageBody });
+  const result = await sendText({ channel: await getBestieChannel(), to: ticket.customer_phone, body: messageBody });
 
   await supabase.from('support_ticket_history').insert({
     ticket_id: ticket.id,

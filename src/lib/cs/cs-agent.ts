@@ -180,7 +180,7 @@ export interface CsTurnInput {
 
 export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>): Promise<CsTurnResult> {
   return runCsTurnCore(
-    { identity: whatsappIdentity(job.waId), text: job.textBody || '', image: job.image ?? null, contactId: job.contactId ?? null },
+    { identity: whatsappIdentity(job.waId, job.waChannelId), text: job.textBody || '', image: job.image ?? null, contactId: job.contactId ?? null },
     depsOverride,
   );
 }

@@ -1,4 +1,5 @@
 import { sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
+import type { WaChannel } from '@/lib/whatsapp-cloud/channels';
 import { enqueueCsMessage } from '@/lib/cs/wa-cs-queue';
 import { publishCsDrain } from '@/lib/cs/wa-cs-publish';
 
@@ -9,6 +10,8 @@ import { publishCsDrain } from '@/lib/cs/wa-cs-publish';
  * message was queued (so the caller stops routing). Mirrors maybeEnqueueAgentJob (route.ts:346).
  */
 export async function routeInboundToCustomerService(input: {
+  waChannelId: string;
+  channel: WaChannel;
   waId: string;
   contactId: string | null;
   msg: any;
@@ -17,12 +20,13 @@ export async function routeInboundToCustomerService(input: {
   // Instant feedback — fire-and-forget so they add no latency. 👀 lands first; the worker swaps
   // it to ✅/⚠️ when the reply is ready. Typing also marks-as-read.
   if (input.msg?.id) {
-    void sendReaction({ to: input.waId, messageId: input.msg.id, emoji: '👀' }).catch(() => {});
-    void sendTyping(input.msg.id).catch(() => {});
+    void sendReaction({ channel: input.channel, to: input.waId, messageId: input.msg.id, emoji: '👀' }).catch(() => {});
+    void sendTyping(input.msg.id, input.channel).catch(() => {});
   }
 
   try {
     await enqueueCsMessage({
+      waChannelId: input.waChannelId,
       waId: input.waId,
       contactId: input.contactId,
       msg: input.msg,
@@ -36,7 +40,7 @@ export async function routeInboundToCustomerService(input: {
 
   // Safely queued; wake the drain (bucket-dedup coalesces a burst to ~1 publish). If this throws,
   // the message still gets picked up by the next inbound's drain or the sweep cron — so don't fail.
-  try { await publishCsDrain(input.waId); }
+  try { await publishCsDrain(input.waChannelId, input.waId); }
   catch (e) { console.error('[cs] publishCsDrain failed (queued; next trigger will drain)', e); }
 
   return { claimed: true };

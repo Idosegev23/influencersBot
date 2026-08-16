@@ -19,6 +19,7 @@
  */
 
 import { sendTemplate, toWaId, type WhatsAppSendResult } from '@/lib/whatsapp-cloud/client';
+import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { createClient } from '@/lib/supabase';
 
 // ---------------------------------------------------------------------
@@ -156,7 +157,7 @@ async function runTemplate(args: {
   });
 
   try {
-    const result = await sendTemplate({
+    const result = await sendTemplate({ channel: await getBestieChannel(),
       to: args.to,
       templateName: args.templateName,
       languageCode: LANG,
