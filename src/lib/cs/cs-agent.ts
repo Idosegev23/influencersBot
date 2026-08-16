@@ -187,7 +187,7 @@ export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>)
 
 export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<CsAgentDeps>): Promise<CsTurnResult> {
   const deps: CsAgentDeps = { callModel: depsOverride?.callModel ?? defaultCallModel };
-  const { channel, channelUserId } = identityKey(input.identity);
+  const { channel, channelUserId, waChannelId } = identityKey(input.identity);
   // waId is the legacy name for the channel user id — on WhatsApp they are the same value, and
   // in M1 only WhatsApp reaches this path (adapters land in M2/M3).
   const waId = channelUserId;
@@ -195,7 +195,11 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   // detectHandoff and the escalation transcript; the ACTUAL photo is threaded to the model below.
   const img = input.image ?? null;
   const userMessage = (img ? (img.caption ? `[תמונה] ${img.caption}` : '[הלקוח/ה שלח/ה תמונה]') : (input.text || '')).trim();
-  let session = (await loadCsSessionByChannel(channel, channelUserId)) || (await createCsSession(channelUserId, input.contactId ?? null, channel));
+  // The session key includes WHICH NUMBER the message arrived on (migration 075). Omitting
+  // waChannelId here would look up `wa_channel_id IS NULL`, miss every backfilled session, and
+  // mint a duplicate on every turn — losing the conversation's memory.
+  let session = (await loadCsSessionByChannel(channel, channelUserId, waChannelId))
+    || (await createCsSession(channelUserId, input.contactId ?? null, channel, waChannelId));
 
   // Effective identity (spec §7): a phone claimed THIS turn, or one stored on the session from an
   // earlier turn, upgrades a claimed-channel identity to phone_claimed. WhatsApp is untouched.
