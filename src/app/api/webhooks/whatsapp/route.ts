@@ -321,6 +321,7 @@ async function processWebhook(payload: any): Promise<void> {
         // 4th branch — unknown sender, no open ticket → customer-service bot.
         await maybeRouteCs({
           channel: waChannel,
+          boundAccountId: inbound.boundAccountId,   // null on Bestie's shared number
           isItamar: isItamarSender(waId),
           handledAsAgent,
           ticketId: ticketMatch,
@@ -447,12 +448,14 @@ export async function maybeRouteCs(args: {
   msg: any;
   textBody: string | null;
   channel: WaChannel;
+  boundAccountId?: string | null;
 }): Promise<void> {
   if (args.isItamar || args.handledAsAgent || args.ticketId) return;
   try {
     await routeInboundToCustomerService({
       waChannelId: args.channel.id,
       channel: args.channel,
+      boundAccountId: args.boundAccountId ?? null,
       waId: args.waId,
       contactId: args.contactId,
       msg: args.msg,

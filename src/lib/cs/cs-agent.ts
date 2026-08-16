@@ -180,7 +180,15 @@ export interface CsTurnInput {
 
 export async function runCsTurn(job: CsJob, depsOverride?: Partial<CsAgentDeps>): Promise<CsTurnResult> {
   return runCsTurnCore(
-    { identity: whatsappIdentity(job.waId, job.waChannelId), text: job.textBody || '', image: job.image ?? null, contactId: job.contactId ?? null },
+    {
+      identity: whatsappIdentity(job.waId, job.waChannelId),
+      text: job.textBody || '',
+      image: job.image ?? null,
+      contactId: job.contactId ?? null,
+      // Set only on a customer channel: the NUMBER names the tenant, so the brain never
+      // gets resolve_brand/bind_brand and reads are scoped to that account.
+      boundAccountId: job.boundAccountId ?? undefined,
+    },
     depsOverride,
   );
 }
@@ -206,7 +214,7 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   const storedClaimedPhone = typeof (session.context as any)?.claimedPhone === 'string' ? (session.context as any).claimedPhone : undefined;
   const identity = withClaimedPhone(input.identity, input.claimedPhone ?? storedClaimedPhone);
 
-  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity, lastImageUrl: img?.url ?? null };
+  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, preBoundAccountId: input.boundAccountId ?? null, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity, lastImageUrl: img?.url ?? null };
 
   // Web channels (spec §5): the account IS the brand — bind up-front so the very first CS turn
   // already speaks with the brand persona and every tool scopes correctly. The whatsapp_cs.enabled
@@ -273,6 +281,8 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   const toolset = buildCsToolset({
     channel: ctx.identity.channel,
     account: accountMeta ? { archetype: accountMeta.config?.archetype, config: accountMeta.config } : null,
+    // Address-decided tenant (customer's own number / web channel) — NOT a mid-conversation bind.
+    preBoundAccountId: input.boundAccountId ?? null,
   });
   const toolMap = new Map(toolset.tools.map((t) => [t.def.function.name, t]));
   const history = session.active_chat_session_id ? await loadHistory(session.active_chat_session_id) : [];

@@ -9,6 +9,9 @@ import type { CsImage } from './cs-media';
 
 export interface CsJob {
   waChannelId: string;      // which business number this arrived on
+  // Customer channel only: the account the NUMBER belongs to. Null on Bestie's shared number,
+  // where the brand is discovered in conversation instead.
+  boundAccountId?: string | null;
   waId: string;
   msg: any;                 // raw inbound WhatsApp message object
   textBody: string | null;  // pre-extracted (text/button/interactive title)

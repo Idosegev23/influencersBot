@@ -12,6 +12,7 @@ import { publishCsDrain } from '@/lib/cs/wa-cs-publish';
 export async function routeInboundToCustomerService(input: {
   waChannelId: string;
   channel: WaChannel;
+  boundAccountId?: string | null;
   waId: string;
   contactId: string | null;
   msg: any;
@@ -27,6 +28,7 @@ export async function routeInboundToCustomerService(input: {
   try {
     await enqueueCsMessage({
       waChannelId: input.waChannelId,
+      boundAccountId: input.boundAccountId ?? null,
       waId: input.waId,
       contactId: input.contactId,
       msg: input.msg,

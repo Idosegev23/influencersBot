@@ -18,10 +18,18 @@ async function previouslyEngagedAccountIds(waId: string): Promise<string[]> {
 }
 
 // Open (non-terminal) whatsapp_cs threads for this shopper, newest first, with the brand display name.
-async function openCsThreads(waId: string): Promise<Array<{ ticketId: string; brand: string; topic: string; status: string }>> {
-  const { data } = await supabaseAdmin
+export async function openCsThreads(
+  waId: string,
+  preBoundAccountId?: string | null,
+): Promise<Array<{ ticketId: string; brand: string; topic: string; status: string }>> {
+  let q = supabaseAdmin
     .from('support_requests').select('id, account_id, status, message, metadata, accounts(config)')
-    .in('source', CS_TICKET_SOURCES).in('customer_phone', phoneVariants(waId)).order('updated_at', { ascending: false }).limit(10);
+    .in('source', CS_TICKET_SOURCES).in('customer_phone', phoneVariants(waId));
+  // On a customer's own number the tenant is fixed by the address, so listing threads from other
+  // brands would hand this tenant another's customer relationship. On Bestie's shared number the
+  // cross-brand listing IS the feature (adaptive re-entry), so it stays unfiltered there.
+  if (preBoundAccountId) q = q.eq('account_id', preBoundAccountId);
+  const { data } = await q.order('updated_at', { ascending: false }).limit(10);
   return ((data as any[]) || []).filter((r) => !TERMINAL_TICKET.has(r.status)).map((r) => ({
     ticketId: r.id,
     brand: r.accounts?.config?.display_name || r.accounts?.config?.username || 'המותג',
@@ -96,7 +104,7 @@ const listOpenThreadsTool: CsTool = {
     parameters: { type: 'object', properties: {} },
   } },
   async handler(_args, ctx) {
-    return { ok: true, data: { threads: await openCsThreads(identityPhone(ctx.identity) ?? ctx.waId) } };
+    return { ok: true, data: { threads: await openCsThreads(identityPhone(ctx.identity) ?? ctx.waId, ctx.preBoundAccountId ?? null) } };
   },
 };
 

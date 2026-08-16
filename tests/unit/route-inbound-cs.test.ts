@@ -39,7 +39,7 @@ describe('routeInboundToCustomerService', () => {
     const r = await routeInboundToCustomerService({ waChannelId: 'ch-1', channel: { id: 'ch-1', phoneNumberId: 'PNID', token: 'T' } as any, waId: '972500000000', contactId: 'c1', msg: { id: 'm1' }, textBody: 'שלום' });
     expect(sendReaction).toHaveBeenCalledWith(expect.objectContaining({ to: '972500000000', messageId: 'm1', emoji: '👀' }));
     expect(sendTyping).toHaveBeenCalledWith('m1', expect.objectContaining({ id: 'ch-1' }));
-    expect(enqueue).toHaveBeenCalledWith({ waChannelId: 'ch-1', waId: '972500000000', contactId: 'c1', msg: { id: 'm1' }, textBody: 'שלום' });
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ waChannelId: 'ch-1', waId: '972500000000', contactId: 'c1', msg: { id: 'm1' }, textBody: 'שלום' }));
     expect(publish).toHaveBeenCalledWith('ch-1', '972500000000');
     expect(r).toEqual({ claimed: true });
   });

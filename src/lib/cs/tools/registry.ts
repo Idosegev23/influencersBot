@@ -9,6 +9,12 @@ export interface CsToolsetOpts {
   channel: CsChannel;
   // null = pre-bind on WhatsApp's shared number (brand unknown) → the full set, today's behavior.
   account: { archetype?: string | null; config?: any } | null;
+  /**
+   * Set when the TENANT WAS DECIDED BY THE ADDRESS, not by the conversation — i.e. a customer's
+   * own WhatsApp number (whatsapp_channels), or a web channel. Distinct from `account`, which is
+   * also set once the shopper binds a brand mid-conversation on the shared number.
+   */
+  preBoundAccountId?: string | null;
 }
 
 const WHATSAPP_ONLY = new Set(['resolve_brand', 'bind_brand']); // shared-number problem; elsewhere the account IS the brand
@@ -26,7 +32,10 @@ export function buildCsToolset(opts: CsToolsetOpts): { tools: CsTool[]; defs: Op
   const all = getCsTools();
   const tools = all.filter((t) => {
     const name = t.def.function.name;
-    if (WHATSAPP_ONLY.has(name) && opts.channel !== 'whatsapp') return false;
+    // Brand-switching tools exist ONLY to solve the shared-number problem. Where the address
+    // already names the tenant, offering them would let the conversation be rebound to another
+    // account — the leak is closed by never offering the tool, not by validating its arguments.
+    if (WHATSAPP_ONLY.has(name) && (opts.channel !== 'whatsapp' || opts.preBoundAccountId)) return false;
     if (!opts.account) return true;
     const archetype = opts.account.archetype || 'brand';
     if (archetype === 'government_ministry') return GOV_ALLOWED.has(name);

@@ -22,6 +22,9 @@ import type { CsIdentity } from '@/lib/cs/identity';
 export interface CsToolCtx {
   waId: string;                  // channel_user_id (WhatsApp send address / ticket key; still WA-shaped in M1)
   accountId: string | null;      // bound brand (null until bind_brand); scopes EVERY read
+  // Set when the tenant was decided by the ADDRESS (customer's own number / web channel) rather
+  // than by the conversation. Tools use it to refuse cross-tenant reads structurally.
+  preBoundAccountId?: string | null;
   chatSessionId: string | null;
   ticketId: string | null;
   customerName: string | null;
