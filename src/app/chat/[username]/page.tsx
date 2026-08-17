@@ -189,6 +189,8 @@ const CHAT_PAGE_STRINGS = {
     csContentChoice: 'לשוחח עם {name} 💬',
     csStarter: 'יש לי בעיה עם הזמנה',
     csGreeting: 'היי! כאן שירות הלקוחות 🙂 איך אפשר לעזור?',
+    csModeHintContent: 'שאלות, תוכן והמלצות',
+    csModeHintCs: 'הזמנות, החזרות ותקלות',
     csSwitchedToCs: 'עברת לשירות לקוחות',
     csSwitchedToContent: 'חזרת לשיחה עם {name}',
     csDetailsSent: 'שלחתי את הפרטים',
@@ -203,6 +205,8 @@ const CHAT_PAGE_STRINGS = {
     csContentChoice: 'Chat with {name} 💬',
     csStarter: 'I have an issue with my order',
     csGreeting: "Hi! You've reached customer service 🙂 How can I help?",
+    csModeHintContent: 'Questions, content, tips',
+    csModeHintCs: 'Orders, returns, issues',
     csSwitchedToCs: 'Switched to customer service',
     csSwitchedToContent: 'Back to chatting with {name}',
     csDetailsSent: 'Sent my details',
@@ -613,6 +617,17 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const streamMetaRef = useRef<StreamMeta | null>(null);
   // --- CS-engine mode (spec §5) ---
   const csWebEnabled = (influencer as any)?._rawConfig?.cs_web?.enabled === true;
+  /**
+   * Influencers get no mode switch. Asking a visitor to choose between two
+   * brains before they have said anything is our architecture leaking into the
+   * UI — and on a creator's page the "customer service" half rarely means
+   * anything (no orders, no shipments). Support still works: sendStreamMessage
+   * routes to the CS brain by itself when the message reads as a complaint, so
+   * the handover is inferred from the conversation instead of chosen up front.
+   * Brands and service providers keep the explicit switch.
+   */
+  const showModeToggle = csWebEnabled
+    && (influencer as any)?._rawConfig?.archetype !== 'influencer';
   const [csMode, setCsMode] = useState(false);
   const csModeRef = useRef(false);                 // read at send time inside the wrapper chokepoint
   const csDetailsRef = useRef<{ phone?: string; orderNumber?: string } | null>(null); // one-turn claim
@@ -1942,7 +1957,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           button fired an analytics event and returned, so it
                           looked broken. A segmented switch shows which mode you
                           are in and makes both directions real. */}
-                      {csWebEnabled && (
+                      {showModeToggle && (
                         // Same measure as the ChatInput and the banner above it —
                         // left to stretch, the switch ran the full page width and
                         // dwarfed the column it belongs to.
@@ -1956,6 +1971,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               (influencer as any).display_name || (influencer as any).displayName || '',
                             )}
                             csLabel={chatStrings(influencer).csChoice}
+                            contentHint={chatStrings(influencer).csModeHintContent}
+                            csHint={chatStrings(influencer).csModeHintCs}
                             onChange={(next) => switchChatMode(next, 'empty')}
                           />
                         </div>
@@ -2020,7 +2037,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           in the empty state too, but entering CS mode appends a
                           greeting — which unmounts the empty state and, with it,
                           the only control that could switch back. */}
-                      {csWebEnabled && (
+                      {showModeToggle && (
                         <div className="mx-auto w-full max-w-[560px]">
                         <ModeToggle
                           mode={csMode ? 'cs' : 'content'}
@@ -2031,6 +2048,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             (influencer as any).display_name || (influencer as any).displayName || '',
                           )}
                           csLabel={chatStrings(influencer).csChoice}
+                          contentHint={chatStrings(influencer).csModeHintContent}
+                          csHint={chatStrings(influencer).csModeHintCs}
                           disabled={isTyping || isStreamActive}
                           onChange={(next) => switchChatMode(next, 'thread')}
                         />
