@@ -73,24 +73,44 @@ export async function persistAccountAvatar(
     .limit(1)
     .maybeSingle();
 
-  const sourceUrl = profile?.profile_pic_url || (existing && !existing.includes(SUPABASE_HOST_HINT) ? existing : null);
+  const storedUrl = profile?.profile_pic_url || (existing && !existing.includes(SUPABASE_HOST_HINT) ? existing : null);
 
-  if (!sourceUrl) {
-    return { ok: false, reason: 'no instagram profile_pic_url found' };
-  }
-
-  let buffer: Buffer;
-  let contentType: string;
-  try {
-    const res = await fetch(sourceUrl, { headers: IG_HEADERS, signal: AbortSignal.timeout(20000) });
-    if (!res.ok) {
-      return { ok: false, reason: `download failed: ${res.status}` };
+  async function download(url: string): Promise<{ buffer: Buffer; contentType: string } | string> {
+    try {
+      const res = await fetch(url, { headers: IG_HEADERS, signal: AbortSignal.timeout(20000) });
+      if (!res.ok) return `download failed: ${res.status}`;
+      return {
+        contentType: res.headers.get('content-type') || 'image/jpeg',
+        buffer: Buffer.from(await res.arrayBuffer()),
+      };
+    } catch (e: any) {
+      return `download error: ${e?.message || e}`;
     }
-    contentType = res.headers.get('content-type') || 'image/jpeg';
-    buffer = Buffer.from(await res.arrayBuffer());
-  } catch (e: any) {
-    return { ok: false, reason: `download error: ${e?.message || e}` };
   }
+
+  // Every URL we have on file is an Instagram CDN link with a signed expiry,
+  // and this function only ever runs because one of them went stale. So when
+  // the stored URL will not download, re-read the profile from the scraper and
+  // try the live one — otherwise the account is stuck showing a coloured
+  // initial forever, which is the exact failure this is meant to prevent.
+  let got = storedUrl ? await download(storedUrl) : 'no instagram profile_pic_url on file';
+
+  if (typeof got === 'string') {
+    const username: string | undefined = cfg.username;
+    if (!username) return { ok: false, reason: `${got}; no username to refetch with` };
+    try {
+      const { scrapeInstagramProfile } = await import('@/lib/scraping/scrapeCreatorsClient');
+      const fresh = await scrapeInstagramProfile(username);
+      const freshUrl = (fresh as any)?.profile_pic_url;
+      if (!freshUrl) return { ok: false, reason: `${got}; scraper returned no profile_pic_url` };
+      got = await download(freshUrl);
+    } catch (e: any) {
+      return { ok: false, reason: `${got}; refetch failed: ${e?.message || e}` };
+    }
+  }
+
+  if (typeof got === 'string') return { ok: false, reason: got };
+  const { buffer, contentType } = got;
 
   const path = `${accountId}/profile.${pickExt(contentType)}`;
   const { error: upErr } = await supabase.storage
