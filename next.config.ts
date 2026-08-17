@@ -37,6 +37,12 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https:",
+      // Banner reel videos stream from Supabase storage. Without an explicit
+      // media-src these fall back to default-src 'self' and Chrome rejects the
+      // load with "Media load rejected by URL safety check" — which reads like
+      // a codec problem and is not one. Scoped to our storage host rather than
+      // `https:` so this stays narrower than img-src.
+      "media-src 'self' blob: https://*.supabase.co",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://generativelanguage.googleapis.com https://vercel.live https://vitals.vercel-insights.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.facebook.com https://analytics.tiktok.com https://*.tiktok.com",
       "frame-ancestors 'none'",
     ].join('; '),

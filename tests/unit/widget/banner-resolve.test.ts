@@ -160,6 +160,78 @@ describe('resolveBanner — art', () => {
   });
 });
 
+describe('resolveBanner — video art', () => {
+  const reels = [
+    { video: 'https://cdn/a.mp4', poster: 'https://cdn/a.jpg' },
+    { video: 'https://cdn/b.mp4', poster: 'https://cdn/b.jpg' },
+  ];
+
+  it('returns every reel so the renderer can rotate between them', () => {
+    const config = { chat: { banner: { headline: 'שלום', art: { mode: 'video', reels } } } };
+    const art = resolveBanner(config, 'chat', CTX)!.art;
+    expect(art.mode).toBe('video');
+    expect(art.reels).toHaveLength(2);
+    expect(art.reels![0]).toEqual({ video: 'https://cdn/a.mp4', poster: 'https://cdn/a.jpg' });
+  });
+
+  it('keeps gradient stops in video mode — they paint the box before the first frame', () => {
+    const config = { chat: { banner: { headline: 'שלום', art: { mode: 'video', reels } } } };
+    const art = resolveBanner(config, 'chat', CTX)!.art;
+    expect(art.from).toMatch(/^hsl\(/);
+  });
+
+  it('drops reels with no video url', () => {
+    const config = {
+      chat: { banner: { headline: 'שלום', art: { mode: 'video', reels: [{ poster: 'https://cdn/a.jpg' }, ...reels] } } },
+    };
+    expect(resolveBanner(config, 'chat', CTX)!.art.reels).toHaveLength(2);
+  });
+
+  it('drops reels whose video url is not http(s) — config is not a script sink', () => {
+    const config = {
+      chat: { banner: { headline: 'שלום', art: { mode: 'video', reels: [{ video: 'javascript:alert(1)' }, ...reels] } } },
+    };
+    expect(resolveBanner(config, 'chat', CTX)!.art.reels).toHaveLength(2);
+  });
+
+  it('allows a reel with no poster — the gradient shows until the first frame', () => {
+    const config = {
+      chat: { banner: { headline: 'שלום', art: { mode: 'video', reels: [{ video: 'https://cdn/a.mp4' }] } } },
+    };
+    expect(resolveBanner(config, 'chat', CTX)!.art.reels![0].poster).toBeNull();
+  });
+
+  it('caps the rotation at five so config cannot balloon the payload', () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({ video: `https://cdn/${i}.mp4` }));
+    const config = { chat: { banner: { headline: 'שלום', art: { mode: 'video', reels: many } } } };
+    expect(resolveBanner(config, 'chat', CTX)!.art.reels).toHaveLength(5);
+  });
+
+  it('falls back to image mode when video mode has no usable reels', () => {
+    const config = {
+      widget: {
+        banner: { headline: 'שלום', art: { mode: 'video', reels: [] } },
+        coverImage: 'https://cdn/cover.jpg',
+      },
+    };
+    const art = resolveBanner(config, 'widget', CTX)!.art;
+    expect(art.mode).toBe('image');
+    expect(art.image).toBe('https://cdn/cover.jpg');
+  });
+
+  it('falls all the way back to gradient when there is no video and no image', () => {
+    const config = { widget: { banner: { headline: 'שלום', art: { mode: 'video' } } } };
+    const art = resolveBanner(config, 'widget', CTX)!.art;
+    expect(art.mode).toBe('gradient');
+    expect(art.reels).toBeNull();
+  });
+
+  it('leaves reels null in gradient and image modes', () => {
+    const config = { widget: { banner: { headline: 'שלום', art: { mode: 'gradient', reels } } } };
+    expect(resolveBanner(config, 'widget', CTX)!.art.reels).toBeNull();
+  });
+});
+
 describe('resolveBanner — copy limits and sanitation', () => {
   it('truncates over-long copy instead of letting it break the layout', () => {
     const config = {

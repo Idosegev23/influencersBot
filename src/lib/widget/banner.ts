@@ -13,14 +13,26 @@
  */
 
 export type BannerSurface = 'widget' | 'chat';
-export type BannerArtMode = 'gradient' | 'image';
+export type BannerArtMode = 'gradient' | 'image' | 'video';
 export type BannerCtaAction = 'prefill' | 'url' | 'none';
+
+export interface BannerReel {
+  /** Public storage URL of a persisted mp4. Instagram CDN URLs expire. */
+  video: string;
+  /** First-frame image shown before the video decodes; may be absent. */
+  poster: string | null;
+}
 
 export interface ResolvedBannerArt {
   mode: BannerArtMode;
   /** Non-null only in `image` mode. */
   image: string | null;
-  /** Always populated — the scrim behind an image needs a color too. */
+  /**
+   * Non-null only in `video` mode. The full rotation — the renderer picks one
+   * per visit, so this module stays pure and testable.
+   */
+  reels: BannerReel[] | null;
+  /** Always populated — the scrim behind an image or video needs a color too. */
   from: string;
   to: string;
 }
@@ -61,6 +73,8 @@ const MAX_EYEBROW = 32;
 const MAX_HEADLINE = 70;
 const MAX_SUBLINE = 110;
 const MAX_STARTERS = 4;
+/** Rotation cap. Each reel is a few MB of stored mp4 and a config payload row. */
+const MAX_REELS = 5;
 
 /** Trim, treat whitespace-only as absent, and cap so long copy can't break the layout. */
 function copy(value: unknown, max: number): string | null {
@@ -112,18 +126,50 @@ export function glowStops(primaryColor: string | null | undefined): [string, str
   return [stop(0), stop(-28), stop(26)];
 }
 
+function httpUrl(value: unknown, max: number): string | null {
+  const raw = copy(value, max);
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  } catch {
+    return null;
+  }
+  return raw;
+}
+
+function resolveReels(raw: unknown): BannerReel[] | null {
+  if (!Array.isArray(raw)) return null;
+  const reels: BannerReel[] = [];
+  for (const item of raw) {
+    const video = httpUrl((item as any)?.video, 2048);
+    if (!video) continue; // a reel with no playable source is not a reel
+    reels.push({ video, poster: httpUrl((item as any)?.poster, 2048) });
+    if (reels.length >= MAX_REELS) break;
+  }
+  return reels.length ? reels : null;
+}
+
 function resolveArt(raw: any, widgetConfig: any, primaryColor: string | null): ResolvedBannerArt {
   const stops = glowStops(primaryColor);
   const from = copy(raw?.from, 64) || stops[0];
   const to = copy(raw?.to, 64) || stops[1];
+  const base = { image: null, reels: null, from, to };
 
-  const wantsImage = raw?.mode === 'image';
+  // Degrade downward — video → image → gradient — so a mode whose asset is
+  // missing never leaves a 206px empty rectangle, which is exactly the failure
+  // the banner exists to remove.
+  if (raw?.mode === 'video') {
+    const reels = resolveReels(raw.reels);
+    if (reels) return { ...base, mode: 'video', reels };
+  }
+
   const image = copy(raw?.image, 2048) || copy(widgetConfig?.coverImage, 2048);
+  if ((raw?.mode === 'image' || raw?.mode === 'video') && image) {
+    return { ...base, mode: 'image', image };
+  }
 
-  // `image` mode with nothing to show is a 206px empty rectangle — exactly the
-  // failure the banner exists to remove. Fall through to the gradient instead.
-  if (wantsImage && image) return { mode: 'image', image, from, to };
-  return { mode: 'gradient', image: null, from, to };
+  return { ...base, mode: 'gradient' };
 }
 
 function resolveCta(raw: any): ResolvedBannerCta | null {

@@ -1362,14 +1362,23 @@
   // Art layer: gradient from the brand color, or the account's image with a
   // scrim. Either way there is a dark ground under the copy, so white text is
   // legible without measuring the artwork.
+  var BANNER_SCRIM = 'linear-gradient(180deg,rgba(0,0,0,0.15) 0%,rgba(0,0,0,0.55) 65%,rgba(0,0,0,0.72) 100%)';
+
   function bannerArtCss() {
     var b = config.banner;
     var grad = 'linear-gradient(135deg,var(--ibot-banner-from),var(--ibot-banner-to))';
-    if (b && b.art && b.art.mode === 'image' && b.art.image) {
-      var url = String(b.art.image).replace(/['"\\]/g, '');
+    var art = b && b.art;
+    // `video` mode is a chat-page feature: the widget lives on the customer's
+    // own site, where autoplaying a few MB of mp4 spends THEIR visitors'
+    // bandwidth. Here the reel degrades to its poster frame, which is the same
+    // image and costs nothing extra.
+    var img = art && (art.mode === 'image' ? art.image
+      : (art.mode === 'video' && art.reels && art.reels[0] ? art.reels[0].poster : null));
+    if (img) {
+      var url = String(img).replace(/['"\\]/g, '');
       // Scrim first (painted on top), image second — a bare photo behind white
       // 25px text is unreadable on light frames.
-      return "background-image:linear-gradient(180deg,rgba(0,0,0,0.15) 0%,rgba(0,0,0,0.55) 65%,rgba(0,0,0,0.72) 100%),url('" + url + "');" +
+      return "background-image:" + BANNER_SCRIM + ",url('" + url + "');" +
         'background-size:cover;background-position:center;';
     }
     return 'background-image:' + grad + ';';

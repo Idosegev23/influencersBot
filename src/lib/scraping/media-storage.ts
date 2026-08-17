@@ -8,6 +8,10 @@
  */
 
 const BUCKET = 'post-media';
+// Separate bucket: `post-media` is capped at 10MB and restricted to image MIME
+// types, which is the guard rail that stops a routine scan from filling it
+// with video. See migration 077.
+const VIDEO_BUCKET = 'reel-video';
 
 type AnySupabase = {
   storage: {
@@ -120,6 +124,71 @@ export async function persistPostMedia(
     stored_thumbnail_url: storedThumbnail,
     media_stored_at: anySaved ? new Date().toISOString() : null,
   };
+}
+
+/**
+ * Persist a reel's mp4 to storage and return its public URL.
+ *
+ * Kept separate from persistPostMedia, which handles images only and is called
+ * for every post on every scan — videos are 3-8MB each and persisting all of
+ * them would blow up storage and scan time for no benefit. Only the handful of
+ * reels chosen for a banner rotation need a permanent URL.
+ *
+ * This exists because Instagram's mp4 URLs are signed with a short `oe=`
+ * expiry: the ones sitting in `instagram_posts.media_urls` are typically dead
+ * within a week or two, so a reel can only be played from our own storage.
+ * Pass a URL fetched fresh from the scraper, not one read back from the DB.
+ */
+export interface PersistedReel {
+  url: string | null;
+  bytes: number;
+  /** Why it failed, for the caller to print. Null on success. */
+  error: string | null;
+}
+
+export async function persistReelVideo(
+  supabase: AnySupabase,
+  accountId: string,
+  shortcode: string,
+  videoUrl: string,
+): Promise<PersistedReel> {
+  if (!/cdninstagram\.com|fbcdn\.net/.test(videoUrl)) {
+    return { url: videoUrl, bytes: 0, error: null };
+  }
+
+  let buffer: Buffer;
+  let contentType: string;
+  try {
+    // Longer than the image timeout: multi-megabyte bodies over a CDN that
+    // throttles unauthenticated range-less reads.
+    const res = await fetch(videoUrl, {
+      headers: { ...IG_HEADERS, Accept: 'video/mp4,video/*;q=0.9,*/*;q=0.8' },
+      signal: AbortSignal.timeout(120000),
+    });
+    if (!res.ok) return { url: null, bytes: 0, error: `download ${res.status} ${res.statusText}` };
+    contentType = res.headers.get('content-type') || 'video/mp4';
+    buffer = Buffer.from(await res.arrayBuffer());
+  } catch (e: any) {
+    return { url: null, bytes: 0, error: `download threw: ${e?.message || e}` };
+  }
+
+  // An expired signed URL comes back as a short HTML/JSON error body with a
+  // 200, not a 4xx — so size is the only reliable liveness check.
+  const bytes = buffer.byteLength;
+  if (bytes < 100_000) {
+    return { url: null, bytes, error: `body too small (${bytes}B) — URL likely expired` };
+  }
+
+  const path = `${accountId}/${shortcode}.mp4`;
+  const { error } = await supabase.storage
+    .from(VIDEO_BUCKET)
+    .upload(path, buffer, { contentType, upsert: true });
+  // Surface the real reason. Returning a bare null here hid a bucket MIME
+  // restriction behind "expired URL" and cost a full debugging round.
+  if (error) return { url: null, bytes, error: `upload: ${error.message}` };
+
+  const { data } = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(path);
+  return { url: data?.publicUrl || null, bytes, error: data?.publicUrl ? null : 'no public URL' };
 }
 
 /**
