@@ -51,7 +51,6 @@ import { useStreamChat, type StreamMeta, type StreamCards, type StreamDone } fro
 import { useChatMedia } from '@/hooks/useChatMedia';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { BannerHero } from '@/components/chat/BannerHero';
-import { ModeToggle } from '@/components/chat/ModeToggle';
 import { resolveBanner, BESTIE_PRIMARY } from '@/lib/widget/banner';
 import { NavTabs } from '@/components/chat/NavTabs';
 import { StarterPills } from '@/components/chat/StarterPills';
@@ -94,12 +93,7 @@ interface BrandInfo {
 
 interface Message {
   id: string;
-  /**
-   * `notice` is a thread divider, not a turn: it marks a mode change so the
-   * visitor can see that switching did something. It is rendered as a centred
-   * rule and is never sent to the model.
-   */
-  role: 'user' | 'assistant' | 'notice';
+  role: 'user' | 'assistant';
   content: string;
   action?: 'show_brands' | 'collect_input' | 'complete';
   brands?: BrandInfo[];
@@ -185,14 +179,7 @@ const CHAT_PAGE_STRINGS = {
     sendError: 'אופס, משהו השתבש. נסה לשלוח שוב או לנסח את השאלה אחרת',
     requiredFields: 'נא למלא את כל השדות החובה',
     submitError: 'שגיאה בשליחת הפנייה',
-    csChoice: 'שירות לקוחות 🛟',
-    csContentChoice: 'לשוחח עם {name} 💬',
     csStarter: 'יש לי בעיה עם הזמנה',
-    csGreeting: 'היי! כאן שירות הלקוחות 🙂 איך אפשר לעזור?',
-    csModeHintContent: 'שאלות, תוכן והמלצות',
-    csModeHintCs: 'הזמנות, החזרות ותקלות',
-    csSwitchedToCs: 'עברת לשירות לקוחות',
-    csSwitchedToContent: 'חזרת לשיחה עם {name}',
     csDetailsSent: 'שלחתי את הפרטים',
   },
   en: {
@@ -201,14 +188,7 @@ const CHAT_PAGE_STRINGS = {
     sendError: 'Something went wrong. Try sending again or rephrasing your question.',
     requiredFields: 'Please fill in all required fields.',
     submitError: 'Error submitting your request.',
-    csChoice: 'Customer service 🛟',
-    csContentChoice: 'Chat with {name} 💬',
     csStarter: 'I have an issue with my order',
-    csGreeting: "Hi! You've reached customer service 🙂 How can I help?",
-    csModeHintContent: 'Questions, content, tips',
-    csModeHintCs: 'Orders, returns, issues',
-    csSwitchedToCs: 'Switched to customer service',
-    csSwitchedToContent: 'Back to chatting with {name}',
     csDetailsSent: 'Sent my details',
   },
 } as const;
@@ -617,17 +597,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const streamMetaRef = useRef<StreamMeta | null>(null);
   // --- CS-engine mode (spec §5) ---
   const csWebEnabled = (influencer as any)?._rawConfig?.cs_web?.enabled === true;
-  /**
-   * Influencers get no mode switch. Asking a visitor to choose between two
-   * brains before they have said anything is our architecture leaking into the
-   * UI — and on a creator's page the "customer service" half rarely means
-   * anything (no orders, no shipments). Support still works: sendStreamMessage
-   * routes to the CS brain by itself when the message reads as a complaint, so
-   * the handover is inferred from the conversation instead of chosen up front.
-   * Brands and service providers keep the explicit switch.
-   */
-  const showModeToggle = csWebEnabled
-    && (influencer as any)?._rawConfig?.archetype !== 'influencer';
   const [csMode, setCsMode] = useState(false);
   const csModeRef = useRef(false);                 // read at send time inside the wrapper chokepoint
   const csDetailsRef = useRef<{ phone?: string; orderNumber?: string } | null>(null); // one-turn claim
@@ -636,40 +605,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   // CS mode had no exit: once entered, every later message routed to the CS
   // brain until the session was thrown away. A switch has to work both ways.
   const exitCsMode = useCallback(() => { csModeRef.current = false; setCsMode(false); }, []);
-  const csGreetedRef = useRef(false);
-
-  /**
-   * One handler for both directions, so switching always does something the
-   * visitor can see. Before this, entering CS pushed a greeting and leaving it
-   * pushed nothing at all — the switch moved but the thread did not, which
-   * made going back feel broken.
-   */
-  const switchChatMode = useCallback((next: 'content' | 'cs', from: string) => {
-    if ((next === 'cs') === csModeRef.current) return;
-    track('cs_choice_clicked', { choice: next, from });
-
-    const strings = chatStrings(influencer);
-    const who = (influencer as any)?.display_name || (influencer as any)?.displayName || '';
-    const notice: Message = {
-      id: `mode-${Date.now()}`,
-      role: 'notice',
-      content: next === 'cs' ? strings.csSwitchedToCs : strings.csSwitchedToContent.replace('{name}', who),
-    };
-
-    if (next === 'cs') {
-      enterCsMode();
-      // Greet once per visit. Flipping back and forth should not stack
-      // identical "you've reached customer service" messages.
-      const extra: Message[] = csGreetedRef.current
-        ? []
-        : [{ id: `cs-hi-${Date.now()}`, role: 'assistant', content: strings.csGreeting }];
-      csGreetedRef.current = true;
-      setMessages((prev) => [...prev, notice, ...extra]);
-    } else {
-      exitCsMode();
-      setMessages((prev) => [...prev, notice]);
-    }
-  }, [influencer, enterCsMode, exitCsMode]);
   const getPersistentAnonId = useCallback((): string => {
     try {
       let a = localStorage.getItem(`anon_id_${username}`);
@@ -1604,6 +1539,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     setSessionId(null);
     setInputValue('');
     setSupportState(null);
+    // Leave customer-service mode too. Entry is automatic — one complaint-
+    // shaped message routes the rest of the visit to the CS brain — and with
+    // no mode picker on the page this is the only way back. Without it, "new
+    // chat" cleared the thread but silently kept answering as support.
+    exitCsMode();
     inputRef.current?.focus();
   };
 
@@ -1951,35 +1891,13 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           )}
                       </motion.div>
 
-                      {/* CS mode switch (spec §5). Was two side-by-side buttons
-                          that read as a pair of actions rather than a choice of
-                          state — and only one of them did anything: the content
-                          button fired an analytics event and returned, so it
-                          looked broken. A segmented switch shows which mode you
-                          are in and makes both directions real. */}
-                      {showModeToggle && (
-                        // Same measure as the ChatInput and the banner above it —
-                        // left to stretch, the switch ran the full page width and
-                        // dwarfed the column it belongs to.
-                        <div className={`${isMobile ? 'w-[363px]' : 'w-[670px]'} max-w-full mb-3`}>
-                          <ModeToggle
-                            mode={csMode ? 'cs' : 'content'}
-                            dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
-                            primaryColor={BESTIE_PRIMARY}
-                            contentLabel={chatStrings(influencer).csContentChoice.replace(
-                              '{name}',
-                              (influencer as any).display_name || (influencer as any).displayName || '',
-                            )}
-                            csLabel={chatStrings(influencer).csChoice}
-                            contentHint={chatStrings(influencer).csModeHintContent}
-                            csHint={chatStrings(influencer).csModeHintCs}
-                            onChange={(next) => switchChatMode(next, 'empty')}
-                          />
-                        </div>
-                      )}
-                      {/* Starter pills — unified for ALL account types. When CS is enabled the
-                          CS choice button above IS the first support entry (Ido's design note:
-                          don't stack a duplicate support starter on top of the content pills). */}
+                      {/* No customer-service mode picker here, by design. It was
+                          two buttons, then a segmented switch, and both asked the
+                          visitor to choose between two brains before saying a
+                          word — our architecture showing through the UI. Support
+                          is inferred instead: sendStreamMessage routes to the CS
+                          brain on its own once a message reads as a complaint. */}
+                      {/* Starter pills — unified for ALL account types. */}
                       {/* A banner may pin its own starters; otherwise the dynamic
                           quickReplies stay in charge, so a config list can't
                           freeze the question set and go stale. */}
@@ -2033,49 +1951,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           onCtaClick={handleBannerCta}
                         />
                       )}
-                      {/* The switch has to survive the first message. It lives
-                          in the empty state too, but entering CS mode appends a
-                          greeting — which unmounts the empty state and, with it,
-                          the only control that could switch back. */}
-                      {showModeToggle && (
-                        <div className="mx-auto w-full max-w-[560px]">
-                        <ModeToggle
-                          mode={csMode ? 'cs' : 'content'}
-                          dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
-                          primaryColor={BESTIE_PRIMARY}
-                          contentLabel={chatStrings(influencer).csContentChoice.replace(
-                            '{name}',
-                            (influencer as any).display_name || (influencer as any).displayName || '',
-                          )}
-                          csLabel={chatStrings(influencer).csChoice}
-                          contentHint={chatStrings(influencer).csModeHintContent}
-                          csHint={chatStrings(influencer).csModeHintCs}
-                          disabled={isTyping || isStreamActive}
-                          onChange={(next) => switchChatMode(next, 'thread')}
-                        />
-                        </div>
-                      )}
                       {messages.map((msg, index) => {
-                        // Mode-change divider — a rule with a label, not a turn.
-                        if (msg.role === 'notice') {
-                          return (
-                            <motion.div
-                              key={msg.id}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ duration: 0.35 }}
-                              className="flex items-center gap-3 py-1"
-                              dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
-                            >
-                              <span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, transparent, #e2e0e6)' }} />
-                              <span className="whitespace-nowrap text-[11.5px] font-medium" style={{ color: '#8b8b93' }}>
-                                {msg.content}
-                              </span>
-                              <span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, #e2e0e6, transparent)' }} />
-                            </motion.div>
-                          );
-                        }
-
                         // For streaming messages, use the live text (strip suggestions tag)
                         const isStreamingThis = streamingMessageId === msg.id && isStreamActive;
                         const rawContent = isStreamingThis ? streamText : msg.content;
