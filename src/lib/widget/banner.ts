@@ -75,6 +75,8 @@ const MAX_SUBLINE = 110;
 const MAX_STARTERS = 4;
 /** Rotation cap. Each reel is a few MB of stored mp4 and a config payload row. */
 const MAX_REELS = 5;
+/** Bestie's brand purple — the same value `--color-primary` carries in globals.css. */
+export const BESTIE_PRIMARY = '#9334EB';
 
 /** Trim, treat whitespace-only as absent, and cap so long copy can't break the layout. */
 function copy(value: unknown, max: number): string | null {
@@ -243,7 +245,15 @@ export function resolveBanner(
   const headline = written || greeting || generic;
   if (!headline) return null;
 
-  const primaryColor = widgetConfig.primaryColor || config?.theme?.colors?.primary || null;
+  // Whose brand is this surface? The widget is embedded on the account's own
+  // site, so it wears the account's colour. /chat/[username] is Bestie's page —
+  // the account's `theme.colors` there is not a brand choice at all, it is a
+  // preset auto-assigned from `influencer_type` (every food account got the
+  // same orange), so letting it drive the page put an arbitrary colour on
+  // Bestie's surface.
+  const primaryColor = surface === 'chat'
+    ? BESTIE_PRIMARY
+    : (widgetConfig.primaryColor || config?.theme?.colors?.primary || null);
 
   return {
     eyebrow: copy(raw.eyebrow, MAX_EYEBROW),

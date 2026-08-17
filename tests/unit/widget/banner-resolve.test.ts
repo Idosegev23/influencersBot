@@ -115,6 +115,30 @@ describe('resolveBanner — chat inherits the copy it already has', () => {
   });
 });
 
+describe('resolveBanner — whose brand colour each surface wears', () => {
+  const config = {
+    widget: { banner: { headline: 'שלום' }, primaryColor: '#ea580c' },
+    chat: { banner: { headline: 'שלום' } },
+  };
+
+  it('the widget wears the account colour — it is embedded on the account\'s own site', () => {
+    const art = resolveBanner(config, 'widget', CTX)!.art;
+    expect(art.from).toBe(glowStops('#ea580c')[0]);
+  });
+
+  it('the chat page wears Bestie purple, ignoring the account colour', () => {
+    const art = resolveBanner(config, 'chat', CTX)!.art;
+    expect(art.from).toBe(glowStops('#9334EB')[0]);
+    expect(art.from).not.toBe(glowStops('#ea580c')[0]);
+  });
+
+  it('an explicit art gradient still wins on the chat page', () => {
+    const withArt = { chat: { banner: { headline: 'שלום', art: { from: '#111', to: '#222' } } } };
+    const art = resolveBanner(withArt, 'chat', CTX)!.art;
+    expect(art.from).toBe('#111');
+  });
+});
+
 describe('resolveBanner — art', () => {
   it('derives gradient stops from primaryColor when none are written', () => {
     const config = {

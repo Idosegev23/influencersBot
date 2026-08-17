@@ -42,7 +42,7 @@ const PlatformTab = dynamic(() => import('@/components/chat/PlatformTab'), { ssr
 const CustomersTab = dynamic(() => import('@/components/chat/CustomersTab'), { ssr: false });
 const DemoTab = dynamic(() => import('@/components/chat/DemoTab'), { ssr: false });
 const SupportTab = dynamic(() => import('@/components/chat/SupportTab'), { ssr: false });
-import { applyTheme, getGoogleFontsUrl } from '@/lib/theme';
+import { getGoogleFontsUrl } from '@/lib/theme';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { BrandCards } from '@/components/chat/BrandCards';
 import { SupportFlowForm } from '@/components/chat/SupportFlowForm';
@@ -52,7 +52,7 @@ import { useChatMedia } from '@/hooks/useChatMedia';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { BannerHero } from '@/components/chat/BannerHero';
 import { ModeToggle } from '@/components/chat/ModeToggle';
-import { resolveBanner } from '@/lib/widget/banner';
+import { resolveBanner, BESTIE_PRIMARY } from '@/lib/widget/banner';
 import { NavTabs } from '@/components/chat/NavTabs';
 import { StarterPills } from '@/components/chat/StarterPills';
 import SupportForm from '@/components/SupportForm';
@@ -799,7 +799,15 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         }
 
         setInfluencer(inf);
-        applyTheme(inf.theme);
+        // Deliberately NOT applyTheme(inf.theme). This is Bestie's chat page,
+        // so it wears Bestie's palette — the tokens :root already defines in
+        // globals.css. The account's `theme.colors` was never a brand choice:
+        // it is a preset picked from `influencer_type`, so every food account
+        // carried the same orange and every tech account the same blue, and
+        // applying it repainted Bestie's surface an arbitrary colour that also
+        // clashed with the purple hardcoded through the rest of the page.
+        // The embedded widget still uses the account's colour — that one sits
+        // on the account's own site. See resolveBanner's surface split.
 
         // Load brands and content
         const brandsRes = await fetch(`/api/chat/brands?username=${encodeURIComponent(username)}`);
@@ -1899,9 +1907,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           <ModeToggle
                             mode={csMode ? 'cs' : 'content'}
                             dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
-                            primaryColor={(influencer as any)?._rawConfig?.widget?.primaryColor
-                              || (influencer as any)?.theme?.colors?.primary
-                              || '#883fe2'}
+                            primaryColor={BESTIE_PRIMARY}
                             contentLabel={chatStrings(influencer).csContentChoice.replace(
                               '{name}',
                               (influencer as any).display_name || (influencer as any).displayName || '',
@@ -1988,9 +1994,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         <ModeToggle
                           mode={csMode ? 'cs' : 'content'}
                           dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
-                          primaryColor={(influencer as any)?._rawConfig?.widget?.primaryColor
-                            || (influencer as any)?.theme?.colors?.primary
-                            || '#883fe2'}
+                          primaryColor={BESTIE_PRIMARY}
                           contentLabel={chatStrings(influencer).csContentChoice.replace(
                             '{name}',
                             (influencer as any).display_name || (influencer as any).displayName || '',
