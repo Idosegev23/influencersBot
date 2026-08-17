@@ -71,7 +71,6 @@
   // Opening-choice dismissal: clicking "chat with the brand" reveals the normal widget
   // (smart chips) instead of stacking choice buttons AND chips together (Ido's design note:
   // the cold-start panel must never show 6-7 buttons at once).
-  var csChoiceDismissed = false;
   var supportForm = { name: '', email: '', phone: '', orderNumber: '', category: '', message: '', urgent: false, attachment: null, attachmentUploading: false, error: null, submitting: false };
   var leadForm = { name: '', email: '', phone: '', interest: '', error: null, submitting: false };
   var bookDemoForm = { name: '', email: '', company: '', teamSize: '', message: '', preferredTime: '', error: null, submitting: false };
@@ -1340,6 +1339,23 @@
       '<span>' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '</span></button>';
   }
 
+  // Quiet support affordance for the opening screen. It replaces the pair of
+  // cold-start choice buttons: "talk to the brand" was never a choice anyone
+  // needed spelled out — it is what the widget is — and putting support behind
+  // a full-width button gave a rare errand equal billing with the whole
+  // conversation. An icon at the top stays reachable without taking the stage,
+  // and the CS brain still picks up a complaint on its own.
+  function bannerSupportBtnHtml() {
+    if (!modules.support.enabled && !modules.customerService.enabled) return '';
+    var label = locale.support && locale.support.openLink ? locale.support.openLink : wlbl('תמיכה', 'Support');
+    return '<button id="ibot-banner-support" title="' + escapeHtml(label) + '" aria-label="' + escapeHtml(label) + '" ' +
+      'style="position:absolute;top:calc(10px + env(safe-area-inset-top));right:calc(12px + var(--ibot-newchat-w,116px));z-index:6;' +
+      'background:rgba(255,255,255,0.92);border:1px solid var(--ibot-border);color:#333;border-radius:999px;cursor:pointer;' +
+      'width:28px;height:28px;display:flex;align-items:center;justify-content:center;padding:0;">' +
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></button>';
+  }
+
   function poweredByFooterHtml() {
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 16px 10px;flex-shrink:0;font-size:10.5px;color:var(--ibot-text-muted);">' +
       '<span style="display:flex;align-items:center;gap:5px;">' + escapeHtml(wlbl('מבוסס על','Powered by')) +
@@ -1443,9 +1459,13 @@
     var b = config.banner;
     var minH = isMobile ? BANNER_H_MOBILE : BANNER_H_DESKTOP;
     var padX = isMobile ? '16px' : '20px';
+    // Copy is TOP-aligned here, unlike the chat page. The avatar straddles the
+    // bottom edge of this box, so anchoring the text to the block end put the
+    // headline directly under it. The chat page has no avatar overlap and
+    // keeps its copy at the bottom.
     return '<div id="ibot-banner" style="position:relative;overflow:hidden;min-height:' + minH + 'px;flex-shrink:0;' +
-      'display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;text-align:start;' +
-      'padding:' + BANNER_CHROME_CLEARANCE + 'px ' + padX + ' ' + (isMobile ? '22px' : '26px') + ';' +
+      'display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start;text-align:start;' +
+      'padding:' + BANNER_CHROME_CLEARANCE + 'px ' + padX + ' ' + (isMobile ? '52px' : '60px') + ';' +
       'background-color:var(--ibot-banner-to);' + bannerArtCss() + '">' +
       bannerVideoHtml() +
       '<div style="position:relative;display:flex;flex-direction:column;align-items:flex-start;text-align:start;">' +
@@ -1460,7 +1480,13 @@
           'color:var(--ibot-on-banner-dim);">' + escapeHtml(b.subline) + '</div>'
         : '') +
       bannerCtaHtml() +
-      '</div></div>';
+      '</div>' +
+      // Dissolve into the panel rather than stopping on a cut line. Same idea
+      // as the chat page's masked fade; done here as an overlay because the
+      // avatar has to sit on top of the seam and a mask would eat it too.
+      '<div style="position:absolute;left:0;right:0;bottom:0;height:' + (isMobile ? '34px' : '42px') +
+      ';pointer-events:none;background:linear-gradient(to bottom,transparent,var(--ibot-panel-bg));"></div>' +
+      '</div>';
   }
 
   // Collapsed strip (direction A): once the conversation starts the banner
@@ -1505,13 +1531,26 @@
     // already carries the identity, and stacking both pushed the input below
     // the fold on a 560px panel.
     if (banner && !hasUser) {
+      // Identity sits UNDER the banner, overlapping it, exactly as the approved
+      // mock has it: the art dissolves into the panel and the avatar straddles
+      // that seam. An earlier version dropped the avatar and brand name on the
+      // grounds that the banner already carried the identity — it did not, and
+      // losing them left the panel looking like a stock header with a picture.
+      var avSize = isMobile ? 64 : 74;
       return '<div style="position:relative;flex-shrink:0;' + radius + 'overflow:hidden;">' +
         newChatBtnHtml() +
+        bannerSupportBtnHtml() +
         statusPillHtml() +
         bannerHtml(isMobile) +
+        '<div style="width:' + avSize + 'px;height:' + avSize + 'px;margin:-' + Math.round(avSize / 2) +
+          'px auto 0;border-radius:50%;border:' + (isMobile ? '4px' : '5px') + ' solid var(--ibot-panel-bg);' +
+          'overflow:hidden;position:relative;z-index:4;box-shadow:0 6px 18px rgba(0,0,0,0.14);">' +
+          avatarHtml(avSize) + '</div>' +
+        '<div style="text-align:center;font-weight:800;font-size:' + (isMobile ? '17px' : '19px') +
+          ';color:var(--ibot-text-primary);margin:8px 12px 0;">' + escapeHtml(config.brandName) + '</div>' +
         (banner.valueLine
-          ? '<div style="text-align:center;font-size:12.5px;line-height:1.4;color:var(--ibot-text-secondary);' +
-            'padding:10px 18px 0;">' + escapeHtml(banner.valueLine) + '</div>'
+          ? '<div style="text-align:center;font-size:12.5px;line-height:1.45;color:var(--ibot-text-secondary);' +
+            'padding:5px 22px 0;">' + escapeHtml(banner.valueLine) + '</div>'
           : '') +
         socialRowHtml() +
         (isMobile ? '<button id="ibot-close-mobile" aria-label="close" style="position:absolute;top:calc(8px + env(safe-area-inset-top));left:50px;background:rgba(0,0,0,0.4);border:none;color:#fff;cursor:pointer;width:40px;height:40px;border-radius:50%;font-size:22px;display:flex;align-items:center;justify-content:center;z-index:6;">&times;</button>' : '') +
@@ -1568,7 +1607,6 @@
     csMode = false;
     csDetailsPending = null;
     csSuggestions = [];
-    csChoiceDismissed = false;
     animatedUpTo = 0;       // fresh thread → let the new welcome slide in
     view = 'chat';
     // A new thread re-exposes the banner, so both funnel edges re-arm.
@@ -1876,12 +1914,11 @@
       msgsHtml +
       '</div>' +
 
-      // ---- CS opening choice (spec §5): the ONLY thing on cold start — two clean buttons.
-      // Smart chips stay hidden until the visitor picks "chat" (csChoiceDismissed) so the
-      // panel never stacks choice buttons + 4 chips together.
-      ((modules.customerService.enabled && !csMode && !csChoiceDismissed && !messages.some(function (mm) { return mm.role === 'user'; }))
-        ? renderCsChoiceRow(pc)
-        : '') +
+      // No customer-service choice buttons on cold start. Asking a visitor to
+      // pick between two brains before they have said anything is our
+      // architecture showing through the UI, and it pushed the conversation
+      // starters below the fold. Support is inferred instead — the CS brain
+      // takes over on its own once a message reads as a complaint.
 
       // ---- CS quick replies parsed from the brain's reply (spec §5) ----
       ((csMode && csSuggestions.length > 0 && !isLoading)
@@ -1889,7 +1926,7 @@
         : '') +
 
       // ---- Smart chips row (only when no user message yet AND chips loaded) ----
-      ((!csMode && (!modules.customerService.enabled || csChoiceDismissed) && starterItems().length > 0 && !messages.some(function (mm) { return mm.role === 'user'; }))
+      ((!csMode && starterItems().length > 0 && !messages.some(function (mm) { return mm.role === 'user'; }))
         ? renderChipsRow(starterItems(), pc, { label: starterLabel() })
         : '') +
 
@@ -1995,6 +2032,15 @@
     var micBtn = document.getElementById('ibot-mic');
     if (micBtn) {
       micBtn.onclick = toggleVoiceInput;
+    }
+
+    var bannerSupport = document.getElementById('ibot-banner-support');
+    if (bannerSupport) {
+      bannerSupport.onclick = function () {
+        widgetTrack('widget_support_opened', { from: 'banner' });
+        if (modules.customerService.enabled) { window.__ibotCsStart('banner'); return; }
+        openSupportForm(null);
+      };
     }
 
     var bannerCta = document.getElementById('ibot-banner-cta');
@@ -2285,18 +2331,6 @@
   // Exactly TWO buttons — the CS button IS the first support entry (spec's starter-first,
   // folded into the choice so the cold-start panel stays clean). Chips come only after
   // the visitor picks "chat".
-  function renderCsChoiceRow(pc) {
-    var mob = window.innerWidth < 640;
-    var brand = config.brandName || locale.brandName;
-    var btnBase = 'cursor:pointer;border-radius:14px;padding:' + (mob ? '13px 14px' : '11px 12px') + ';font-size:' + (mob ? '14.5px' : '13px') + ';font-weight:600;font-family:inherit;line-height:1.3;text-align:center;flex:1;min-width:0;transition:transform 0.15s;';
-    return (
-      '<div style="padding:' + (mob ? '8px 16px' : '6px 16px') + ';display:flex;gap:8px;direction:' + locale.dir + ';flex-shrink:0;">' +
-        '<button onclick="window.__ibotCsStart(\'choice\')" style="' + btnBase + 'background:' + pc + ';border:1px solid ' + pc + ';color:#fff;">' + escapeHtml(locale.cs.choiceCs) + '</button>' +
-        '<button onclick="window.__ibotCsContent()" style="' + btnBase + 'background:var(--ibot-surface);border:1px solid var(--ibot-border);color:var(--ibot-text-primary);">' + escapeHtml(locale.cs.choiceContent.replace('{brand}', brand)) + '</button>' +
-      '</div>'
-    );
-  }
-
   // Cold-start starters. A banner may pin its own list; otherwise the dynamic
   // chips from /api/widget/chips stay in charge, so accounts don't freeze a
   // question list into config and forget it.
@@ -3250,13 +3284,6 @@
     widgetTrack('widget_cs_started', { from: from || 'choice' });
     var brand = config.brandName || locale.brandName;
     messages.push({ role: 'assistant', content: locale.cs.greeting.replace('{brand}', brand) });
-    render();
-    var inputEl = document.getElementById('ibot-input');
-    if (inputEl) inputEl.focus();
-  };
-  window.__ibotCsContent = function () {
-    widgetTrack('widget_cs_content_chosen', {});
-    csChoiceDismissed = true; // reveal the normal widget (smart chips) in place of the choice
     render();
     var inputEl = document.getElementById('ibot-input');
     if (inputEl) inputEl.focus();
