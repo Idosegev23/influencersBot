@@ -1,5 +1,10 @@
 import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
 import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
+import {
+  buildBrandLogoIndex,
+  lookupBrandLogo,
+  type BrandLogoIndex,
+} from '@/lib/brands/brand-logo-index';
 import type {
   Influencer,
   Post,
@@ -553,6 +558,46 @@ export interface Brand {
   last_seen_at: string | null; // YYYY-MM-DD — from website's "עדכון אחרון" or partnership.start_date
 }
 
+// The brand_logos registry is global, tiny (~50 rows) and changes rarely — one
+// fetch serves every account, so cache it briefly instead of re-reading it on
+// every coupon list render.
+let brandLogoIndexCache: { index: BrandLogoIndex; at: number } | null = null;
+const BRAND_LOGO_INDEX_TTL_MS = 5 * 60 * 1000;
+
+async function getBrandLogoIndex(): Promise<BrandLogoIndex> {
+  if (brandLogoIndexCache && Date.now() - brandLogoIndexCache.at < BRAND_LOGO_INDEX_TTL_MS) {
+    return brandLogoIndexCache.index;
+  }
+  const { data, error } = await supabase
+    .from('brand_logos')
+    .select('brand_name_normalized, display_name, logo_url, aliases')
+    .not('logo_url', 'is', null);
+
+  if (error) {
+    // A missing logo is cosmetic — never fail the coupon list over it.
+    console.warn('[brand-logos] registry fetch failed:', error.message);
+    return brandLogoIndexCache?.index || new Map();
+  }
+
+  const index = buildBrandLogoIndex((data as any[]) || []);
+  brandLogoIndexCache = { index, at: Date.now() };
+  return index;
+}
+
+/** Mutates in place: any brand still missing an image gets one from the registry, by name. */
+async function fillMissingBrandLogos(brands: Brand[]): Promise<void> {
+  const needy = brands.filter(b => !b.image_url && b.brand_name);
+  if (needy.length === 0) return;
+
+  const index = await getBrandLogoIndex();
+  if (index.size === 0) return;
+
+  for (const brand of needy) {
+    const logo = lookupBrandLogo(index, brand.brand_name);
+    if (logo) brand.image_url = logo;
+  }
+}
+
 /**
  * @deprecated Use getPartnershipsByInfluencer instead
  * Kept for backward compatibility
@@ -655,9 +700,15 @@ export async function getBrandsByInfluencer(influencerId: string): Promise<Brand
 
   // 4. Combine all brands - show ALL partnerships, with or without coupons
   const allBrands = [...partnershipBrands, ...standaloneBrands];
-  
+
+  // 5. Fill in missing logos from the global brand_logos registry, by name.
+  //    Until now a logo only ever reached the UI through partnerships.brand_logo_id
+  //    — a hand-set FK — so standalone coupons were always logo-less, and most
+  //    partnerships showed a bare letter avatar even when we host the brand's logo.
+  await fillMissingBrandLogos(allBrands);
+
   console.log(`[getBrandsByInfluencer] ✅ Found ${allBrands.length} brands (${allBrands.filter(b => b.coupon_code).length} with coupons, ${allBrands.filter(b => b.image_url).length} with logos)`);
-  
+
   return allBrands;
 }
 
