@@ -1331,9 +1331,14 @@
   }
 
   // Small "new conversation" pill (welcome state, absolute top-right).
-  function newChatBtnHtml() {
+  // `inline` drops the absolute placement so the button can sit in a flex row
+  // next to its siblings; the legacy header still positions it on its own.
+  function newChatBtnHtml(opts) {
+    var place = (opts && opts.inline)
+      ? ''
+      : 'position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:6;';
     return '<button onclick="window.__ibotNewChat()" title="' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '" ' +
-      'style="position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:6;background:rgba(255,255,255,0.92);border:1px solid var(--ibot-border);' +
+      'style="' + place + 'background:rgba(255,255,255,0.92);border:1px solid var(--ibot-border);' +
       'color:#333;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:inherit;font-size:12px;padding:5px 10px;line-height:1;">' +
       newChatIconSvg(13) +
       '<span>' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '</span></button>';
@@ -1347,13 +1352,27 @@
   // and the CS brain still picks up a complaint on its own.
   function bannerSupportBtnHtml() {
     if (!modules.support.enabled && !modules.customerService.enabled) return '';
-    var label = locale.support && locale.support.openLink ? locale.support.openLink : wlbl('תמיכה', 'Support');
-    return '<button id="ibot-banner-support" title="' + escapeHtml(label) + '" aria-label="' + escapeHtml(label) + '" ' +
-      'style="position:absolute;top:calc(10px + env(safe-area-inset-top));right:calc(12px + var(--ibot-newchat-w,116px));z-index:6;' +
-      'background:rgba(255,255,255,0.92);border:1px solid var(--ibot-border);color:#333;border-radius:999px;cursor:pointer;' +
-      'width:28px;height:28px;display:flex;align-items:center;justify-content:center;padding:0;">' +
-      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></button>';
+    var label = wlbl('תמיכה', 'Support');
+    // Quieter than "new chat" beside it: no border, muted text, so the pair
+    // reads as one primary action and one secondary rather than two equals.
+    return '<button id="ibot-banner-support" aria-label="' + escapeHtml(label) + '" ' +
+      'style="background:rgba(255,255,255,0.82);border:none;color:#555;border-radius:999px;cursor:pointer;' +
+      'display:flex;align-items:center;gap:5px;font-family:inherit;font-size:11.5px;padding:5px 10px;line-height:1;">' +
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>' +
+      '<span>' + escapeHtml(label) + '</span></button>';
+  }
+
+  // The two top-right controls live in one flex row rather than being placed
+  // independently. Offsetting the support button by the width of "new chat"
+  // meant hardcoding that width — which is a different number in English, and
+  // changes again the moment either label gains a word.
+  function bannerTopControlsHtml() {
+    return '<div style="position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:6;' +
+      'display:flex;align-items:center;gap:6px;flex-direction:row-reverse;">' +
+      newChatBtnHtml({ inline: true }) +
+      bannerSupportBtnHtml() +
+      '</div>';
   }
 
   function poweredByFooterHtml() {
@@ -1538,8 +1557,7 @@
       // losing them left the panel looking like a stock header with a picture.
       var avSize = isMobile ? 64 : 74;
       return '<div style="position:relative;flex-shrink:0;' + radius + 'overflow:hidden;">' +
-        newChatBtnHtml() +
-        bannerSupportBtnHtml() +
+        bannerTopControlsHtml() +
         statusPillHtml() +
         bannerHtml(isMobile) +
         '<div style="width:' + avSize + 'px;height:' + avSize + 'px;margin:-' + Math.round(avSize / 2) +
