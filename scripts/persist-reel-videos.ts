@@ -162,19 +162,14 @@ async function main() {
     process.exit(1);
   }
 
-  // Write into the CHAT banner only. The widget is embedded on customers'
-  // sites where an autoplaying video is their bandwidth, not ours to spend.
-  const chat = { ...(config.chat || {}) };
-  const existing = chat.banner || {};
-  chat.banner = {
-    ...existing,
-    enabled: existing.enabled !== false,
-    art: { ...(existing.art || {}), mode: 'video', reels },
-  };
-
+  // One list at account level, read by both surfaces. Writing it per-banner
+  // meant copying the same array into config.chat and config.widget and
+  // keeping them in step; the reels belong to the account, not to a surface.
+  // Its presence is also the opt-in — resolveArt switches to video whenever an
+  // account has a rotation and its banner has not explicitly asked for a still.
   const { error: writeErr } = await supabase
     .from('accounts')
-    .update({ config: { ...config, chat } })
+    .update({ config: { ...config, reels } })
     .eq('id', accountId);
 
   if (writeErr) {
@@ -182,11 +177,8 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`\nWrote ${reels.length} reel(s) to config.chat.banner.art.reels.`);
+  console.log(`\nWrote ${reels.length} reel(s) to config.reels — live on the chat page AND the widget.`);
   console.log('Edit or prune that list by hand if one of them reads badly muted.');
-  if (!chat.banner.headline) {
-    console.log('Note: no banner headline set — the chat page will use greeting_message.');
-  }
 }
 
 main().catch((e) => {

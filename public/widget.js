@@ -1104,6 +1104,7 @@
       // the account author writes it in whatever language they publish in.
       if (data.banner && data.banner.headline) {
         config.banner = data.banner;
+        pickBannerReel();
         applyLocaleAssets(); // re-emit CSS vars now that art colors are known
         // Config can land after the visitor already opened the panel, in which
         // case the open-time call found no banner to report.
@@ -1364,16 +1365,49 @@
   // legible without measuring the artwork.
   var BANNER_SCRIM = 'linear-gradient(180deg,rgba(0,0,0,0.15) 0%,rgba(0,0,0,0.55) 65%,rgba(0,0,0,0.72) 100%)';
 
+  // The reel chosen for this visit. Picked once, not per render, so the video
+  // does not restart every time the panel re-draws.
+  var bannerReel = null;
+  function pickBannerReel() {
+    var art = config.banner && config.banner.art;
+    if (!art || art.mode !== 'video' || !art.reels || !art.reels.length) { bannerReel = null; return; }
+    bannerReel = art.reels[Math.floor(Math.random() * art.reels.length)] || art.reels[0];
+  }
+
+  // Whether to actually play, as opposed to showing the poster frame. The
+  // widget runs on the customer's site, so a visitor who has asked for less
+  // motion or less data gets the still — same picture, no download.
+  function bannerMotionAllowed() {
+    try {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+      if (navigator.connection && navigator.connection.saveData === true) return false;
+    } catch (e) { /* treat an unreadable environment as permissive */ }
+    return true;
+  }
+
+  // Video layer for the banner. Absolutely positioned under the copy, muted +
+  // inline so browsers will autoplay it without a gesture. Only ever built
+  // while the panel is open, so a visitor who never opens the widget never
+  // downloads an mp4.
+  function bannerVideoHtml() {
+    if (!bannerReel || !bannerMotionAllowed()) return '';
+    var src = String(bannerReel.video).replace(/['"\\]/g, '');
+    var poster = bannerReel.poster ? ' poster="' + escapeHtml(String(bannerReel.poster)) + '"' : '';
+    return '<video id="ibot-banner-video" src="' + escapeHtml(src) + '"' + poster +
+      ' muted loop playsinline autoplay preload="none" aria-hidden="true"' +
+      ' style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;"></video>' +
+      '<div style="position:absolute;inset:0;pointer-events:none;background-image:' + BANNER_SCRIM + ';"></div>';
+  }
+
   function bannerArtCss() {
     var b = config.banner;
     var grad = 'linear-gradient(135deg,var(--ibot-banner-from),var(--ibot-banner-to))';
     var art = b && b.art;
-    // `video` mode is a chat-page feature: the widget lives on the customer's
-    // own site, where autoplaying a few MB of mp4 spends THEIR visitors'
-    // bandwidth. Here the reel degrades to its poster frame, which is the same
-    // image and costs nothing extra.
+    // In video mode the moving picture is a real element (bannerVideoHtml);
+    // this only paints what sits behind it — the poster, so there is something
+    // on screen before the first frame decodes and after a refusal to autoplay.
     var img = art && (art.mode === 'image' ? art.image
-      : (art.mode === 'video' && art.reels && art.reels[0] ? art.reels[0].poster : null));
+      : (art.mode === 'video' && bannerReel ? bannerReel.poster : null));
     if (img) {
       var url = String(img).replace(/['"\\]/g, '');
       // Scrim first (painted on top), image second — a bare photo behind white
@@ -1409,10 +1443,12 @@
     var b = config.banner;
     var minH = isMobile ? BANNER_H_MOBILE : BANNER_H_DESKTOP;
     var padX = isMobile ? '16px' : '20px';
-    return '<div id="ibot-banner" style="position:relative;min-height:' + minH + 'px;flex-shrink:0;' +
+    return '<div id="ibot-banner" style="position:relative;overflow:hidden;min-height:' + minH + 'px;flex-shrink:0;' +
       'display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;text-align:start;' +
       'padding:' + BANNER_CHROME_CLEARANCE + 'px ' + padX + ' ' + (isMobile ? '22px' : '26px') + ';' +
       'background-color:var(--ibot-banner-to);' + bannerArtCss() + '">' +
+      bannerVideoHtml() +
+      '<div style="position:relative;display:flex;flex-direction:column;align-items:flex-start;text-align:start;">' +
       (b.eyebrow
         ? '<div style="font-size:11.5px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;' +
           'color:var(--ibot-on-banner-dim);margin-bottom:6px;">' + escapeHtml(b.eyebrow) + '</div>'
@@ -1424,7 +1460,7 @@
           'color:var(--ibot-on-banner-dim);">' + escapeHtml(b.subline) + '</div>'
         : '') +
       bannerCtaHtml() +
-      '</div>';
+      '</div></div>';
   }
 
   // Collapsed strip (direction A): once the conversation starts the banner

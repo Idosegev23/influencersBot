@@ -250,9 +250,74 @@ describe('resolveBanner — video art', () => {
     expect(art.reels).toBeNull();
   });
 
-  it('leaves reels null in gradient and image modes', () => {
+  it('leaves reels null when the banner explicitly asks for a gradient', () => {
     const config = { widget: { banner: { headline: 'שלום', art: { mode: 'gradient', reels } } } };
     expect(resolveBanner(config, 'widget', CTX)!.art.reels).toBeNull();
+  });
+
+  describe('account-level rotation (config.reels)', () => {
+    it('plays on BOTH surfaces from one list — no per-surface copy', () => {
+      const config = {
+        reels,
+        widget: { banner: { headline: 'שלום' } },
+        chat: { banner: { headline: 'שלום' } },
+      };
+      for (const surface of ['widget', 'chat'] as const) {
+        const art = resolveBanner(config, surface, CTX)!.art;
+        expect(art.mode).toBe('video');
+        expect(art.reels).toHaveLength(2);
+      }
+    });
+
+    it('turns video on by default — a persisted rotation is the opt-in', () => {
+      const config = { reels, widget: { banner: { headline: 'שלום' } } };
+      expect(resolveBanner(config, 'widget', CTX)!.art.mode).toBe('video');
+    });
+
+    it('an explicit still mode is how an account opts out', () => {
+      const config = {
+        reels,
+        widget: { banner: { headline: 'שלום', art: { mode: 'gradient' } }, coverImage: 'https://cdn/c.jpg' },
+      };
+      expect(resolveBanner(config, 'widget', CTX)!.art.mode).toBe('gradient');
+    });
+
+    it('a banner\'s own reels beat the account list', () => {
+      const own = [{ video: 'https://cdn/own.mp4' }];
+      const config = { reels, widget: { banner: { headline: 'שלום', art: { reels: own } } } };
+      const art = resolveBanner(config, 'widget', CTX)!.art;
+      expect(art.reels).toHaveLength(1);
+      expect(art.reels![0].video).toBe('https://cdn/own.mp4');
+    });
+
+    it('accounts with no reels are untouched — still gradient', () => {
+      const config = { widget: { banner: { headline: 'שלום' } } };
+      expect(resolveBanner(config, 'widget', CTX)!.art.mode).toBe('gradient');
+    });
+
+    it('the rotation alone produces a banner — nobody has to configure copy', () => {
+      const config = { reels };            // no widget.banner, no chat.banner
+      for (const surface of ['widget', 'chat'] as const) {
+        const b = resolveBanner(config, surface, CTX);
+        expect(b).not.toBeNull();
+        expect(b!.art.mode).toBe('video');
+        expect(b!.headline.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('chat uses its own greeting for that auto-banner rather than the generic line', () => {
+      expect(resolveBanner({ reels }, 'chat', CTX)!.headline).toBe(CTX.greeting);
+    });
+
+    it('no reels and no banner still means no banner at all', () => {
+      expect(resolveBanner({}, 'widget', CTX)).toBeNull();
+      expect(resolveBanner({}, 'chat', CTX)).toBeNull();
+    });
+
+    it('an explicit opt-out beats the rotation', () => {
+      const config = { reels, widget: { banner: { enabled: false } } };
+      expect(resolveBanner(config, 'widget', CTX)).toBeNull();
+    });
   });
 });
 

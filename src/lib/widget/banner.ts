@@ -152,7 +152,12 @@ function resolveReels(raw: unknown): BannerReel[] | null {
   return reels.length ? reels : null;
 }
 
-function resolveArt(raw: any, widgetConfig: any, primaryColor: string | null): ResolvedBannerArt {
+function resolveArt(
+  raw: any,
+  widgetConfig: any,
+  primaryColor: string | null,
+  accountReels: unknown,
+): ResolvedBannerArt {
   const stops = glowStops(primaryColor);
   const from = copy(raw?.from, 64) || stops[0];
   const to = copy(raw?.to, 64) || stops[1];
@@ -161,9 +166,17 @@ function resolveArt(raw: any, widgetConfig: any, primaryColor: string | null): R
   // Degrade downward — video → image → gradient — so a mode whose asset is
   // missing never leaves a 206px empty rectangle, which is exactly the failure
   // the banner exists to remove.
-  if (raw?.mode === 'video') {
-    const reels = resolveReels(raw.reels);
-    if (reels) return { ...base, mode: 'video', reels };
+  //
+  // Reels are read from `config.reels` (account level) as well as from the
+  // banner's own art, and a persisted rotation turns video on by default. The
+  // list is one property of the account, not of a surface: the same reels play
+  // in the widget and on the chat page, so rolling this out is a matter of
+  // populating one array rather than copying it into every banner. An explicit
+  // `mode: 'image' | 'gradient'` still wins, which is how an account opts out.
+  const reels = resolveReels(raw?.reels) || resolveReels(accountReels);
+  const wantsStill = raw?.mode === 'image' || raw?.mode === 'gradient';
+  if (reels && !wantsStill) {
+    return { ...base, mode: 'video', reels };
   }
 
   const image = copy(raw?.image, 2048) || copy(widgetConfig?.coverImage, 2048);
@@ -229,7 +242,15 @@ export function resolveBanner(
   // Chat inherits the widget's banner wholesale — but only when it has none of
   // its own. An explicit `chat.banner: { enabled: false }` is an opt-out, not a
   // reason to go looking for the widget's.
-  const raw = surface === 'chat' && (own === undefined || own === null) ? widgetConfig.banner : own;
+  const inherited = surface === 'chat' && (own === undefined || own === null) ? widgetConfig.banner : own;
+
+  // An account with a persisted reel rotation gets a banner even if nobody
+  // wrote one. This is what makes the rollout "every account that has reels"
+  // rather than "every account someone remembered to configure": the rotation
+  // is the switch, and the copy falls back to the generic headline below.
+  // Accounts with no reels and no banner are untouched.
+  const hasReels = !!resolveReels(config?.reels);
+  const raw = (inherited === undefined || inherited === null) && hasReels ? { enabled: true } : inherited;
 
   if (!raw || typeof raw !== 'object') return null;
   if (raw.enabled === false) return null;
@@ -261,7 +282,7 @@ export function resolveBanner(
     subline: copy(raw.subline, MAX_SUBLINE) || subtitle,
     valueLine: copy(raw.valueLine, MAX_SUBLINE),
     cta: resolveCta(raw.cta),
-    art: resolveArt(raw.art, widgetConfig, primaryColor),
+    art: resolveArt(raw.art, widgetConfig, primaryColor, config?.reels),
     starters: resolveStarters(raw.starters),
   };
 }
