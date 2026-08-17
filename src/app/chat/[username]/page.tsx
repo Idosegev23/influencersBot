@@ -51,6 +51,7 @@ import { useStreamChat, type StreamMeta, type StreamCards, type StreamDone } fro
 import { useChatMedia } from '@/hooks/useChatMedia';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { BannerHero } from '@/components/chat/BannerHero';
+import { ModeToggle } from '@/components/chat/ModeToggle';
 import { resolveBanner } from '@/lib/widget/banner';
 import { NavTabs } from '@/components/chat/NavTabs';
 import { StarterPills } from '@/components/chat/StarterPills';
@@ -608,6 +609,9 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const csDetailsRef = useRef<{ phone?: string; orderNumber?: string } | null>(null); // one-turn claim
   const streamPayloadsRef = useRef<CsUiPayload[]>([]);
   const enterCsMode = useCallback(() => { csModeRef.current = true; setCsMode(true); }, []);
+  // CS mode had no exit: once entered, every later message routed to the CS
+  // brain until the session was thrown away. A switch has to work both ways.
+  const exitCsMode = useCallback(() => { csModeRef.current = false; setCsMode(false); }, []);
   const getPersistentAnonId = useCallback((): string => {
     try {
       let a = localStorage.getItem(`anon_id_${username}`);
@@ -1881,27 +1885,42 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           )}
                       </motion.div>
 
-                      {/* CS opening choice (spec §5) — customer service vs content conversation */}
-                      {csWebEnabled && !csMode && (
-                        <div className="flex gap-2 mb-3" dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}>
-                          <button
-                            onClick={() => {
-                              track('cs_choice_clicked', { choice: 'cs' });
-                              enterCsMode();
-                              setMessages((prev) => [...prev, { id: Date.now().toString(), role: 'assistant', content: chatStrings(influencer).csGreeting }]);
+                      {/* CS mode switch (spec §5). Was two side-by-side buttons
+                          that read as a pair of actions rather than a choice of
+                          state — and only one of them did anything: the content
+                          button fired an analytics event and returned, so it
+                          looked broken. A segmented switch shows which mode you
+                          are in and makes both directions real. */}
+                      {csWebEnabled && (
+                        // Same measure as the ChatInput and the banner above it —
+                        // left to stretch, the switch ran the full page width and
+                        // dwarfed the column it belongs to.
+                        <div className={`${isMobile ? 'w-[363px]' : 'w-[670px]'} max-w-full mb-3`}>
+                          <ModeToggle
+                            mode={csMode ? 'cs' : 'content'}
+                            dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
+                            primaryColor={(influencer as any)?._rawConfig?.widget?.primaryColor
+                              || (influencer as any)?.theme?.colors?.primary
+                              || '#883fe2'}
+                            contentLabel={chatStrings(influencer).csContentChoice.replace(
+                              '{name}',
+                              (influencer as any).display_name || (influencer as any).displayName || '',
+                            )}
+                            csLabel={chatStrings(influencer).csChoice}
+                            onChange={(next) => {
+                              track('cs_choice_clicked', { choice: next });
+                              if (next === 'cs') {
+                                enterCsMode();
+                                setMessages((prev) => [...prev, {
+                                  id: Date.now().toString(),
+                                  role: 'assistant',
+                                  content: chatStrings(influencer).csGreeting,
+                                }]);
+                              } else {
+                                exitCsMode();
+                              }
                             }}
-                            className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-white"
-                            style={{ background: 'var(--color-primary, #883fe2)' }}
-                          >
-                            {chatStrings(influencer).csChoice}
-                          </button>
-                          <button
-                            onClick={() => track('cs_choice_clicked', { choice: 'content' })}
-                            className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold border"
-                            style={{ borderColor: 'var(--color-primary, #883fe2)', color: 'var(--color-text)' }}
-                          >
-                            {chatStrings(influencer).csContentChoice.replace('{name}', (influencer as any).displayName || (influencer as any).name || '')}
-                          </button>
+                          />
                         </div>
                       )}
                       {/* Starter pills — unified for ALL account types. When CS is enabled the
@@ -1959,6 +1978,40 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
                           onCtaClick={handleBannerCta}
                         />
+                      )}
+                      {/* The switch has to survive the first message. It lives
+                          in the empty state too, but entering CS mode appends a
+                          greeting — which unmounts the empty state and, with it,
+                          the only control that could switch back. */}
+                      {csWebEnabled && (
+                        <div className="mx-auto w-full max-w-[560px]">
+                        <ModeToggle
+                          mode={csMode ? 'cs' : 'content'}
+                          dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
+                          primaryColor={(influencer as any)?._rawConfig?.widget?.primaryColor
+                            || (influencer as any)?.theme?.colors?.primary
+                            || '#883fe2'}
+                          contentLabel={chatStrings(influencer).csContentChoice.replace(
+                            '{name}',
+                            (influencer as any).display_name || (influencer as any).displayName || '',
+                          )}
+                          csLabel={chatStrings(influencer).csChoice}
+                          disabled={isTyping || isStreamActive}
+                          onChange={(next) => {
+                            track('cs_choice_clicked', { choice: next, from: 'thread' });
+                            if (next === 'cs') {
+                              enterCsMode();
+                              setMessages((prev) => [...prev, {
+                                id: Date.now().toString(),
+                                role: 'assistant',
+                                content: chatStrings(influencer).csGreeting,
+                              }]);
+                            } else {
+                              exitCsMode();
+                            }
+                          }}
+                        />
+                        </div>
                       )}
                       {messages.map((msg, index) => {
                         // For streaming messages, use the live text (strip suggestions tag)

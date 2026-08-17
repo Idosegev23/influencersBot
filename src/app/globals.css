@@ -4276,12 +4276,59 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
 /* ═══════════════════════════════════════════
    RECIPE SHEET — full-screen, sticky header (Figma 431:8662)
    ═══════════════════════════════════════════ */
+/* Recipe detail — a bottom sheet, not a page.
+   It used to be `inset: 0` (a full-screen white takeover) sliding in from the
+   side, which read as navigating away from the feed. Now it rises from the
+   bottom over a dimmed grid, so a recipe stays a detail of the thing you were
+   already looking at. */
+.cf-recipe-scrim {
+  position: fixed; inset: 0; z-index: 9998;
+  background: rgba(12, 16, 19, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
 .cf-recipe-sheet {
-  position: fixed; inset: 0; z-index: 9999;
+  position: fixed; z-index: 9999;
+  inset-inline: 0; bottom: 0;
+  /* dvh, not vh: on iOS Safari the toolbar collapse makes vh overshoot and the
+     sheet's footer actions end up under the chrome. */
+  height: 88dvh;
+  max-height: 88dvh;
   background: #ffffff;
   direction: rtl;
   display: flex; flex-direction: column;
   overflow: hidden;
+  border-radius: 26px 26px 0 0;
+  box-shadow: 0 -18px 60px rgba(12, 16, 19, 0.22);
+  will-change: transform;
+}
+/* On a wide screen a full-bleed sheet looks like a torn-off page; float it. */
+@media (min-width: 768px) {
+  .cf-recipe-sheet {
+    /* Centered with auto margins, NOT left:50% + translateX(-50%): the sheet's
+       entry and drag are driven by an inline transform from framer-motion,
+       which would overwrite a transform set here and drop it against the left
+       edge. */
+    width: min(680px, 92vw);
+    margin-inline: auto;
+    height: 86dvh;
+    max-height: 86dvh;
+  }
+}
+/* Grab handle — the affordance that says "drag me down". */
+.cf-recipe-sheet__grabber {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px 0 2px;
+  cursor: grab;
+  touch-action: none;
+}
+.cf-recipe-sheet__grabber:active { cursor: grabbing; }
+.cf-recipe-sheet__grabber > span {
+  display: block;
+  width: 42px; height: 4px;
+  border-radius: 999px;
+  background: rgba(12, 16, 19, 0.16);
 }
 .cf-recipe-sheet__header {
   position: sticky; top: 0; z-index: 5;

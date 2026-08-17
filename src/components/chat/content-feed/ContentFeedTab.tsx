@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChefHat, Shirt, Sparkles, Dumbbell, Cpu, Plane, Baby, Heart, Home, Newspaper,
   Clock, ChevronLeft, Loader2, Star, UtensilsCrossed, Search,
-  X, ExternalLink, MessageCircle, ShoppingBag, Tag, Flame, AlignCenter, ArrowLeft,
+  X, ExternalLink, MessageCircle, ShoppingBag, Tag, Flame, AlignCenter,
 } from 'lucide-react';
 import type { InfluencerType } from '@/types';
 import { getProxiedImageUrl } from '@/lib/image-utils';
@@ -201,19 +201,67 @@ function RecipeSheet({
   const { ingredients, steps } = parseRecipeText(item.fullText);
   const postUrl = item.sourceUrl || null;
 
+  // Escape closes, and the page behind is frozen while the sheet is up —
+  // otherwise scrolling inside the sheet chains to the feed underneath and the
+  // visitor loses their place in the grid.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
   return (
-    <motion.div
-      initial={{ opacity: 0, x: '-30%' }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: '-30%' }}
-      transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-      className="cf-recipe-sheet"
-      dir="rtl"
-    >
+    <>
+      {/* Scrim. Keeping the feed visible behind it is the point: a recipe is a
+          detail of the grid, not a different place. The old sheet covered the
+          screen edge-to-edge and slid in sideways, which read as navigating
+          away. */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+        onClick={onClose}
+        className="cf-recipe-scrim"
+        aria-hidden
+      />
+
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label={item.title}
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 34, stiffness: 340, mass: 0.9 }}
+        // Drag down to dismiss — the gesture people already expect from a
+        // bottom sheet. Elastic only downward so it can't be pulled off the top.
+        drag="y"
+        dragDirectionLock
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.4 }}
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 120 || info.velocity.y > 700) onClose();
+        }}
+        className="cf-recipe-sheet"
+        dir="rtl"
+      >
+        <div className="cf-recipe-sheet__grabber" aria-hidden>
+          <span />
+        </div>
+
       {/* Sticky header */}
       <div className="cf-recipe-sheet__header">
-        <button onClick={onClose} className="cf-recipe-sheet__back" aria-label="חזרה">
-          <ArrowLeft className="w-7 h-7" />
+        {/* A close control, not a back arrow: the sheet sits on top of the
+            feed rather than replacing it, so "back" would promise a navigation
+            that never happened. */}
+        <button onClick={onClose} className="cf-recipe-sheet__back" aria-label="סגירה">
+          <X className="w-6 h-6" />
         </button>
         <div className="cf-recipe-sheet__user">
           <div className="cf-recipe-sheet__user-text">
@@ -332,7 +380,8 @@ function RecipeSheet({
           </div>
         </div>
       </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
 }
 
