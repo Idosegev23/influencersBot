@@ -105,11 +105,22 @@ async function main() {
       continue;
     }
 
-    const { picked, rejected, unjudged } = await pickReels(candidates, { count, minScore });
+    // Judge for THIS account: the frame that suits a food creator is not the
+    // frame that suits a fashion brand, and a face is on-brand for a creator
+    // in a way it is not on a product page.
+    const { picked, rejected, unjudged } = await pickReels(candidates, {
+      count,
+      minScore,
+      account: {
+        type: config.influencer_type,
+        archetype: config.archetype,
+        brandName: config.display_name || config.username,
+      },
+    });
     console.log(`▸ ${label}: judged ${candidates.length - unjudged.length}/${candidates.length}, ${picked.length} usable`);
     for (const p of picked) console.log(`    ✓ ${p.shortcode.padEnd(14)} ${p.score}/10  ${p.reason}`);
     for (const r of rejected.slice(0, 3)) {
-      const why = r.faceDominant ? 'face dominant' : r.burnedInText ? 'burned-in text' : `score ${r.score}`;
+      const why = r.burnedInText ? 'burned-in text' : `score ${r.score}`;
       console.log(`    ✗ ${r.shortcode.padEnd(14)} ${why} — ${r.reason}`);
     }
 
