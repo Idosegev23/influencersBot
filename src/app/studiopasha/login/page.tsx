@@ -7,7 +7,12 @@ import { Loader2, LogIn, AlertCircle } from 'lucide-react';
 // Studio Pasha account. Username drives the influencer-cookie auth + dashboard
 // route; the id is only used to pull branding from the public widget config so
 // this page stays in sync with the account instead of hardcoding logo/colors.
-// Mirrors /argania/login (single shared-password model).
+//
+// Two login modes live side by side here:
+//   • named agent  — support_agents row (first + last name), like /argania/login.
+//     This is the preferred path; tickets get attributed to the person.
+//   • shared login — the legacy account-wide username + password
+//     (security_config.login_username). Kept working so the owner isn't locked out.
 const ACCOUNT_USERNAME = 'studiopasha_fashion';
 const ACCOUNT_ID = '36705ad6-4f82-46af-95e1-fb5ea6f4a44f';
 const SUPPORT_PATH = `/influencer/${ACCOUNT_USERNAME}/support`;
@@ -15,6 +20,9 @@ const FALLBACK_COLOR = '#1a1a1a';
 
 export default function StudioPashaLoginPage() {
   const router = useRouter();
+  const [mode, setMode] = useState<'agent' | 'shared'>('agent');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -49,11 +57,18 @@ export default function StudioPashaLoginPage() {
     };
   }, []);
 
-  // If already logged in, skip the form.
+  // If already logged in — under either mode — skip the form.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        const agentRes = await fetch(`/api/agent/me?accountUsername=${ACCOUNT_USERNAME}`, { cache: 'no-store' });
+        const agentData = await agentRes.json();
+        if (!cancelled && agentData.authenticated) {
+          router.replace(SUPPORT_PATH);
+          return;
+        }
+
         const res = await fetch(`/api/influencer/auth?username=${ACCOUNT_USERNAME}`, { cache: 'no-store' });
         const data = await res.json();
         if (!cancelled && data.authenticated) {
@@ -74,6 +89,38 @@ export default function StudioPashaLoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (mode === 'agent') {
+      if (!firstName.trim() || !lastName.trim() || !password) {
+        setError('יש למלא את כל השדות');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const res = await fetch('/api/agent/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountUsername: ACCOUNT_USERNAME,
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            password,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          setError('שם או סיסמה שגויים');
+          setSubmitting(false);
+          return;
+        }
+        router.replace(SUPPORT_PATH);
+      } catch {
+        setError('שגיאת רשת — נסו שוב');
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (!username || !password) {
       setError('יש להזין שם משתמש וסיסמה');
       return;
@@ -96,6 +143,12 @@ export default function StudioPashaLoginPage() {
       setError('שגיאת רשת — נסו שוב');
       setSubmitting(false);
     }
+  }
+
+  function switchMode(next: 'agent' | 'shared') {
+    setMode(next);
+    setError(null);
+    setPassword('');
   }
 
   if (checking) {
@@ -142,25 +195,67 @@ export default function StudioPashaLoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs mb-1.5" style={{ color: '#6b7280' }}>
-              שם משתמש
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoFocus
-              autoComplete="username"
-              className="w-full text-sm p-3 rounded-xl outline-none focus:ring-2"
-              style={{
-                background: '#f9fafb',
-                color: '#111',
-                border: '1px solid rgba(0,0,0,0.1)',
-                ['--tw-ring-color' as any]: brand.color + '55',
-              }}
-            />
-          </div>
+          {mode === 'agent' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs mb-1.5" style={{ color: '#6b7280' }}>
+                  שם פרטי
+                </label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  autoFocus
+                  autoComplete="given-name"
+                  className="w-full text-sm p-3 rounded-xl outline-none focus:ring-2"
+                  style={{
+                    background: '#f9fafb',
+                    color: '#111',
+                    border: '1px solid rgba(0,0,0,0.1)',
+                    ['--tw-ring-color' as any]: brand.color + '55',
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs mb-1.5" style={{ color: '#6b7280' }}>
+                  שם משפחה
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  autoComplete="family-name"
+                  className="w-full text-sm p-3 rounded-xl outline-none focus:ring-2"
+                  style={{
+                    background: '#f9fafb',
+                    color: '#111',
+                    border: '1px solid rgba(0,0,0,0.1)',
+                    ['--tw-ring-color' as any]: brand.color + '55',
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs mb-1.5" style={{ color: '#6b7280' }}>
+                שם משתמש
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoFocus
+                autoComplete="username"
+                className="w-full text-sm p-3 rounded-xl outline-none focus:ring-2"
+                style={{
+                  background: '#f9fafb',
+                  color: '#111',
+                  border: '1px solid rgba(0,0,0,0.1)',
+                  ['--tw-ring-color' as any]: brand.color + '55',
+                }}
+              />
+            </div>
+          )}
           <div>
             <label className="block text-xs mb-1.5" style={{ color: '#6b7280' }}>
               סיסמה
@@ -198,6 +293,15 @@ export default function StudioPashaLoginPage() {
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
             כניסה
+          </button>
+
+          <button
+            type="button"
+            onClick={() => switchMode(mode === 'agent' ? 'shared' : 'agent')}
+            className="w-full text-xs underline underline-offset-4 pt-1"
+            style={{ color: '#6b7280' }}
+          >
+            {mode === 'agent' ? 'כניסה עם שם משתמש משותף' : 'כניסה עם שם פרטי ושם משפחה'}
           </button>
         </form>
       </div>
