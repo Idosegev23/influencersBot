@@ -90,7 +90,7 @@ async function main() {
       .order('views_count', { ascending: false, nullsFirst: false })
       .limit(CANDIDATES_PER_ACCOUNT);
 
-    const candidates = (posts || [])
+    let candidates = (posts || [])
       .map((p: any) => ({
         shortcode: p.shortcode,
         poster: p.stored_media_urls?.[0] || p.stored_thumbnail_url,
@@ -99,9 +99,40 @@ async function main() {
       }))
       .filter((c: any) => c.poster);
 
+    // Fetched here rather than after judging when the account has no persisted
+    // posters — some accounts were scraped before media persistence existed, so
+    // they have plenty of reels and nothing stored to look at. Reading their
+    // `thumbnail_url` from the database is no good either: those are the same
+    // signed Instagram URLs that expire. A fresh pull gives live thumbnails to
+    // judge and live mp4 URLs to persist, from one call.
+    let fresh: any[] | null = null;
+    const username = config.username;
+
+    if (candidates.length === 0 && username) {
+      try {
+        fresh = await getScrapeCreatorsClient().getPosts(username, 240);
+      } catch (e: any) {
+        summary.failed++;
+        console.log(`— ${label}: scraper failed (${e?.message})`);
+        continue;
+      }
+      candidates = (fresh || [])
+        .filter((p: any) => p.media_type === 'video' && p.media_urls?.[0])
+        .sort((a: any, b: any) => (b.views_count || 0) - (a.views_count || 0))
+        .slice(0, CANDIDATES_PER_ACCOUNT)
+        .map((p: any) => ({
+          shortcode: p.shortcode,
+          poster: p.thumbnail_url || p.media_urls?.[1],
+          viewsCount: p.views_count,
+          caption: p.caption,
+        }))
+        .filter((c: any) => c.poster);
+      if (candidates.length) console.log(`  (no stored posters — judging ${candidates.length} fresh frames)`);
+    }
+
     if (candidates.length === 0) {
       summary.skippedNoVideo++;
-      console.log(`— ${label}: no stored video posters, skipping`);
+      console.log(`— ${label}: no video frames to judge, skipping`);
       continue;
     }
 
@@ -130,17 +161,17 @@ async function main() {
     }
     if (dryRun) { summary.done++; continue; }
 
-    // Fresh mp4 URLs, only for the winners.
-    const username = config.username;
+    // Fresh mp4 URLs, only for the winners — unless the candidates already
+    // came from a fresh pull above, in which case reuse it.
     if (!username) { summary.failed++; console.log(`    ! no username, cannot fetch fresh URLs`); continue; }
-
-    let fresh: any[] = [];
-    try {
-      fresh = await getScrapeCreatorsClient().getPosts(username, 240);
-    } catch (e: any) {
-      summary.failed++;
-      console.log(`    ! scraper failed: ${e?.message}`);
-      continue;
+    if (!fresh) {
+      try {
+        fresh = await getScrapeCreatorsClient().getPosts(username, 240);
+      } catch (e: any) {
+        summary.failed++;
+        console.log(`    ! scraper failed: ${e?.message}`);
+        continue;
+      }
     }
 
     const reels: { video: string; poster: string | null }[] = [];

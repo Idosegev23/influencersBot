@@ -58,12 +58,25 @@ function subject(ctx: AccountContext): string {
   return isBrand ? 'products and the places they are used' : 'the creator and what they make';
 }
 
-function buildPrompt(ctx: AccountContext): string {
+function buildPrompt(ctx: AccountContext, sample: string[]): string {
   const who = ctx.brandName ? `"${ctx.brandName}"` : 'this account';
   const isBrand = (ctx.archetype || '') === 'brand';
 
+  // Real captions beat the vertical enum, which is often wrong or too narrow.
+  // One account typed "beauty" actually sells herbal supplements, so every
+  // frame of its own product was rejected as "unrelated to skin or makeup".
+  // The stored type is a hint; what the account actually posts is the evidence.
+  const context = sample.length
+    ? `\n\nRecent posts from this account, so you know what it is actually about:\n` +
+      sample.map((c) => `- ${c}`).join('\n')
+    : '';
+
   return `You judge whether a single video frame works as the BACKGROUND of a chat
-banner for ${who} — ${isBrand ? 'a brand' : 'a creator'} whose content is about ${subject(ctx)}.
+banner for ${who} — ${isBrand ? 'a brand' : 'a creator'}, nominally about ${subject(ctx)}.${context}
+
+Treat the subject as a preference, not a gate: an on-topic frame scores higher,
+but do not reject a frame merely for showing something adjacent to the account's
+usual subject.
 
 The frame will be cropped to a wide strip, played silently on a loop, with the
 headline text sitting BELOW it (not on top of it).
@@ -75,8 +88,11 @@ Score 0-10 on how well it represents this account and holds up as that backdrop:
  - 0-3: unusable — heavy burned-in caption text, a title card, a screenshot,
    near-black, or motion blur leaving nothing recognisable.
 
-Set burnedInText true when words are baked into the picture (subtitles, captions,
-meme text, a title card). Small logos and package labels do NOT count.
+Set burnedInText true only when baked-in words DOMINATE the frame — large
+headline captions, meme text, a title card, or text across the middle. It is
+about whether the words would fight a headline placed beside this image, not
+whether any text exists. These do NOT count: logos, packaging and product
+labels, small captions low in the frame, signage in the background.
 
 Judge ONLY what is visible. Ignore how popular the video is.
 
@@ -121,6 +137,7 @@ function parseVerdict(text: string): Omit<ReelVerdict, 'shortcode'> | null {
 export async function scoreReel(
   candidate: ReelCandidate,
   ctx: AccountContext = {},
+  sample: string[] = [],
 ): Promise<ReelVerdict | null> {
   const image = await fetchAsInline(candidate.poster);
   if (!image) return null;
@@ -131,7 +148,7 @@ export async function scoreReel(
       contents: [{
         role: 'user',
         parts: [
-          { text: buildPrompt(ctx) },
+          { text: buildPrompt(ctx, sample) },
           { inlineData: { mimeType: image.mimeType, data: image.data } },
         ],
       }],
@@ -172,12 +189,18 @@ export async function pickReels(
   const pool = candidates.slice(0, opts.maxJudged ?? 30);
   const enough = opts.count * ENOUGH_MULTIPLIER;
 
+  // A handful of captions describe the account better than its stored type.
+  const sample = candidates
+    .map((c) => (c.caption || '').replace(/\s+/g, ' ').trim().slice(0, 110))
+    .filter(Boolean)
+    .slice(0, 6);
+
   const verdicts: ReelVerdict[] = [];
   const unjudged: string[] = [];
   const isUsable = (v: ReelVerdict) => !v.burnedInText && v.score >= minScore;
 
   for (const c of pool) {
-    const v = await scoreReel(c, opts.account);
+    const v = await scoreReel(c, opts.account, sample);
     if (v) verdicts.push(v);
     else unjudged.push(c.shortcode);
     if (verdicts.filter(isUsable).length >= enough) break;
