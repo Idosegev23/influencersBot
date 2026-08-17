@@ -94,7 +94,12 @@ interface BrandInfo {
 
 interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  /**
+   * `notice` is a thread divider, not a turn: it marks a mode change so the
+   * visitor can see that switching did something. It is rendered as a centred
+   * rule and is never sent to the model.
+   */
+  role: 'user' | 'assistant' | 'notice';
   content: string;
   action?: 'show_brands' | 'collect_input' | 'complete';
   brands?: BrandInfo[];
@@ -184,6 +189,8 @@ const CHAT_PAGE_STRINGS = {
     csContentChoice: 'לשוחח עם {name} 💬',
     csStarter: 'יש לי בעיה עם הזמנה',
     csGreeting: 'היי! כאן שירות הלקוחות 🙂 איך אפשר לעזור?',
+    csSwitchedToCs: 'עברת לשירות לקוחות',
+    csSwitchedToContent: 'חזרת לשיחה עם {name}',
     csDetailsSent: 'שלחתי את הפרטים',
   },
   en: {
@@ -196,6 +203,8 @@ const CHAT_PAGE_STRINGS = {
     csContentChoice: 'Chat with {name} 💬',
     csStarter: 'I have an issue with my order',
     csGreeting: "Hi! You've reached customer service 🙂 How can I help?",
+    csSwitchedToCs: 'Switched to customer service',
+    csSwitchedToContent: 'Back to chatting with {name}',
     csDetailsSent: 'Sent my details',
   },
 } as const;
@@ -612,6 +621,40 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   // CS mode had no exit: once entered, every later message routed to the CS
   // brain until the session was thrown away. A switch has to work both ways.
   const exitCsMode = useCallback(() => { csModeRef.current = false; setCsMode(false); }, []);
+  const csGreetedRef = useRef(false);
+
+  /**
+   * One handler for both directions, so switching always does something the
+   * visitor can see. Before this, entering CS pushed a greeting and leaving it
+   * pushed nothing at all — the switch moved but the thread did not, which
+   * made going back feel broken.
+   */
+  const switchChatMode = useCallback((next: 'content' | 'cs', from: string) => {
+    if ((next === 'cs') === csModeRef.current) return;
+    track('cs_choice_clicked', { choice: next, from });
+
+    const strings = chatStrings(influencer);
+    const who = (influencer as any)?.display_name || (influencer as any)?.displayName || '';
+    const notice: Message = {
+      id: `mode-${Date.now()}`,
+      role: 'notice',
+      content: next === 'cs' ? strings.csSwitchedToCs : strings.csSwitchedToContent.replace('{name}', who),
+    };
+
+    if (next === 'cs') {
+      enterCsMode();
+      // Greet once per visit. Flipping back and forth should not stack
+      // identical "you've reached customer service" messages.
+      const extra: Message[] = csGreetedRef.current
+        ? []
+        : [{ id: `cs-hi-${Date.now()}`, role: 'assistant', content: strings.csGreeting }];
+      csGreetedRef.current = true;
+      setMessages((prev) => [...prev, notice, ...extra]);
+    } else {
+      exitCsMode();
+      setMessages((prev) => [...prev, notice]);
+    }
+  }, [influencer, enterCsMode, exitCsMode]);
   const getPersistentAnonId = useCallback((): string => {
     try {
       let a = localStorage.getItem(`anon_id_${username}`);
@@ -1913,19 +1956,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               (influencer as any).display_name || (influencer as any).displayName || '',
                             )}
                             csLabel={chatStrings(influencer).csChoice}
-                            onChange={(next) => {
-                              track('cs_choice_clicked', { choice: next });
-                              if (next === 'cs') {
-                                enterCsMode();
-                                setMessages((prev) => [...prev, {
-                                  id: Date.now().toString(),
-                                  role: 'assistant',
-                                  content: chatStrings(influencer).csGreeting,
-                                }]);
-                              } else {
-                                exitCsMode();
-                              }
-                            }}
+                            onChange={(next) => switchChatMode(next, 'empty')}
                           />
                         </div>
                       )}
@@ -2001,23 +2032,31 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           )}
                           csLabel={chatStrings(influencer).csChoice}
                           disabled={isTyping || isStreamActive}
-                          onChange={(next) => {
-                            track('cs_choice_clicked', { choice: next, from: 'thread' });
-                            if (next === 'cs') {
-                              enterCsMode();
-                              setMessages((prev) => [...prev, {
-                                id: Date.now().toString(),
-                                role: 'assistant',
-                                content: chatStrings(influencer).csGreeting,
-                              }]);
-                            } else {
-                              exitCsMode();
-                            }
-                          }}
+                          onChange={(next) => switchChatMode(next, 'thread')}
                         />
                         </div>
                       )}
                       {messages.map((msg, index) => {
+                        // Mode-change divider — a rule with a label, not a turn.
+                        if (msg.role === 'notice') {
+                          return (
+                            <motion.div
+                              key={msg.id}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.35 }}
+                              className="flex items-center gap-3 py-1"
+                              dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
+                            >
+                              <span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, transparent, #e2e0e6)' }} />
+                              <span className="whitespace-nowrap text-[11.5px] font-medium" style={{ color: '#8b8b93' }}>
+                                {msg.content}
+                              </span>
+                              <span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, #e2e0e6, transparent)' }} />
+                            </motion.div>
+                          );
+                        }
+
                         // For streaming messages, use the live text (strip suggestions tag)
                         const isStreamingThis = streamingMessageId === msg.id && isStreamActive;
                         const rawContent = isStreamingThis ? streamText : msg.content;
