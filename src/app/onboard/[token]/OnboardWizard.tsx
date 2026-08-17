@@ -200,12 +200,20 @@ export default function OnboardWizard({ token, lang }: { token: string; lang: On
           )}
 
           {phase === 'done' && (
-            <div className="py-8 text-center">
-              <div className="text-5xl mb-3">🎉</div>
-              <h1 className="text-2xl font-extrabold text-gray-900">{t.done.heading}</h1>
-              <p className="text-sm text-gray-500 mt-2">{t.done.subtitle}</p>
-            </div>
+            <>
+              <div className="py-8 text-center">
+                <div className="text-5xl mb-3">🎉</div>
+                <h1 className="text-2xl font-extrabold text-gray-900">{t.done.heading}</h1>
+                <p className="text-sm text-gray-500 mt-2">{t.done.subtitle}</p>
+              </div>
+              {/* Also here, not only on the form: connecting WhatsApp needs a round trip to
+                  Meta for the payment method, and the form screen is gone by the time the
+                  customer comes back. This is the screen they can return to. */}
+              <WhatsAppConnectCard token={token} />
+            </>
           )}
+
+          {phase === 'scanning' && <WhatsAppConnectCard token={token} />}
 
           {phase === 'error' && (
             <div className="py-8 text-center">
