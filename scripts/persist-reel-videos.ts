@@ -16,10 +16,16 @@
  * not by changing code.
  *
  * Usage:
- *   npx tsx --tsconfig tsconfig.json scripts/persist-reel-videos.ts <account_id> [--count=3] [--dry-run]
+ *   persist-reel-videos.ts <account_id> [--shortcodes=A,B,C] [--count=3] [--dry-run]
  *
- * Example (Danielle Amit):
- *   npx tsx --tsconfig tsconfig.json scripts/persist-reel-videos.ts 038fd490-906d-431f-b428-ff9203ce4968 --count=3
+ * Prefer --shortcodes. Ranking by views picks what an audience watched, which
+ * is a different question from what plays well silent, cropped and looping —
+ * see the comment at the ranking code.
+ *
+ * Requires Node 22 (the Supabase client needs native WebSocket):
+ *   nvm use 22
+ *   npx tsx --tsconfig tsconfig.json scripts/persist-reel-videos.ts \
+ *     038fd490-906d-431f-b428-ff9203ce4968 --shortcodes=DTQf3YkjM_h,DLAI4FgNpSs
  */
 
 import dotenv from 'dotenv';
@@ -33,6 +39,13 @@ dotenv.config({ path: '.env.local' });
 
 /** How deep to look for reels before ranking. Reels are sparse among posts. */
 const FETCH_LIMIT = 60;
+/**
+ * Named shortcodes get a much deeper sweep. Curating by eye means picking from
+ * the whole archive — the good food reels on the account this was built for
+ * sat well outside the recent window, and a silent "not found" would have sent
+ * you back to view rank, which is the thing hand-picking exists to escape.
+ */
+const FETCH_LIMIT_TARGETED = 240;
 
 function arg(name: string, fallback: string): string {
   const hit = process.argv.slice(2).find((a) => a.startsWith(`--${name}=`));
@@ -78,16 +91,30 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`Account ${accountId} (@${username}) — fetching ${FETCH_LIMIT} posts for fresh media URLs...`);
-  const posts = await getScrapeCreatorsClient().getPosts(username, FETCH_LIMIT);
+  // Hand-picked shortcodes beat view rank, and should be the normal path.
+  // View count measures what an audience watched, not what works as a silent
+  // looping backdrop: on the account this was built for, the most-watched
+  // reels were a talking-head about relationships and a soldier's memorial,
+  // while the ones that actually suit a recipe assistant — a pan of pasta, a
+  // bowl of orzo — sat far down the list. Rank is a starting point, not a
+  // choice; look at the frames before you ship them.
+  const wanted = arg('shortcodes', '').split(',').map((s) => s.trim()).filter(Boolean);
+  const limit = wanted.length ? FETCH_LIMIT_TARGETED : FETCH_LIMIT;
 
-  // Rank by views. `media_type: 'video'` covers reels; the scraper does not
-  // distinguish reels from feed videos and for a banner the difference does
-  // not matter — both are vertical-ish short clips.
-  const candidates = posts
-    .filter((p) => p.media_type === 'video' && p.media_urls?.[0])
-    .sort((a, b) => (b.views_count || 0) - (a.views_count || 0))
-    .slice(0, count);
+  console.log(`Account ${accountId} (@${username}) — fetching ${limit} posts for fresh media URLs...`);
+  const posts = await getScrapeCreatorsClient().getPosts(username, limit);
+
+  const videos = posts.filter((p) => p.media_type === 'video' && p.media_urls?.[0]);
+
+  const candidates = wanted.length
+    ? wanted.map((sc) => videos.find((p) => p.shortcode === sc)).filter(Boolean as any as (p: any) => p is any)
+    : videos.sort((a, b) => (b.views_count || 0) - (a.views_count || 0)).slice(0, count);
+
+  for (const sc of wanted) {
+    if (!videos.some((p) => p.shortcode === sc)) {
+      console.warn(`  ! ${sc} not among the ${videos.length} videos in the last ${limit} posts — skipped`);
+    }
+  }
 
   if (candidates.length === 0) {
     console.error('No video posts with a media URL came back from the scraper.');

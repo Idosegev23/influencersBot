@@ -19,12 +19,11 @@ import type { BannerReel, ResolvedBanner } from '@/lib/widget/banner';
 
 const BANNER_H_DESKTOP = 206;
 const BANNER_H_MOBILE = 168;
-// Reels are shot 9:16. At the flat banner height a vertical frame cropped to
-// 3.25:1 shows barely a tenth of the picture — in practice an arbitrary slice
-// of someone's forehead. Video mode gets a taller box so the crop keeps a
-// recognisable subject, at the cost of some panel height.
-const VIDEO_H_DESKTOP = 300;
-const VIDEO_H_MOBILE = 280;
+// The reel's own band, with the copy below rather than on top. Reels are shot
+// 9:16, so any horizontal frame crops hard; ~1.9:1 keeps a top-down dish or a
+// pan legible while staying a band rather than a video player.
+const VIDEO_H_DESKTOP = 260;
+const VIDEO_H_MOBILE = 220;
 const BANNER_COLLAPSED_H = 44;
 
 /** The scrim that keeps white copy legible over unmeasured artwork. */
@@ -60,7 +59,7 @@ function artStyle(art: ResolvedBanner['art']): React.CSSProperties {
  * the Save-Data header, and the collapsed strip. In each case the poster frame
  * stands in, so the banner still looks intentional rather than empty.
  */
-function ReelLayer({ reel, playing }: { reel: BannerReel; playing: boolean }) {
+function ReelLayer({ reel, playing, scrim }: { reel: BannerReel; playing: boolean; scrim?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [allowMotion, setAllowMotion] = useState(false);
 
@@ -102,7 +101,7 @@ function ReelLayer({ reel, playing }: { reel: BannerReel; playing: boolean }) {
           <img src={reel.poster} alt="" aria-hidden className="h-full w-full object-cover" />
         )
       )}
-      <div className="absolute inset-0" style={{ backgroundImage: SCRIM_VIDEO }} />
+      {scrim && <div className="absolute inset-0" style={{ backgroundImage: scrim }} />}
     </div>
   );
 }
@@ -132,7 +131,7 @@ export function BannerHero({ banner, isMobile, collapsed, dir, onCtaClick }: Ban
       >
         {/* Paused: a video playing above a live conversation is a distraction
             and a battery cost, so the strip keeps only the poster frame. */}
-        {reel && <ReelLayer reel={reel} playing={false} />}
+        {reel && <ReelLayer reel={reel} playing={false} scrim={SCRIM_VIDEO} />}
         {banner.eyebrow && (
           <span
             className="relative z-10 flex-shrink-0 rounded-full px-2 py-[3px] text-[10.5px] font-bold uppercase tracking-wide text-white"
@@ -151,64 +150,102 @@ export function BannerHero({ banner, isMobile, collapsed, dir, onCtaClick }: Ban
     );
   }
 
+  const onDark = !reel; // gradient/image keep white copy over the art
+
+  const copy = (
+    <div
+      className={
+        reel
+          ? `flex flex-col items-start text-start ${isMobile ? 'px-4 py-4' : 'px-5 py-[18px]'}`
+          : `relative z-10 flex flex-col items-start text-start ${
+              isMobile ? 'px-4 pb-[22px] pt-[26px]' : 'px-5 pb-[26px] pt-[30px]'
+            }`
+      }
+    >
+      {banner.eyebrow && (
+        <div
+          className="mb-1.5 text-[11.5px] font-semibold uppercase tracking-wide"
+          style={{ color: onDark ? 'rgba(255,255,255,0.78)' : 'var(--color-primary, #ff6b35)' }}
+        >
+          {banner.eyebrow}
+        </div>
+      )}
+      <div
+        className="font-extrabold"
+        style={{
+          fontSize: isMobile ? '20px' : '23px',
+          lineHeight: 1.2,
+          color: onDark ? '#fff' : '#0c1013',
+          textShadow: onDark ? '0 1px 12px rgba(0,0,0,0.25)' : undefined,
+        }}
+      >
+        {banner.headline}
+      </div>
+      {banner.subline && (
+        <div
+          className="mt-[6px] text-[13.5px] font-normal leading-[1.45]"
+          style={{ color: onDark ? 'rgba(255,255,255,0.78)' : '#676767' }}
+        >
+          {banner.subline}
+        </div>
+      )}
+      {banner.cta &&
+        (banner.cta.action === 'none' ? (
+          <span
+            className="mt-3 inline-flex items-center rounded-full px-4 py-2 text-[13px] font-semibold opacity-90"
+            style={onDark ? { background: '#fff', color: '#111' } : { background: 'var(--color-primary, #ff6b35)', color: '#fff' }}
+          >
+            {banner.cta.label}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onCtaClick}
+            className="mt-3 inline-flex items-center rounded-full px-4 py-2 text-[13px] font-semibold transition-transform active:scale-[0.98]"
+            style={onDark ? { background: '#fff', color: '#111' } : { background: 'var(--color-primary, #ff6b35)', color: '#fff' }}
+          >
+            {banner.cta.label}
+          </button>
+        ))}
+    </div>
+  );
+
+  // Video gets its own composition: the reel on top, copy on a clean surface
+  // beneath it. Laying text over a recipe reel meant a heavy scrim, and a
+  // scrim over food is just mud — the one thing the visitor should see is the
+  // thing we were darkening. Separating them also means no crop compromise on
+  // the copy side and no text fighting the reel's burned-in captions.
+  if (reel) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        dir={dir}
+        className="w-full overflow-hidden rounded-2xl bg-white"
+        style={{ boxShadow: '0 6px 28px rgba(12,16,19,0.08)' }}
+      >
+        <div className="relative w-full" style={{ height: isMobile ? VIDEO_H_MOBILE : VIDEO_H_DESKTOP }}>
+          <ReelLayer reel={reel} playing />
+        </div>
+        {copy}
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.1 }}
       dir={dir}
-      style={{
-        ...artStyle(banner.art),
-        minHeight: reel
-          ? (isMobile ? VIDEO_H_MOBILE : VIDEO_H_DESKTOP)
-          : (isMobile ? BANNER_H_MOBILE : BANNER_H_DESKTOP),
-      }}
+      style={{ ...artStyle(banner.art), minHeight: isMobile ? BANNER_H_MOBILE : BANNER_H_DESKTOP }}
       className="relative flex w-full flex-col justify-end overflow-hidden rounded-2xl"
     >
-      {reel && <ReelLayer reel={reel} playing />}
       {/* min-height, not height: a headline that wraps to three lines on a
           390px phone would otherwise be clipped from the top. Copy is pinned
           to the block end but the box grows to fit it. */}
-      <div
-        className={`relative z-10 flex flex-col items-start text-start ${
-          isMobile ? 'px-4 pb-[22px] pt-[26px]' : 'px-5 pb-[26px] pt-[30px]'
-        }`}
-      >
-        {banner.eyebrow && (
-          <div className="mb-1.5 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.78)' }}>
-            {banner.eyebrow}
-          </div>
-        )}
-        <div
-          className="font-extrabold text-white"
-          style={{
-            fontSize: isMobile ? '22px' : '25px',
-            lineHeight: 1.18,
-            textShadow: '0 1px 12px rgba(0,0,0,0.25)',
-          }}
-        >
-          {banner.headline}
-        </div>
-        {banner.subline && (
-          <div className="mt-[7px] text-[13.5px] font-normal leading-[1.45]" style={{ color: 'rgba(255,255,255,0.78)' }}>
-            {banner.subline}
-          </div>
-        )}
-        {banner.cta &&
-          (banner.cta.action === 'none' ? (
-            <span className="mt-3 inline-flex items-center rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#111] opacity-90">
-              {banner.cta.label}
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={onCtaClick}
-              className="mt-3 inline-flex items-center rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#111] transition-transform active:scale-[0.98]"
-            >
-              {banner.cta.label}
-            </button>
-          ))}
-      </div>
+      {copy}
     </motion.div>
   );
 }
