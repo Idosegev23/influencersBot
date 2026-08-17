@@ -404,6 +404,9 @@
     brandName: locale.brandName,
     profilePic: null,
     coverImage: null,
+    // Resolved opening banner from /api/widget/config (see lib/widget/banner.ts).
+    // null → the pre-banner header: cover strip + avatar + brand name.
+    banner: null,
     socialLinks: [],
     tooltip: null,
     enabled: true,
@@ -859,8 +862,23 @@
   window.__ibotInlineProductClick = function (href) {
     widgetTrack('widget_product_click', { surface: 'inline_link', href: href || null });
   };
+  // Once-per-thread guards for the two funnel edges the banner is judged on.
+  var bannerViewTracked = false;
+  var firstMessageTracked = false;
+
+  function trackBannerViewed() {
+    if (bannerViewTracked || !config.banner) return;
+    bannerViewTracked = true;
+    widgetTrack('banner_viewed', { surface: 'widget', art: config.banner.art && config.banner.art.mode });
+  }
+
   window.__ibotChipClick = function (idx) {
-    if (chips[idx]) onChipClick(chips[idx], idx, 'initial');
+    // Index into whatever was actually rendered — a banner may pin its own
+    // starter list in place of the dynamic chips.
+    var items = starterItems();
+    if (!items[idx]) return;
+    if (config.banner) widgetTrack('banner_starter_clicked', { index: idx, label: items[idx] });
+    onChipClick(items[idx], idx, 'initial');
   };
 
   // ============================================
@@ -915,6 +933,7 @@
     // without re-rendering individual blocks.
     var t = theme();
     var glow = glowStops();
+    var bannerArt = config.banner ? config.banner.art : null;
     var vars =
       '#ibot-widget-container{' +
       '--ibot-glow-1:' + glow[0] + ';' +
@@ -936,6 +955,15 @@
       '--ibot-error-text:' + t.errorText + ';' +
       '--ibot-success-bg:' + t.successBg + ';' +
       '--ibot-success-text:' + t.successText + ';' +
+      // ---- Banner surface ----
+      // The banner paints its own dark ground, so text on it is white in BOTH
+      // modes — these are deliberately not theme-flipped. The gradient stops
+      // come from the account's brand color unless the banner overrides them,
+      // which is what lets every account get a usable banner with no artwork.
+      '--ibot-banner-from:' + (bannerArt && bannerArt.from ? bannerArt.from : glow[0]) + ';' +
+      '--ibot-banner-to:' + (bannerArt && bannerArt.to ? bannerArt.to : glow[1]) + ';' +
+      '--ibot-on-banner:#ffffff;' +
+      '--ibot-on-banner-dim:rgba(255,255,255,0.78);' +
       '}';
     styleEl.textContent =
       vars +
@@ -1070,6 +1098,17 @@
       if (data.brandName) config.brandName = data.brandName;
       if (data.profilePic) config.profilePic = data.profilePic;
       if (data.coverImage) config.coverImage = data.coverImage;
+      // Banner last among the copy fields: resolving the locale above resets
+      // welcomeMessage/placeholder/brandName to the language defaults, and the
+      // banner must not be clobbered by that reset. It is language-agnostic —
+      // the account author writes it in whatever language they publish in.
+      if (data.banner && data.banner.headline) {
+        config.banner = data.banner;
+        applyLocaleAssets(); // re-emit CSS vars now that art colors are known
+        // Config can land after the visitor already opened the panel, in which
+        // case the open-time call found no banner to report.
+        if (isOpen) trackBannerViewed();
+      }
       if (Array.isArray(data.socialLinks)) config.socialLinks = data.socialLinks;
       if (data.cartWatcher) config.cartWatcher = data.cartWatcher;
       if (data.tooltip && data.tooltip.text) config.tooltip = data.tooltip;
@@ -1308,10 +1347,132 @@
       '<span>' + escapeHtml(wlbl('AI עלול לטעות','AI can make mistakes')) + '</span></div>';
   }
 
+  // ---- Banner ----
+  // The opening surface. Replaces the old cover strip, which without an
+  // uploaded image was 112px of empty panel background under a
+  // transparent→panel-bg gradient (i.e. white on white).
+  var BANNER_H_DESKTOP = 206;
+  var BANNER_H_MOBILE = 168;   // 30% of a 560px panel; the doc's 312px was 56%
+  var BANNER_COLLAPSED_H = 44;
+  // Vertical room reserved at the top of the banner for the overlaid chrome
+  // (status pill, "new chat", mobile close). Keep in step with those buttons'
+  // `top` offsets — currently 12px + a ~26px control + breathing room.
+  var BANNER_CHROME_CLEARANCE = 52;
+
+  // Art layer: gradient from the brand color, or the account's image with a
+  // scrim. Either way there is a dark ground under the copy, so white text is
+  // legible without measuring the artwork.
+  function bannerArtCss() {
+    var b = config.banner;
+    var grad = 'linear-gradient(135deg,var(--ibot-banner-from),var(--ibot-banner-to))';
+    if (b && b.art && b.art.mode === 'image' && b.art.image) {
+      var url = String(b.art.image).replace(/['"\\]/g, '');
+      // Scrim first (painted on top), image second — a bare photo behind white
+      // 25px text is unreadable on light frames.
+      return "background-image:linear-gradient(180deg,rgba(0,0,0,0.15) 0%,rgba(0,0,0,0.55) 65%,rgba(0,0,0,0.72) 100%),url('" + url + "');" +
+        'background-size:cover;background-position:center;';
+    }
+    return 'background-image:' + grad + ';';
+  }
+
+  function bannerCtaHtml() {
+    var cta = config.banner && config.banner.cta;
+    if (!cta) return '';
+    var base = 'margin-top:12px;display:inline-flex;align-items:center;gap:6px;padding:8px 16px;' +
+      'border-radius:999px;font-size:13px;font-weight:600;font-family:inherit;border:none;' +
+      'background:var(--ibot-on-banner);color:#111;';
+    if (cta.action === 'none') {
+      return '<span style="' + base + 'opacity:0.9;">' + escapeHtml(cta.label) + '</span>';
+    }
+    return '<button id="ibot-banner-cta" type="button" style="' + base + 'cursor:pointer;">' +
+      escapeHtml(cta.label) + '</button>';
+  }
+
+  // The full banner, shown until the visitor sends their first message.
+  //
+  // min-height, not height: long headlines in Hebrew wrap to three lines on a
+  // 390px phone, and a fixed box clipped them from the top — the eyebrow and
+  // the first line of the headline simply vanished. The banner grows instead.
+  // The top padding is chrome clearance: the status pill, "new chat" and the
+  // mobile close button are absolutely positioned over this box, so copy that
+  // starts any higher slides underneath them.
+  function bannerHtml(isMobile) {
+    var b = config.banner;
+    var minH = isMobile ? BANNER_H_MOBILE : BANNER_H_DESKTOP;
+    var padX = isMobile ? '16px' : '20px';
+    return '<div id="ibot-banner" style="position:relative;min-height:' + minH + 'px;flex-shrink:0;' +
+      'display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;text-align:start;' +
+      'padding:' + BANNER_CHROME_CLEARANCE + 'px ' + padX + ' ' + (isMobile ? '22px' : '26px') + ';' +
+      'background-color:var(--ibot-banner-to);' + bannerArtCss() + '">' +
+      (b.eyebrow
+        ? '<div style="font-size:11.5px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;' +
+          'color:var(--ibot-on-banner-dim);margin-bottom:6px;">' + escapeHtml(b.eyebrow) + '</div>'
+        : '') +
+      '<div style="font-size:' + (isMobile ? '21px' : '25px') + ';line-height:1.18;font-weight:800;' +
+      'color:var(--ibot-on-banner);text-shadow:0 1px 12px rgba(0,0,0,0.25);">' + escapeHtml(b.headline) + '</div>' +
+      (b.subline
+        ? '<div style="font-size:13.5px;line-height:1.45;font-weight:400;margin-top:7px;' +
+          'color:var(--ibot-on-banner-dim);">' + escapeHtml(b.subline) + '</div>'
+        : '') +
+      bannerCtaHtml() +
+      '</div>';
+  }
+
+  // Collapsed strip (direction A): once the conversation starts the banner
+  // shrinks to a 44px band that keeps the eyebrow + a one-line headline above
+  // the thread, instead of vanishing or eating panel height.
+  function bannerStripHtml(isMobile) {
+    var b = config.banner;
+    var label = b.eyebrow || b.headline;
+    return '<div style="height:' + BANNER_COLLAPSED_H + 'px;flex-shrink:0;display:flex;align-items:center;gap:8px;' +
+      'padding:0 ' + (isMobile ? '14px' : '16px') + ';overflow:hidden;background-color:var(--ibot-banner-to);' +
+      bannerArtCss() + '">' +
+      (b.eyebrow
+        ? '<span style="flex-shrink:0;font-size:10.5px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;' +
+          'padding:3px 8px;border-radius:999px;background:rgba(255,255,255,0.18);color:var(--ibot-on-banner);">' +
+          escapeHtml(b.eyebrow) + '</span>'
+        : '') +
+      '<span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;' +
+      'font-weight:600;color:' + (b.eyebrow ? 'var(--ibot-on-banner-dim)' : 'var(--ibot-on-banner)') + ';">' +
+      escapeHtml(label === b.eyebrow ? b.headline : label) + '</span>' +
+      '</div>';
+  }
+
+  // Availability pill. Colors come from theme() so the pill inverts with dark
+  // mode — it used to hardcode #15803d on rgba(255,255,255,.85), which put a
+  // white lozenge on a dark panel.
+  function statusPillHtml() {
+    return '<div style="position:absolute;top:calc(12px + env(safe-area-inset-top));left:14px;z-index:6;' +
+      'display:flex;align-items:center;gap:5px;background:var(--ibot-success-bg);padding:3px 8px;' +
+      'border-radius:999px;font-size:11.5px;color:var(--ibot-success-text);">' +
+      '<span style="width:7px;height:7px;border-radius:50%;background:currentColor;"></span>' +
+      escapeHtml(locale.status) + '</div>';
+  }
+
   // Header: rich cover+logo on the welcome screen, compact bar once chatting.
   function headerHtml(pc, isMobile) {
     var hasUser = messages.some(function (mm) { return mm.role === 'user'; });
     var radius = isMobile ? '' : 'border-radius:18px 18px 0 0;';
+    var banner = config.banner;
+
+    // ---- Banner welcome screen ----
+    // Deliberately no avatar ring / brand name / social row here: the banner
+    // already carries the identity, and stacking both pushed the input below
+    // the fold on a 560px panel.
+    if (banner && !hasUser) {
+      return '<div style="position:relative;flex-shrink:0;' + radius + 'overflow:hidden;">' +
+        newChatBtnHtml() +
+        statusPillHtml() +
+        bannerHtml(isMobile) +
+        (banner.valueLine
+          ? '<div style="text-align:center;font-size:12.5px;line-height:1.4;color:var(--ibot-text-secondary);' +
+            'padding:10px 18px 0;">' + escapeHtml(banner.valueLine) + '</div>'
+          : '') +
+        socialRowHtml() +
+        (isMobile ? '<button id="ibot-close-mobile" aria-label="close" style="position:absolute;top:calc(8px + env(safe-area-inset-top));left:50px;background:rgba(0,0,0,0.4);border:none;color:#fff;cursor:pointer;width:40px;height:40px;border-radius:50%;font-size:22px;display:flex;align-items:center;justify-content:center;z-index:6;">&times;</button>' : '') +
+        '</div>';
+    }
+
     if (!hasUser) {
       var coverUrl = config.coverImage ? String(config.coverImage).replace(/['"]/g, '') : '';
       // No cover image → plain panel background (white in light mode), not a
@@ -1321,8 +1482,7 @@
         : 'background:var(--ibot-panel-bg);';
       return '<div style="position:relative;flex-shrink:0;' + radius + 'overflow:hidden;">' +
         newChatBtnHtml() +
-        '<div style="position:absolute;top:calc(12px + env(safe-area-inset-top));left:14px;z-index:6;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);padding:3px 8px;border-radius:999px;font-size:11.5px;color:#15803d;">' +
-        '<span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span>' + escapeHtml(locale.status) + '</div>' +
+        statusPillHtml() +
         '<div style="height:' + (isMobile ? '72px' : '112px') + ';position:relative;' + coverBg + '"><div style="position:absolute;left:0;right:0;bottom:0;height:' + (isMobile ? '30px' : '46px') + ';background:linear-gradient(to bottom,transparent,var(--ibot-panel-bg));"></div></div>' +
         '<div style="width:' + (isMobile ? '54px' : '84px') + ';height:' + (isMobile ? '54px' : '84px') + ';margin:' + (isMobile ? '-27px' : '-42px') + ' auto 0;border-radius:50%;border:' + (isMobile ? '3px' : '4px') + ' solid var(--ibot-panel-bg);overflow:hidden;position:relative;z-index:2;box-shadow:0 4px 14px rgba(0,0,0,0.12);">' + avatarHtml(isMobile ? 54 : 84) + '</div>' +
         '<div style="text-align:center;font-weight:800;font-size:' + (isMobile ? '16px' : '20px') + ';color:var(--ibot-text-primary);margin:' + (isMobile ? '5px 12px 0' : '9px 12px 2px') + ';">' + escapeHtml(config.brandName) + '</div>' +
@@ -1330,12 +1490,16 @@
         (isMobile ? '<button id="ibot-close-mobile" aria-label="close" style="position:absolute;top:calc(8px + env(safe-area-inset-top));left:50px;background:rgba(0,0,0,0.4);border:none;color:#fff;cursor:pointer;width:40px;height:40px;border-radius:50%;font-size:22px;display:flex;align-items:center;justify-content:center;z-index:6;">&times;</button>' : '') +
         '</div>';
     }
-    return '<div style="display:flex;align-items:center;gap:10px;padding:env(safe-area-inset-top) 12px 0;height:62px;flex-shrink:0;position:relative;z-index:2;' +
-      'background:var(--ibot-surface);border-bottom:1px solid var(--ibot-border);' + radius + '">' +
+    // Direction A: the banner survives the first message as a 44px strip above
+    // the compact bar. Both are flex-shrink:0 children of the panel column, so
+    // the strip steals height from the thread, not from the input.
+    return (banner ? '<div style="flex-shrink:0;' + radius + 'overflow:hidden;">' + bannerStripHtml(isMobile) + '</div>' : '') +
+      '<div style="display:flex;align-items:center;gap:10px;padding:env(safe-area-inset-top) 12px 0;height:62px;flex-shrink:0;position:relative;z-index:2;' +
+      'background:var(--ibot-surface);border-bottom:1px solid var(--ibot-border);' + (banner ? '' : radius) + '">' +
       '<div style="width:40px;height:40px;flex-shrink:0;border-radius:50%;overflow:hidden;">' + avatarHtml(40) + '</div>' +
       '<div style="flex:1;min-width:0;">' +
       '<div style="font-weight:700;font-size:16px;color:var(--ibot-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(config.brandName) + '</div>' +
-      '<div style="display:flex;align-items:center;gap:4px;margin-top:1px;"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;"></span><span style="font-size:11.5px;color:#15803d;">' + escapeHtml(locale.status) + '</span></div>' +
+      '<div style="display:flex;align-items:center;gap:4px;margin-top:1px;color:var(--ibot-success-text);"><span style="width:7px;height:7px;border-radius:50%;background:currentColor;"></span><span style="font-size:11.5px;">' + escapeHtml(locale.status) + '</span></div>' +
       '</div>' +
       '<button onclick="window.__ibotNewChat()" title="' + escapeHtml(wlbl('שיחה חדשה','New chat')) + '" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
       newChatIconSvg(17) + '</button>' +
@@ -1362,6 +1526,10 @@
     csChoiceDismissed = false;
     animatedUpTo = 0;       // fresh thread → let the new welcome slide in
     view = 'chat';
+    // A new thread re-exposes the banner, so both funnel edges re-arm.
+    bannerViewTracked = false;
+    firstMessageTracked = false;
+    trackBannerViewed();
     fetchChips('initial');
     render();
   };
@@ -1524,6 +1692,7 @@
       try { markTooltipSeen(); } catch (e) {}
       try { removeTeaser(); } catch (e) {}
       widgetTrack('widget_opened', {});
+      trackBannerViewed();
       render();
     };
     trigger.onclick = openFromTrigger;
@@ -1675,8 +1844,8 @@
         : '') +
 
       // ---- Smart chips row (only when no user message yet AND chips loaded) ----
-      ((!csMode && (!modules.customerService.enabled || csChoiceDismissed) && chips.length > 0 && !messages.some(function (mm) { return mm.role === 'user'; }))
-        ? renderChipsRow(chips, pc)
+      ((!csMode && (!modules.customerService.enabled || csChoiceDismissed) && starterItems().length > 0 && !messages.some(function (mm) { return mm.role === 'user'; }))
+        ? renderChipsRow(starterItems(), pc, { label: starterLabel() })
         : '') +
 
       // ---- Footer actions row — visible only after first user turn so it
@@ -1783,6 +1952,27 @@
       micBtn.onclick = toggleVoiceInput;
     }
 
+    var bannerCta = document.getElementById('ibot-banner-cta');
+    if (bannerCta) {
+      bannerCta.onclick = function () {
+        var cta = config.banner && config.banner.cta;
+        if (!cta) return;
+        widgetTrack('banner_cta_clicked', { action: cta.action, label: cta.label });
+        if (cta.action === 'url') {
+          window.open(cta.value, '_blank', 'noopener,noreferrer');
+          return;
+        }
+        // Prefill, don't send: the visitor sees the question that is about to
+        // go out and can edit it. Auto-sending on a banner tap produces
+        // conversations the visitor never chose to start.
+        var el = document.getElementById('ibot-input');
+        if (!el) return;
+        el.value = cta.value;
+        el.focus();
+        try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) { /* */ }
+      };
+    }
+
     var inputEl = document.getElementById('ibot-input');
     var sendEl = document.getElementById('ibot-send');
 
@@ -1823,6 +2013,13 @@
     messages.push({ role: 'assistant', content: '' });
     isLoading = true;
     widgetTrack('widget_message_sent', { length: text.length, msg_index: messages.length - 2 });
+    // Opened→spoke is the ratio the banner is meant to move. Emitted once per
+    // thread, tagged with whether a banner was on, so the two cohorts are
+    // comparable without joining against config history.
+    if (!firstMessageTracked) {
+      firstMessageTracked = true;
+      widgetTrack('first_message', { surface: 'widget', banner: !!config.banner });
+    }
     render();
 
     // Re-extract page context each turn — pages within a SPA can change without
@@ -2055,6 +2252,20 @@
     );
   }
 
+  // Cold-start starters. A banner may pin its own list; otherwise the dynamic
+  // chips from /api/widget/chips stay in charge, so accounts don't freeze a
+  // question list into config and forget it.
+  function starterItems() {
+    var s = config.banner && config.banner.starters;
+    if (s && s.items && s.items.length) return s.items;
+    return chips;
+  }
+
+  function starterLabel() {
+    var s = config.banner && config.banner.starters;
+    return (s && s.label) ? s.label : '';
+  }
+
   function renderChipsRow(items, pc, opts) {
     var isCs = !!(opts && opts.csChips);
     var pills = '';
@@ -2078,7 +2289,16 @@
       rendered++;
     }
     if (!pills) return '';
+    // Optional section label above the chips ("אפשר להתחיל מכאן"). Banner-only
+    // and cold-start-only — labelling the follow-up chips mid-conversation
+    // would read as the bot restarting.
+    var label = (opts && opts.label) ? String(opts.label) : '';
     return (
+      (label
+        ? '<div style="padding:' + (mob ? '2px 16px 4px' : '2px 16px 3px') + ';font-size:11.5px;font-weight:600;' +
+          'letter-spacing:0.03em;color:var(--ibot-text-muted);direction:' + locale.dir + ';flex-shrink:0;">' +
+          escapeHtml(label) + '</div>'
+        : '') +
       '<div style="padding:' + (mob ? '6px 16px' : '4px 16px') + ';display:flex;flex-wrap:wrap;gap:' + (mob ? '8px' : '6px') + ';direction:' + locale.dir + ';flex-shrink:0;">' +
       pills +
       '</div>'
@@ -2109,7 +2329,9 @@
       if (p.submitted) {
         return wrap + '<div style="' + panel + 'opacity:0.65;font-size:12.5px;color:var(--ibot-text-muted);">✓ ' + escapeHtml(locale.cs.detailsSent) + '</div></div>';
       }
-      var inputStyle = 'width:100%;box-sizing:border-box;background:var(--ibot-bg);border:1px solid var(--ibot-border);border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit;color:var(--ibot-text-primary);margin-bottom:8px;direction:' + locale.dir + ';';
+      // --ibot-bg was never defined by applyLocaleAssets, so these inputs fell
+      // back to transparent and inherited whatever sat behind them.
+      var inputStyle = 'width:100%;box-sizing:border-box;background:var(--ibot-input-bg);border:1px solid var(--ibot-border);border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit;color:var(--ibot-text-primary);margin-bottom:8px;direction:' + locale.dir + ';';
       return wrap +
         '<div style="' + panel + 'width:88%;">' +
           '<div style="font-size:12.5px;color:var(--ibot-text-primary);margin-bottom:8px;">' + escapeHtml(locale.cs.detailsTitle) + '</div>' +

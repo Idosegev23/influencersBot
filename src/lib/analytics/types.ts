@@ -35,6 +35,12 @@ export type AnalyticsEventName =
   | 'starter_pill_clicked'
   | 'suggestion_pill_clicked'
   | 'topic_pill_clicked'
+  // Opening banner (shared with public/widget.js — see lib/widget/banner.ts).
+  // `first_message` is the numerator of opened-the-surface → actually-spoke.
+  | 'banner_viewed'
+  | 'banner_cta_clicked'
+  | 'banner_starter_clicked'
+  | 'first_message'
   // CS engine (spec §5)
   | 'cs_choice_clicked'
   | 'cs_support_starter_clicked'

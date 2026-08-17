@@ -40,6 +40,15 @@ export const EVENT_CATALOG: Record<string, EventDef> = {
   conversation_starter_clicked: { category: 'engagement', surface: 'chat' },
   meeting_pill_clicked: { category: 'engagement', surface: 'chat' },
 
+  // Opening banner (shared: widget.js and the chat page both emit these).
+  // `first_message` is the denominator half of the KPI the banner exists to
+  // move — opened-the-surface vs actually-said-something. It carries whether a
+  // banner was on, which widget_message_sent/chat_message_sent cannot.
+  banner_viewed: { category: 'engagement', surface: 'shared' },
+  banner_cta_clicked: { category: 'engagement', surface: 'shared' },
+  banner_starter_clicked: { category: 'engagement', surface: 'shared' },
+  first_message: { category: 'engagement', surface: 'shared' },
+
   // Dynamic CTAs / cards (every clickable element the bot/page renders)
   dynamic_cta_clicked: { category: 'engagement', surface: 'shared' },
   product_card_clicked: { category: 'engagement', surface: 'chat' },

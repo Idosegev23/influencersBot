@@ -124,6 +124,17 @@ export default function ManagePage() {
   const [coverUploading, setCoverUploading] = useState(false);
   // Tooltip bubble shown near the widget launcher button (mobile, once per visitor).
   const [tooltip, setTooltip] = useState('');
+  // ---- Opening banner (config.widget.banner) ----
+  // The same banner drives the chat page, which falls back to this object when
+  // config.chat.banner is absent — one edit, both surfaces. Empty headline =
+  // no banner at all, i.e. the pre-banner header stays exactly as it was.
+  const [bannerEyebrow, setBannerEyebrow] = useState('');
+  const [bannerHeadline, setBannerHeadline] = useState('');
+  const [bannerSubline, setBannerSubline] = useState('');
+  const [bannerCtaLabel, setBannerCtaLabel] = useState('');
+  const [bannerCtaValue, setBannerCtaValue] = useState('');
+  const [bannerStartersLabel, setBannerStartersLabel] = useState('');
+  const [bannerArtMode, setBannerArtMode] = useState<'gradient' | 'image'>('gradient');
   // Social links — auto-filled from scraping, editable here; rendered in the widget footer/header.
   const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([]);
   const [brandNameOverride, setBrandNameOverride] = useState('');
@@ -196,6 +207,14 @@ export default function ManagePage() {
         setBrandNameOverride(w.brandName || '');
         setCoverImage(w.coverImage || '');
         setTooltip(w.tooltip || '');
+        const b = w.banner || {};
+        setBannerEyebrow(b.eyebrow || '');
+        setBannerHeadline(b.headline || '');
+        setBannerSubline(b.subline || '');
+        setBannerCtaLabel(b.cta?.label || '');
+        setBannerCtaValue(b.cta?.value || '');
+        setBannerStartersLabel(b.starters?.label || '');
+        setBannerArtMode(b.art?.mode === 'image' ? 'image' : 'gradient');
         setSocialLinks(Array.isArray(w.socialLinks) ? w.socialLinks : []);
         const mods = w.modules || {};
         setModSupport(mods.support?.enabled === true);
@@ -315,6 +334,22 @@ export default function ManagePage() {
           placeholder: placeholderText,
           brandName: brandNameOverride,
           tooltip: tooltip.trim(),
+          // Headline is the switch: no headline, no banner. Writing a disabled
+          // stub instead of null would leave the account permanently one
+          // forgotten checkbox away from a blank band.
+          banner: bannerHeadline.trim()
+            ? {
+                enabled: true,
+                eyebrow: bannerEyebrow.trim() || null,
+                headline: bannerHeadline.trim(),
+                subline: bannerSubline.trim() || null,
+                cta: bannerCtaLabel.trim() && bannerCtaValue.trim()
+                  ? { label: bannerCtaLabel.trim(), action: 'prefill', value: bannerCtaValue.trim() }
+                  : null,
+                art: { mode: bannerArtMode },
+                starters: bannerStartersLabel.trim() ? { label: bannerStartersLabel.trim() } : null,
+              }
+            : null,
           socialLinks: socialLinks.filter((s) => s.platform && /^https?:\/\//i.test(s.url)),
           modules: {
             support: { enabled: modSupport, categories: supportCategories },
@@ -1456,6 +1491,92 @@ export default function ManagePage() {
                         placeholder="שלום! איך אפשר לעזור?"
                         className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
                         style={{ backgroundColor: '#faf2e9' }} />
+                    </div>
+
+                    {/* ---- Opening banner ---- */}
+                    <div className="sm:col-span-2 rounded-xl border border-[#c6c6c6] p-4" style={{ backgroundColor: '#fdf8f2' }}>
+                      <h4 className="text-sm font-bold text-[#1e1b15] mb-1">באנר פתיחה</h4>
+                      <p className="text-xs text-[#655e51] mb-3">
+                        מוצג במסך הפתיחה של הווידג&apos;ט <b>וגם</b> בעמוד הצ&apos;אט. בלי כותרת ראשית — אין באנר,
+                        והמסך נשאר כמו היום.
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-[#655e51] mb-1.5">כותרת עליונה</label>
+                          <input value={bannerEyebrow} onChange={e => setBannerEyebrow(e.target.value.slice(0, 32))}
+                            maxLength={32}
+                            placeholder="חדש · Q3"
+                            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                            style={{ backgroundColor: '#faf2e9' }} />
+                          <p className="text-xs text-[#655e51] mt-1">{bannerEyebrow.length}/32</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#655e51] mb-1.5">כותרת ראשית</label>
+                          <input value={bannerHeadline} onChange={e => setBannerHeadline(e.target.value.slice(0, 70))}
+                            maxLength={70}
+                            placeholder="בונים קמפיין? קבלו מסלול מדויק בשיחה אחת."
+                            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                            style={{ backgroundColor: '#faf2e9' }} />
+                          <p className="text-xs text-[#655e51] mt-1">{bannerHeadline.length}/70</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-[#655e51] mb-1.5">שורת משנה</label>
+                          <input value={bannerSubline} onChange={e => setBannerSubline(e.target.value.slice(0, 110))}
+                            maxLength={110}
+                            placeholder="ספרו לי על המותג והתקציב — ואבנה הצעה תוך שתי דקות."
+                            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                            style={{ backgroundColor: '#faf2e9' }} />
+                          <p className="text-xs text-[#655e51] mt-1">{bannerSubline.length}/110</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#655e51] mb-1.5">כפתור — טקסט</label>
+                          <input value={bannerCtaLabel} onChange={e => setBannerCtaLabel(e.target.value.slice(0, 32))}
+                            maxLength={32}
+                            placeholder="רוצה לשמוע"
+                            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                            style={{ backgroundColor: '#faf2e9' }} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#655e51] mb-1.5">כפתור — השאלה שתיכתב</label>
+                          <input value={bannerCtaValue} onChange={e => setBannerCtaValue(e.target.value.slice(0, 200))}
+                            maxLength={200}
+                            placeholder="ספרו לי על מודל ההצלחה"
+                            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                            style={{ backgroundColor: '#faf2e9' }} />
+                          <p className="text-xs text-[#655e51] mt-1">נכתבת בשורת הכתיבה ולא נשלחת — הגולש רואה ויכול לערוך.</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#655e51] mb-1.5">כותרת לפותחי שיחה</label>
+                          <input value={bannerStartersLabel} onChange={e => setBannerStartersLabel(e.target.value.slice(0, 40))}
+                            maxLength={40}
+                            placeholder="אפשר להתחיל מכאן"
+                            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none border border-[#c6c6c6]"
+                            style={{ backgroundColor: '#faf2e9' }} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#655e51] mb-1.5">רקע הבאנר</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'gradient' as const, label: 'גרדיאנט' },
+                              { value: 'image' as const, label: 'תמונת כיסוי' },
+                            ].map(opt => (
+                              <button key={opt.value} type="button" onClick={() => setBannerArtMode(opt.value)}
+                                className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                                  bannerArtMode === opt.value
+                                    ? 'border-[#575a8c] text-[#1e1b15]'
+                                    : 'border-[#c6c6c6] text-[#655e51]'
+                                }`}
+                                style={{ backgroundColor: bannerArtMode === opt.value ? '#eceaf7' : '#faf2e9' }}>
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-[#655e51] mt-1">
+                            גרדיאנט נגזר אוטומטית מצבע המותג. &quot;תמונת כיסוי&quot; משתמשת בתמונה שלמטה — ובלעדיה חוזר לגרדיאנט.
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="sm:col-span-2">

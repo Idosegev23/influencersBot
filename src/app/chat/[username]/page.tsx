@@ -50,6 +50,8 @@ import { DirectiveRenderer, type UIDirectives, type BrandCardData } from '@/comp
 import { useStreamChat, type StreamMeta, type StreamCards, type StreamDone } from '@/hooks/useStreamChat';
 import { useChatMedia } from '@/hooks/useChatMedia';
 import { ChatInput } from '@/components/chat/ChatInput';
+import { BannerHero } from '@/components/chat/BannerHero';
+import { resolveBanner } from '@/lib/widget/banner';
 import { NavTabs } from '@/components/chat/NavTabs';
 import { StarterPills } from '@/components/chat/StarterPills';
 import SupportForm from '@/components/SupportForm';
@@ -462,6 +464,39 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     for (const c of supportCategoryOverride || []) m.set(c.id, c);
     return m;
   }, [supportCategoryOverride]);
+
+  // Opening banner. Resolved from the raw config rather than a mapped loader
+  // field, because two loaders build the influencer object (lib/supabase.ts and
+  // lib/cached-loaders.ts) and only `_rawConfig` is guaranteed identical in
+  // both — a mapped `banner` would have to be added twice and would drift.
+  // Falls back to config.widget.banner when the chat has none of its own.
+  const banner = useMemo(() => {
+    const raw = (influencer as any)?._rawConfig;
+    if (!raw) return null;
+    return resolveBanner(raw, 'chat', {
+      brandName: (influencer as any).display_name,
+      greeting: raw.greeting_message,
+      subtitle: raw.chat_subtitle,
+    });
+  }, [influencer]);
+
+  // The two funnel edges the banner is judged on: saw-it and said-something.
+  // Both fire once per visit; `first_message` carries whether a banner was on
+  // so the with/without cohorts are comparable without joining config history.
+  const bannerViewTracked = useRef(false);
+  const firstMessageTracked = useRef(false);
+
+  // Cold-start starters: a banner's pinned list wins, otherwise the dynamic
+  // quickReplies. Same precedence as starterItems() in public/widget.js.
+  const starterItems = useMemo(
+    () => (banner?.starters?.items?.length ? banner.starters.items : quickReplies),
+    [banner, quickReplies],
+  );
+  useEffect(() => {
+    if (!banner || bannerViewTracked.current) return;
+    bannerViewTracked.current = true;
+    track('banner_viewed', { surface: 'chat', art: banner.art.mode });
+  }, [banner]);
 
   // Reject obvious garbage that leaked into partnerships.brand_name during
   // extraction (numeric-only, URL fragments, percent signs, single letters).
@@ -1257,6 +1292,22 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   };
 
   // Send a quick message directly (used by suggestion pills)
+  // Banner CTA. Prefill rather than send, matching the widget: the visitor
+  // sees the question that is about to go out and can edit it.
+  const handleBannerCta = () => {
+    const cta = banner?.cta;
+    if (!cta) return;
+    track('banner_cta_clicked', { surface: 'chat', action: cta.action, label: cta.label });
+    if (cta.action === 'url' && cta.value) {
+      window.open(cta.value, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (cta.value) {
+      setInputValue(cta.value);
+      inputRef.current?.focus();
+    }
+  };
+
   const sendQuickMessage = (text: string) => {
     if (isTyping || isStreamActive || !influencer) return;
     setInputValue(text);
@@ -1273,6 +1324,14 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       setInputValue('');
       setIsTyping(true);
       maybeShowLeadPopup(fakeInput);
+
+      // A starter pill is a first message too — without this the funnel would
+      // only count visitors who typed, and undercount exactly the path the
+      // banner's starter label is meant to encourage.
+      if (!firstMessageTracked.current) {
+        firstMessageTracked.current = true;
+        track('first_message', { surface: 'chat', banner: !!banner });
+      }
 
       // Streaming send
       if (useStreaming) {
@@ -1325,6 +1384,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
       has_question: /\?$/.test(rawText.trim()),
       msg_index: messages.length,
     });
+
+    if (!firstMessageTracked.current) {
+      firstMessageTracked.current = true;
+      track('first_message', { surface: 'chat', banner: !!banner });
+    }
 
     // Lead capture trigger: 4+ messages OR meeting intent in the user text
     maybeShowLeadPopup(rawText);
@@ -1702,6 +1766,21 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 >
                   {messages.length === 0 ? (
                     <div className={`flex flex-col items-center text-center px-4 ${isMobile ? 'pt-[32px]' : 'justify-center min-h-full'}`}>
+                      {/* The banner swallows the greeting block: its headline IS
+                          greeting_message and its subline IS chat_subtitle, so
+                          rendering both would say the same thing twice. */}
+                      {banner ? (
+                        <div className={`${isMobile ? 'w-[363px]' : 'w-[670px]'} max-w-full mb-6`}>
+                          <BannerHero
+                            banner={banner}
+                            isMobile={isMobile}
+                            collapsed={false}
+                            dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
+                            onCtaClick={handleBannerCta}
+                          />
+                        </div>
+                      ) : (
+                        <>
                       <motion.h2
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -1729,6 +1808,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       >
                         {influencer.chat_subtitle || `אני כאן לעזור עם ${(typeLabels[influencer.influencer_type as InfluencerType] || typeLabels.other).toLowerCase()}, מותגים וקופונים`}
                       </motion.p>
+                        </>
+                      )}
 
                       {/* Inline input in empty state (centered, Figma style) */}
                       <motion.div
@@ -1826,15 +1907,31 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                       {/* Starter pills — unified for ALL account types. When CS is enabled the
                           CS choice button above IS the first support entry (Ido's design note:
                           don't stack a duplicate support starter on top of the content pills). */}
-                      {quickReplies.length > 0 && (
+                      {/* A banner may pin its own starters; otherwise the dynamic
+                          quickReplies stay in charge, so a config list can't
+                          freeze the question set and go stale. */}
+                      {starterItems.length > 0 && (
+                        <>
+                        {banner?.starters?.label && (
+                          <div
+                            className="mb-1.5 text-[11.5px] font-semibold tracking-wide"
+                            style={{ color: '#676767' }}
+                            dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
+                          >
+                            {banner.starters.label}
+                          </div>
+                        )}
                         <StarterPills
-                          items={quickReplies}
+                          items={starterItems}
                           onSelect={(q) => {
                             track('starter_pill_clicked', {
                               pill_label: q,
-                              pill_index: quickReplies.indexOf(q),
-                              total_pills: quickReplies.length,
+                              pill_index: starterItems.indexOf(q),
+                              total_pills: starterItems.length,
                             });
+                            if (banner) {
+                              track('banner_starter_clicked', { surface: 'chat', index: starterItems.indexOf(q), label: q });
+                            }
                             maybeShowLeadPopup();
                             sendQuickMessage(q);
                           }}
@@ -1845,10 +1942,24 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               : undefined
                           }
                         />
+                        </>
                       )}
                     </div>
                   ) : (
                     <div className={`${isMobile ? 'flex flex-col justify-end min-h-full' : 'max-w-[700px] mx-auto'} space-y-4`}>
+                      {/* Direction A: the banner survives the first message as a
+                          44px strip. Not sticky — it scrolls away with the top
+                          of the thread rather than permanently taxing the
+                          reading area on a phone. */}
+                      {banner && (
+                        <BannerHero
+                          banner={banner}
+                          isMobile={isMobile}
+                          collapsed
+                          dir={(influencer as any).language === 'en' ? 'ltr' : 'rtl'}
+                          onCtaClick={handleBannerCta}
+                        />
+                      )}
                       {messages.map((msg, index) => {
                         // For streaming messages, use the live text (strip suggestions tag)
                         const isStreamingThis = streamingMessageId === msg.id && isStreamActive;

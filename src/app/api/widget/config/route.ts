@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { signWidgetToken } from '@/lib/analytics/widget-token';
+import { resolveBanner } from '@/lib/widget/banner';
 
 function getCorsHeaders(origin: string): Record<string, string> {
   return {
@@ -96,13 +97,21 @@ export async function GET(req: NextRequest) {
         language,
         theme: {
           primaryColor: widgetConfig.primaryColor || config.theme?.colors?.primary || '#6366f1',
-          fontFamily: config.theme?.fonts?.body || 'system-ui',
+          // No `fontFamily` here on purpose: widget.js takes its font from
+          // `locale.font` (the per-language Google Font) and has never read a
+          // value from this response. Shipping the field back only invited
+          // someone to "fix" the widget to honor a font nobody configured.
           darkMode: config.theme?.darkMode || false,
           position: widgetConfig.position || 'bottom-right',
         },
         brandName: config.display_name || config.username || '',
         profilePic: config.profile_pic_url || config.avatar_url || config.logo_url || widgetConfig.profilePic || null,
         coverImage: widgetConfig.coverImage || null,
+        // Opening banner. Null keeps the pre-banner header exactly as it was,
+        // so accounts that never configured one are untouched. The fallback
+        // ladder (gradient from primaryColor, coverImage as art, copy caps)
+        // lives in resolveBanner so widget.js and the chat page can't drift.
+        banner: resolveBanner(config, 'widget', { brandName: config.display_name || config.username }),
         socialLinks: Array.isArray(widgetConfig.socialLinks) ? widgetConfig.socialLinks : [],
         cartWatcher: (widgetConfig.cartWatcher && typeof widgetConfig.cartWatcher === 'object') ? widgetConfig.cartWatcher : null,
         tooltip: (widgetConfig.tooltip && typeof widgetConfig.tooltip === 'string' && widgetConfig.tooltip.trim())
