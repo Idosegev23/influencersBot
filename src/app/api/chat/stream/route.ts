@@ -45,6 +45,7 @@ import {
 
 import { understandMessageFast } from '@/engines/understanding';
 import { runEscalationCheck } from '@/engines/escalation/dispatch';
+import { runLeadCaptureCheck, leadDiggingInstruction } from '@/engines/escalation/lead-capture';
 import { maybeFileAutoTicket } from '@/lib/support/file-auto-ticket';
 import { alreadyTriedOfficialChannels } from '@/lib/support/auto-ticket';
 import { loadProductLinkCatalog, selectRelevantProducts, renderProductCatalogBlock } from '@/lib/recommendations/product-links';
@@ -1098,6 +1099,21 @@ export async function POST(req: NextRequest) {
               });
             }
 
+            // Lead-capture accounts get the "digging" behavior (Yoav: בוט חופר
+            // ולא חכם): answer briefly, qualify with ONE question per turn until a
+            // brief can be sent. Same instruction the DM and widget paths inject —
+            // a lead must be worked the same way whichever surface it came in on.
+            // CS-mode turns never reach here; they return earlier in this route.
+            const leadCfgForDigging = (influencer as any)?._rawConfig || {};
+            if (leadCfgForDigging?.lead_capture?.enabled === true) {
+              conversationHistory.unshift({
+                role: 'assistant' as const,
+                content: leadDiggingInstruction(
+                  influencer.display_name || influencer.username || username || 'העסק',
+                ),
+              });
+            }
+
             console.log('[Memory] Context prepared', {
               sessionId: currentSessionId,
               turns: budgetResult.messages.length,
@@ -1373,6 +1389,16 @@ export async function POST(req: NextRequest) {
             userMessage: displayMessage,
             source: 'chat',
           }).catch((e: any) => console.error('[escalation] chat hook failed:', e?.message || e));
+
+          // Lead-capture check — same fire-and-forget contract as escalation. No-op
+          // unless config.lead_capture.enabled; emails a lane-routed brief once the
+          // qualifying questions gathered enough (engines/escalation/lead-capture.ts).
+          runLeadCaptureCheck({
+            accountId,
+            sessionId: currentSessionId,
+            userMessage: displayMessage,
+            channel: 'chat',
+          }).catch((e: any) => console.error('[lead-capture] chat hook failed:', e?.message || e));
 
           // Auto-file a support ticket when the customer has a real service
           // problem AND left something we can act on. Deterministic and off the

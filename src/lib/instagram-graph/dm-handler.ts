@@ -316,6 +316,7 @@ export async function processInstagramGraphDM(
       accountId,
       sessionId: sessionUUID,
       userMessage: messageText,
+      channel: 'dm',
       contact,
     }).catch((e: any) => console.error('[lead-capture] dm hook failed:', e?.message || e));
 

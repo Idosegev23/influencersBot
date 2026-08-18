@@ -1,5 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runLeadCaptureCheck, flushStaleLeads, leadDiggingInstruction } from '@/engines/escalation/lead-capture';
+import {
+  runLeadCaptureCheck,
+  flushStaleLeads,
+  leadDiggingInstruction,
+  resolveLeadRecipients,
+  mergeLeadType,
+  LEAD_SOURCES,
+  LEAD_SOURCE_BY_CHANNEL,
+} from '@/engines/escalation/lead-capture';
 import type { LeadVerdict } from '@/engines/escalation/lead-capture';
 import { buildLeadBriefEmail } from '@/engines/escalation/lead-email-template';
 import { buildRawEmail } from '@/lib/email';
@@ -23,6 +31,7 @@ function makeSupabase(opts: {
       let updatePatch: any = null;
       ctx.select = () => ctx;
       ctx.eq = () => ctx;
+      ctx.in = () => ctx;
       ctx.gte = () => ctx;
       ctx.order = () => ctx;
       ctx.limit = () => ctx;
@@ -55,6 +64,21 @@ const enabledConfig = {
   lead_capture: { enabled: true, to: ['pnina@x.com', 'gili@x.com'], cc: ['yoav@x.com', 'cto@x.com'] },
 };
 
+// LDRS's real shape: two lanes plus a legacy `to` that catches an unresolved lane.
+const routedConfig = {
+  username: 'ldrs_group',
+  display_name: 'LDRS',
+  lead_capture: {
+    enabled: true,
+    routes: {
+      brand: { to: ['itamar@x.com', 'roei@x.com', 'kfir@x.com'] },
+      talent: { to: ['sharon@x.com'] },
+    },
+    to: ['yoav@x.com', 'cto@x.com'],
+    cc: ['yoav@x.com', 'cto@x.com'],
+  },
+};
+
 const baseInput = {
   accountId: 'acc',
   sessionId: 'sess',
@@ -62,9 +86,14 @@ const baseInput = {
   contact: { name: 'Dana Cohen', username: 'dana_brand' },
 };
 
-const verdict = (readiness: LeadVerdict['readiness'], fields: any = {}): LeadVerdict => ({
+const verdict = (
+  readiness: LeadVerdict['readiness'],
+  fields: any = {},
+  leadType: LeadVerdict['lead_type'] = null,
+): LeadVerdict => ({
   is_lead: readiness !== 'not_lead',
   readiness,
+  lead_type: leadType,
   fields,
 });
 
@@ -188,7 +217,7 @@ describe('runLeadCaptureCheck', () => {
     const call: any = sendEmail.mock.calls[0][0];
     expect(call.to).toEqual(['pnina@x.com', 'gili@x.com']);
     expect(call.cc).toEqual(['yoav@x.com', 'cto@x.com']);
-    expect(call.subject).toContain('ליד חדש מאינסטגרם');
+    expect(call.subject).toContain('ליד חדש מהודעות האינסטגרם');
     expect(call.html).toContain('GlowCo');
     expect(call.html).toContain('dana_brand');
     // the state row was flipped to sent + surfaced as a new item in the inbox
@@ -297,7 +326,7 @@ describe('buildLeadBriefEmail', () => {
       lastMessages: [{ role: 'user', content: 'כמה עולה קמפיין?' }],
       sessionId: 'sess-1',
     });
-    expect(subject).toContain('ליד חדש מאינסטגרם');
+    expect(subject).toContain('ליד חדש מהודעות האינסטגרם');
     expect(html).toContain('instagram.com/dana_brand');
     expect(html).toContain('קמפיין משפיענים');
     expect(html).toContain('050-1234567');
@@ -340,5 +369,213 @@ describe('sendEmail cc support', () => {
     expect(withCc).toContain('Cc: b@x.com, c@x.com');
     const noCc = decode(buildRawEmail({ to: 'a@x.com', subject: 'hi', html: '<p>hi</p>' }));
     expect(noCc).not.toContain('Cc:');
+  });
+});
+
+// ── Lane routing: the reason this engine has two inboxes at all ──
+
+describe('resolveLeadRecipients', () => {
+  const cfg = routedConfig.lead_capture;
+
+  it('routes a brand lead to the sales list, cc unchanged', () => {
+    expect(resolveLeadRecipients(cfg, 'brand')).toEqual({
+      to: ['itamar@x.com', 'roei@x.com', 'kfir@x.com'],
+      cc: ['yoav@x.com', 'cto@x.com'],
+    });
+  });
+
+  it('routes a talent lead to the talent list only', () => {
+    expect(resolveLeadRecipients(cfg, 'talent')).toEqual({
+      to: ['sharon@x.com'],
+      cc: ['yoav@x.com', 'cto@x.com'],
+    });
+  });
+
+  it('routes a both-lane lead to the union of the two lists', () => {
+    expect(resolveLeadRecipients(cfg, 'both').to).toEqual([
+      'itamar@x.com',
+      'roei@x.com',
+      'kfir@x.com',
+      'sharon@x.com',
+    ]);
+  });
+
+  it('falls back to the legacy `to` when the lane is still unknown', () => {
+    const r = resolveLeadRecipients(cfg, null);
+    expect(r.to).toEqual(['yoav@x.com', 'cto@x.com']);
+    // ...and nobody is both addressed and copied
+    expect(r.cc).toEqual([]);
+  });
+
+  it('falls back to the union when a lane is configured empty and there is no legacy `to`', () => {
+    const sparse = { enabled: true, routes: { brand: { to: ['a@x.com'] }, talent: { to: [] } }, cc: ['z@x.com'] };
+    expect(resolveLeadRecipients(sparse, 'talent').to).toEqual(['a@x.com']);
+  });
+
+  it('returns no recipients when nothing is configured (caller raises an admin alert)', () => {
+    expect(resolveLeadRecipients({ enabled: true }, 'brand').to).toEqual([]);
+  });
+
+  it('de-duplicates addresses case-insensitively across lanes', () => {
+    const overlap = {
+      enabled: true,
+      routes: { brand: { to: ['Roei@x.com'] }, talent: { to: ['roei@X.com', 'sharon@x.com'] } },
+      cc: [],
+    };
+    expect(resolveLeadRecipients(overlap, 'both').to).toEqual(['Roei@x.com', 'sharon@x.com']);
+  });
+});
+
+describe('mergeLeadType', () => {
+  it('adopts the first lane it learns', () => {
+    expect(mergeLeadType(null, 'brand')).toBe('brand');
+  });
+
+  it('keeps the known lane when a later turn cannot tell', () => {
+    expect(mergeLeadType('talent', null)).toBe('talent');
+  });
+
+  it('widens to both when two turns disagree — a lead never leaves an inbox that was watching it', () => {
+    expect(mergeLeadType('brand', 'talent')).toBe('both');
+    expect(mergeLeadType('talent', 'brand')).toBe('both');
+  });
+
+  it('stays both once widened', () => {
+    expect(mergeLeadType('both', 'brand')).toBe('both');
+  });
+});
+
+describe('runLeadCaptureCheck lane routing end to end', () => {
+  it('a creator looking for work reaches the talent list, not the sales list', async () => {
+    const supabase = makeSupabase({ config: routedConfig });
+    const sendEmail = vi.fn(async (_opts: any) => ({ success: true }));
+    const out = await runLeadCaptureCheck(baseInput, {
+      supabase: supabase as any,
+      sendEmail: sendEmail as any,
+      classify: async () =>
+        verdict(
+          'ready',
+          { niche: 'אופנה', platforms: 'אינסטגרם, טיקטוק', audience: '80K', contact_phone: '050-1' },
+          'talent',
+        ),
+    });
+    expect(out.leadType).toBe('talent');
+    const call: any = sendEmail.mock.calls[0][0];
+    expect(call.to).toEqual(['sharon@x.com']);
+    expect(call.subject).toContain('משפיען / מועמד');
+    expect(call.html).toContain('גודל קהל');
+    expect(call.html).toContain('80K');
+    // the talent lane must never surface a budget question's answer slot
+    expect(call.html).not.toContain('תקציב');
+  });
+
+  it('a brand buying a campaign reaches the sales list', async () => {
+    const supabase = makeSupabase({ config: routedConfig });
+    const sendEmail = vi.fn(async (_opts: any) => ({ success: true }));
+    const out = await runLeadCaptureCheck(baseInput, {
+      supabase: supabase as any,
+      sendEmail: sendEmail as any,
+      classify: async () =>
+        verdict('ready', { service: 'קמפיין משפיענים', brand: 'GlowCo', contact_phone: '050-1' }, 'brand'),
+    });
+    expect(out.leadType).toBe('brand');
+    const call: any = sendEmail.mock.calls[0][0];
+    expect(call.to).toEqual(['itamar@x.com', 'roei@x.com', 'kfir@x.com']);
+    expect(call.cc).toEqual(['yoav@x.com', 'cto@x.com']);
+  });
+
+  it('an agency pitching its own creators lands on both lists', async () => {
+    const supabase = makeSupabase({
+      config: routedConfig,
+      existingLeadRow: {
+        id: 'r1',
+        session_id: 'sess',
+        metadata: { lead: { state: 'gathering', lead_type: 'brand', fields: { brand: 'AgencyCo' } } },
+      },
+    });
+    const sendEmail = vi.fn(async (_opts: any) => ({ success: true }));
+    const out = await runLeadCaptureCheck(baseInput, {
+      supabase: supabase as any,
+      sendEmail: sendEmail as any,
+      classify: async () => verdict('ready', { audience: '3 יוצרים', contact_phone: '050-1' }, 'talent'),
+    });
+    expect(out.leadType).toBe('both');
+    const call: any = sendEmail.mock.calls[0][0];
+    expect(call.to).toEqual(['itamar@x.com', 'roei@x.com', 'kfir@x.com', 'sharon@x.com']);
+  });
+
+  it('an unresolved lane still gets delivered — to the fallback list', async () => {
+    const supabase = makeSupabase({ config: routedConfig });
+    const sendEmail = vi.fn(async (_opts: any) => ({ success: true }));
+    await runLeadCaptureCheck(baseInput, {
+      supabase: supabase as any,
+      sendEmail: sendEmail as any,
+      classify: async () => verdict('ready', { contact_phone: '050-1' }, null),
+    });
+    const call: any = sendEmail.mock.calls[0][0];
+    expect(call.to).toEqual(['yoav@x.com', 'cto@x.com']);
+    expect(call.subject).toContain('ליד חדש');
+  });
+});
+
+// ── Surfaces: the same lead must be worked identically wherever it walks in ──
+
+describe('lead capture across surfaces', () => {
+  it('maps every channel to its own support_requests source', () => {
+    expect(LEAD_SOURCE_BY_CHANNEL).toEqual({ dm: 'ig_lead', chat: 'web_lead', widget: 'widget_lead' });
+    expect(LEAD_SOURCES).toEqual(['ig_lead', 'web_lead', 'widget_lead']);
+  });
+
+  it('a widget lead files a widget_lead row and says so in the brief', async () => {
+    const supabase = makeSupabase({ config: routedConfig });
+    const sendEmail = vi.fn(async (_opts: any) => ({ success: true }));
+    await runLeadCaptureCheck(
+      { accountId: 'acc', sessionId: 'sess', userMessage: 'מחפשים קמפיין', channel: 'widget' },
+      {
+        supabase: supabase as any,
+        sendEmail: sendEmail as any,
+        classify: async () => verdict('ready', { service: 'קמפיין', contact_email: 'a@b.com' }, 'brand'),
+      },
+    );
+    expect(supabase.inserts[0].row.source).toBe('widget_lead');
+    expect(supabase.inserts[0].row.metadata.lead.channel).toBe('widget');
+    expect(supabase.inserts[0].row.customer_name).toBe('ליד מהאתר');
+    const call: any = sendEmail.mock.calls[0][0];
+    expect(call.subject).toContain('מהווידג׳ט באתר');
+  });
+
+  it('a chat-page lead files a web_lead row', async () => {
+    const supabase = makeSupabase({ config: routedConfig });
+    const sendEmail = vi.fn(async (_opts: any) => ({ success: true }));
+    await runLeadCaptureCheck(
+      { accountId: 'acc', sessionId: 'sess', userMessage: 'שלום', channel: 'chat' },
+      {
+        supabase: supabase as any,
+        sendEmail: sendEmail as any,
+        classify: async () => verdict('gathering', { service: 'סושיאל' }, 'brand'),
+      },
+    );
+    expect(supabase.inserts[0].row.source).toBe('web_lead');
+  });
+
+  it('defaults to the DM channel when none is given (pre-existing callers)', async () => {
+    const supabase = makeSupabase({ config: routedConfig });
+    await runLeadCaptureCheck(baseInput, {
+      supabase: supabase as any,
+      sendEmail: vi.fn() as any,
+      classify: async () => verdict('gathering', { service: 'סושיאל' }, 'brand'),
+    });
+    expect(supabase.inserts[0].row.source).toBe('ig_lead');
+  });
+});
+
+describe('leadDiggingInstruction lanes', () => {
+  it('carries both ladders and forbids asking a candidate about budget', () => {
+    const s = leadDiggingInstruction('LDRS');
+    expect(s).toContain('מותג, חברה או סוכנות');
+    expect(s).toContain('יוצר/ת תוכן');
+    expect(s).toContain('מה סדר גודל התקציב');       // lane (א)
+    expect(s).toContain('מה גודל הקהל/מספר העוקבים'); // lane (ב)
+    expect(s).toContain('אל תשאל/י על תקציב לעולם');
   });
 });

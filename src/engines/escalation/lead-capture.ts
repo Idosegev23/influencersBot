@@ -1,17 +1,27 @@
 /**
- * Inbound-lead capture for the IG DM path (modeled on the Bestie ads lead flow).
+ * Inbound-lead capture for the IG DM, chat-page and widget paths (modeled on
+ * the Bestie ads lead flow).
  *
  * A "lead" is the OPPOSITE of an escalation: a potential client showing buying
  * intent (services / collab / quote) rather than an angry customer. The bot keeps
  * answering everyone; this module watches the conversation, and once the digging
  * questions have gathered enough (or the lead leaves contact details) it emails a
- * structured brief to the account's sales contacts (config.lead_capture.to/cc).
+ * structured brief to the account's sales contacts.
+ *
+ * TWO LANES. An agency does not route leads the way it routes applicants, so the
+ * classifier also decides WHICH KIND of lead this is and the brief goes to the
+ * matching list (config.lead_capture.routes):
+ *   - 'brand'  — a brand / company / agency buying marketing services
+ *   - 'talent' — a creator / influencer / candidate looking for work or representation
+ *   - 'both'   — genuinely both, or two turns that disagreed (see mergeLeadType)
+ * A lead never silently moves out of someone's inbox mid-conversation: a lane
+ * conflict widens to 'both' rather than replacing the earlier lane.
  *
  * Leads that go quiet mid-qualification are flushed by the hourly
  * /api/cron/ig-lead-flush sweep as a "partial brief" — gathered > lost.
  *
- * Per-account opt-in: config.lead_capture = { enabled: true, to: [...], cc: [...] }.
- * State lives on a support_requests row (source='ig_lead', one per session) —
+ * Per-account opt-in: config.lead_capture = { enabled: true, routes: {...}, cc: [...] }.
+ * State lives on a support_requests row (source per channel, one per session) —
  * no migration needed, and the lead shows up in the support inbox.
  */
 import OpenAI from 'openai';
@@ -20,16 +30,38 @@ import { sendEmail } from '@/lib/email';
 import { laneModel } from '@/lib/llm/config';
 import { buildLeadBriefEmail } from './lead-email-template';
 
+/** Which surface the lead arrived on. Drives the support_requests.source value
+ *  and the wording of the brief — "מאינסטגרם" is wrong for a website visitor. */
+export type LeadChannel = 'dm' | 'chat' | 'widget';
+
+export const LEAD_SOURCE_BY_CHANNEL: Record<LeadChannel, string> = {
+  dm: 'ig_lead',
+  chat: 'web_lead',
+  widget: 'widget_lead',
+};
+
+/** Every source this engine owns. The flush sweep scans all of them. */
+export const LEAD_SOURCES = Object.values(LEAD_SOURCE_BY_CHANNEL);
+
+export type LeadType = 'brand' | 'talent' | 'both';
+
 export interface LeadFields {
+  // Shared
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  summary?: string | null;       // one-line Hebrew summary of what the lead wants
+  // 'brand' lane — someone buying services
   service?: string | null;       // influencer campaign / social / content / 360
   brand?: string | null;         // the inquiring brand/company
   timeline?: string | null;
   goal?: string | null;          // leads / awareness / sales
   budget?: string | null;
-  contact_name?: string | null;
-  contact_phone?: string | null;
-  contact_email?: string | null;
-  summary?: string | null;       // one-line Hebrew summary of what the lead wants
+  // 'talent' lane — someone offering themselves
+  niche?: string | null;         // content vertical
+  platforms?: string | null;     // instagram / tiktok / youtube ...
+  audience?: string | null;      // follower count / audience size
+  experience?: string | null;    // past collabs, representation status
 }
 
 export type LeadReadiness = 'not_lead' | 'gathering' | 'ready';
@@ -37,12 +69,21 @@ export type LeadReadiness = 'not_lead' | 'gathering' | 'ready';
 export interface LeadVerdict {
   is_lead: boolean;
   readiness: LeadReadiness;
+  lead_type?: LeadType | null;
   fields: LeadFields;
+}
+
+export interface LeadRoute {
+  to?: string[];
 }
 
 export interface LeadCaptureConfig {
   enabled?: boolean;
+  /** Per-lane recipients. Absent → everything falls back to `to`. */
+  routes?: Partial<Record<'brand' | 'talent', LeadRoute>>;
+  /** Legacy / fallback recipients: used when no lane matched or routes are unset. */
   to?: string[];
+  /** Always copied, on every lane. */
   cc?: string[];
   idleFlushMinutes?: number; // quiet-time before a partial brief goes out (default 30)
 }
@@ -51,6 +92,8 @@ export interface LeadCaptureInput {
   accountId: string;
   sessionId: string;
   userMessage: string;
+  /** Defaults to 'dm' — the only channel that existed before web surfaces were wired. */
+  channel?: LeadChannel;
   contact?: { name?: string | null; username?: string | null } | null;
 }
 
@@ -61,6 +104,7 @@ export interface LeadCaptureDeps {
     transcript: { role: string; content: string }[];
     userMessage: string;
     priorFields: LeadFields;
+    priorType: LeadType | null;
     brandName: string;
   }) => Promise<LeadVerdict | null>;
   now: () => number;
@@ -69,25 +113,100 @@ export interface LeadCaptureDeps {
 export interface LeadCaptureOutcome {
   isLead: boolean;
   briefSent?: boolean;
+  leadType?: LeadType | null;
   skipped?: string;
 }
 
 /**
- * Injected into the DM conversation context when lead capture is on — Yoav's
+ * Injected into the conversation context when lead capture is on — Yoav's
  * "בוט חופר": answer briefly, then dig ONE qualifying question per turn.
- * Every qualifying question must carry <<SUGGESTIONS>> so the DM shows
- * quick-reply chips with ready answers (dm-handler converts them to buttons).
+ *
+ * Two ladders, because the two lanes need different questions: asking a creator
+ * who wants work "what's your budget?" reads as an insult, and asking a brand
+ * how many followers it has learns nothing. The bot picks the ladder itself,
+ * which is also what produces the lead_type the classifier confirms.
+ *
+ * Every qualifying question must carry <<SUGGESTIONS>> so the surface shows
+ * quick-reply chips (DM converts them to buttons; chat/widget render chips).
  */
 export function leadDiggingInstruction(brandName: string): string {
   return (
-    `[הנחיה פנימית לבוט של ${brandName}: כשפונה מתעניין/ת בשירותים, בשיתוף פעולה, בקמפיין או בהצעת מחיר — ` +
-    `זהו ליד עסקי. ענה/י קצר ולעניין, ובכל תשובה שאל/י שאלה מבררת אחת בלבד, לפי הסדר וממה שעוד חסר: ` +
-    `איזה שירות מעניין אותם · לאיזה מותג/חברה · מה לוח הזמנים · מה המטרה (לידים/מודעות/מכירות) · מה סדר גודל התקציב · ` +
-    `ולבסוף שם + טלפון או אימייל לחזרה. אל תשאל/י את כל השאלות בבת אחת, ואל תבטיח/י מחירים. ` +
+    `[הנחיה פנימית לבוט של ${brandName}: כשפונה מתעניין/ת, זהה/י קודם לאיזה משני המסלולים הוא/היא שייך/ת, ` +
+    `ואל תשאל/י שאלות מהמסלול השני:\n` +
+    `(א) מותג, חברה או סוכנות שמחפשים שירותי שיווק, קמפיין, שיתוף פעולה או הצעת מחיר.\n` +
+    `(ב) יוצר/ת תוכן, משפיען/ית או מועמד/ת שמחפשים עבודה, ייצוג או שיתוף פעולה מצד ${brandName}.\n` +
+    `במסלול (א) שאל/י לפי הסדר וממה שעוד חסר: איזה שירות מעניין · לאיזה מותג/חברה · מה לוח הזמנים · ` +
+    `מה המטרה (לידים/מודעות/מכירות) · מה סדר גודל התקציב · ולבסוף שם + טלפון או אימייל לחזרה.\n` +
+    `במסלול (ב) שאל/י לפי הסדר וממה שעוד חסר: באיזה תחום התוכן · באילו פלטפורמות · מה גודל הקהל/מספר העוקבים · ` +
+    `איזה ניסיון או שיתופי פעולה קודמים יש · ולבסוף שם + טלפון או אימייל לחזרה. ` +
+    `במסלול הזה אל תשאל/י על תקציב לעולם.\n` +
+    `בכל תשובה: ענה/י קצר ולעניין ושאל/י שאלה מבררת אחת בלבד. אל תשאל/י את כל השאלות בבת אחת, ואל תבטיח/י מחירים. ` +
     `לכל שאלה מבררת צרף/י בסוף התשובה שורת <<SUGGESTIONS>>אפשרות 1|אפשרות 2|אפשרות 3<</SUGGESTIONS>> ` +
     `עם 2-4 תשובות קצרות (עד 20 תווים) שמתאימות בדיוק לשאלה ששאלת. ` +
     `כשיש שם ופרטי קשר — אמור/אמרי שנציג/ה יחזרו בהקדם.]`
   );
+}
+
+// ── Routing ──
+
+function uniqEmails(list: (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of list) {
+    const addr = (raw || '').trim();
+    if (!addr) continue;
+    const key = addr.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(addr);
+  }
+  return out;
+}
+
+/**
+ * Which inboxes this brief goes to.
+ *
+ * Fallback chain, deliberately never-empty-by-accident:
+ *   lane list → legacy `to` → union of every configured lane.
+ * An address on `to` is stripped from `cc` so nobody is addressed twice.
+ * Returning `{to: []}` is still possible (nothing configured at all) and the
+ * caller turns that into an admin alert rather than dropping the lead.
+ */
+export function resolveLeadRecipients(
+  leadConfig: LeadCaptureConfig,
+  leadType: LeadType | null | undefined,
+): { to: string[]; cc: string[] } {
+  const routes = leadConfig.routes || {};
+  const lane = (k: 'brand' | 'talent') => uniqEmails(routes[k]?.to || []);
+
+  let to: string[] = [];
+  if (leadType === 'brand') to = lane('brand');
+  else if (leadType === 'talent') to = lane('talent');
+  else if (leadType === 'both') to = uniqEmails([...lane('brand'), ...lane('talent')]);
+
+  if (to.length === 0) to = uniqEmails(leadConfig.to || []);
+  if (to.length === 0) to = uniqEmails([...lane('brand'), ...lane('talent')]);
+
+  const addressed = new Set(to.map((a) => a.toLowerCase()));
+  const cc = uniqEmails(leadConfig.cc || []).filter((a) => !addressed.has(a.toLowerCase()));
+
+  return { to, cc };
+}
+
+/**
+ * A lane, once decided, only ever widens. Two turns that disagree mean the
+ * conversation genuinely straddles both (an agency pitching its own creators is
+ * the case Ido named), and the cost of widening — one extra inbox — is far below
+ * the cost of a lead vanishing from the list that was already watching it.
+ */
+export function mergeLeadType(
+  prior: LeadType | null | undefined,
+  next: LeadType | null | undefined,
+): LeadType | null {
+  if (!next) return prior ?? null;
+  if (!prior) return next;
+  if (prior === next) return prior;
+  return 'both';
 }
 
 // ── Default LLM classifier (cheap router lane; best-effort, null on failure) ──
@@ -96,6 +215,7 @@ async function classifyLeadLLM(input: {
   transcript: { role: string; content: string }[];
   userMessage: string;
   priorFields: LeadFields;
+  priorType: LeadType | null;
   brandName: string;
 }): Promise<LeadVerdict | null> {
   if (!process.env.OPENAI_API_KEY) return null;
@@ -109,25 +229,33 @@ async function classifyLeadLLM(input: {
     const res = await openai.chat.completions.create({
       model: laneModel('router'),
       response_format: { type: 'json_object' },
-      max_completion_tokens: 700,
+      max_completion_tokens: 800,
       messages: [
         {
           role: 'system',
           content:
-            `אתה מסווג הודעות DM עבור העסק "${input.brandName}". ` +
-            'קבע אם הפונה הוא ליד עסקי — מותג/חברה/גורם שמתעניין בשירותים, שיתוף פעולה, קמפיין או הצעת מחיר. ' +
+            `אתה מסווג פניות נכנסות עבור העסק "${input.brandName}". ` +
+            'קבע (1) האם הפונה הוא ליד, ו-(2) לאיזה סוג. ' +
+            'ליד מסוג "brand" = מותג/חברה/סוכנות שמתעניינים בשירותים, בקמפיין, בשיתוף פעולה או בהצעת מחיר. ' +
+            'ליד מסוג "talent" = יוצר/ת תוכן, משפיען/ית או מועמד/ת שמחפשים עבודה, ייצוג או שיתוף פעולה מצד העסק. ' +
+            'אם הפנייה היא באמת שניהם (למשל סוכנות שמציעה את המשפיענים שלה) — "both". ' +
             'עוקב/מעריץ/לקוח עם בעיית שירות אינם ליד. ' +
             'החזר JSON בלבד במבנה: {"is_lead": boolean, "readiness": "not_lead"|"gathering"|"ready", ' +
+            '"lead_type": "brand"|"talent"|"both"|null, ' +
             '"fields": {"service": string|null, "brand": string|null, "timeline": string|null, "goal": string|null, ' +
-            '"budget": string|null, "contact_name": string|null, "contact_phone": string|null, "contact_email": string|null, ' +
-            '"summary": string|null}}. ' +
+            '"budget": string|null, "niche": string|null, "platforms": string|null, "audience": string|null, ' +
+            '"experience": string|null, "contact_name": string|null, "contact_phone": string|null, ' +
+            '"contact_email": string|null, "summary": string|null}}. ' +
+            'שדות service/brand/timeline/goal/budget שייכים ל-brand; niche/platforms/audience/experience שייכים ל-talent. ' +
             'מלא שדות רק ממה שנאמר בפועל בשיחה (אל תמציא), שמור ערכים קודמים שידועים, ו-summary = משפט אחד בעברית על מה הליד רוצה. ' +
-            '"ready" רק כאשר יש טלפון או אימייל לחזרה וגם ידוע איזה שירות מבוקש; אחרת אם זה ליד — "gathering".',
+            '"ready" רק כאשר יש טלפון או אימייל לחזרה וגם ידוע מה הפונה רוצה; אחרת אם זה ליד — "gathering". ' +
+            'אם עוד לא ברור לאיזה סוג הפונה שייך, החזר lead_type: null ואל תנחש.',
         },
         {
           role: 'user',
           content:
-            `שדות שכבר נאספו: ${JSON.stringify(input.priorFields || {})}\n\n` +
+            `שדות שכבר נאספו: ${JSON.stringify(input.priorFields || {})}\n` +
+            `סוג הליד שנקבע עד כה: ${input.priorType || '(עוד לא נקבע)'}\n\n` +
             `השיחה עד כה:\n${convo || '(אין)'}\n\nההודעה הנוכחית של הפונה: ${input.userMessage}`,
         },
       ],
@@ -141,7 +269,10 @@ async function classifyLeadLLM(input: {
       : parsed.is_lead
         ? 'gathering'
         : 'not_lead';
-    return { is_lead: parsed.is_lead, readiness, fields: parsed.fields || {} };
+    const leadType: LeadType | null = ['brand', 'talent', 'both'].includes(parsed.lead_type)
+      ? parsed.lead_type
+      : null;
+    return { is_lead: parsed.is_lead, readiness, lead_type: leadType, fields: parsed.fields || {} };
   } catch (e) {
     console.warn('[lead-capture] classify failed', (e as Error).message);
     return null;
@@ -165,17 +296,21 @@ async function sendBrief(params: {
   brandName: string;
   row: any;
   briefType: 'full' | 'partial' | 'updated';
+  channel: LeadChannel;
   transcript: { role: string; content: string }[];
 }): Promise<boolean> {
-  const { deps, leadConfig, brandName, row, briefType, transcript } = params;
+  const { deps, leadConfig, brandName, row, briefType, channel, transcript } = params;
   const lead = (row.metadata?.lead || {}) as Record<string, any>;
-  const to = (leadConfig.to || []).filter(Boolean);
+  const leadType: LeadType | null = lead.lead_type ?? null;
+  const { to, cc } = resolveLeadRecipients(leadConfig, leadType);
 
   const { subject, html } = buildLeadBriefEmail({
     brandName,
     contactLabel: lead.ig?.label || null,
     igUsername: lead.ig?.username || null,
     fields: lead.fields || {},
+    leadType,
+    channel,
     briefType,
     lastMessages: transcript.slice(-8),
     sessionId: row.session_id,
@@ -183,7 +318,7 @@ async function sendBrief(params: {
 
   let sent = false;
   if (to.length > 0) {
-    const res = await deps.sendEmail({ to, cc: (leadConfig.cc || []).filter(Boolean), subject, html });
+    const res = await deps.sendEmail({ to, cc, subject, html });
     sent = !!res.success;
   } else {
     // Never-silent fallback, mirroring dispatch.ts — misconfig must not eat leads.
@@ -191,8 +326,8 @@ async function sendBrief(params: {
     await sendAdminAlert({
       level: 'warning',
       subject: `ליד ללא נמען — ${brandName}`,
-      message: lead.fields?.summary || 'ליד נכנס מאינסטגרם אך config.lead_capture.to ריק',
-      details: JSON.stringify(lead.fields || {}, null, 2),
+      message: lead.fields?.summary || 'ליד נכנס אך אין נמענים מוגדרים ב-config.lead_capture',
+      details: JSON.stringify({ lead_type: leadType, ...(lead.fields || {}) }, null, 2),
     });
     sent = true;
   }
@@ -211,7 +346,7 @@ async function sendBrief(params: {
           fields_changed_after_brief: false,
           // Delivery evidence — without this a failed send still flips the state
           // and the lead silently dies (learned from the first live test).
-          email: { success: sent, at: new Date(deps.now()).toISOString() },
+          email: { success: sent, at: new Date(deps.now()).toISOString(), to, cc },
         },
       },
       updated_at: new Date(deps.now()).toISOString(),
@@ -221,7 +356,15 @@ async function sendBrief(params: {
   return sent;
 }
 
-// ── Per-turn check (fire-and-forget from dm-handler) ──
+/** support_requests.source → the channel it came from (flush needs the reverse map). */
+function channelOfSource(source: string): LeadChannel {
+  const hit = (Object.keys(LEAD_SOURCE_BY_CHANNEL) as LeadChannel[]).find(
+    (c) => LEAD_SOURCE_BY_CHANNEL[c] === source,
+  );
+  return hit || 'dm';
+}
+
+// ── Per-turn check (fire-and-forget from the surface handlers) ──
 
 export async function runLeadCaptureCheck(
   input: LeadCaptureInput,
@@ -234,6 +377,8 @@ export async function runLeadCaptureCheck(
     now: depsOverride?.now ?? (() => Date.now()),
   };
   const { supabase } = deps;
+  const channel: LeadChannel = input.channel || 'dm';
+  const source = LEAD_SOURCE_BY_CHANNEL[channel];
 
   // 1) per-account opt-in
   const { data: acct } = await supabase.from('accounts').select('config').eq('id', input.accountId).single();
@@ -250,7 +395,7 @@ export async function runLeadCaptureCheck(
     .from('support_requests')
     .select('id, session_id, metadata')
     .eq('session_id', input.sessionId)
-    .eq('source', 'ig_lead')
+    .eq('source', source)
     .limit(1)
     .maybeSingle();
   const briefAlreadySent = row?.metadata?.lead?.state === 'sent';
@@ -266,12 +411,21 @@ export async function runLeadCaptureCheck(
 
   // 4) classify
   const priorFields = (row?.metadata?.lead?.fields || {}) as LeadFields;
-  const verdict = await deps.classify({ transcript, userMessage: input.userMessage, priorFields, brandName });
+  const priorType = (row?.metadata?.lead?.lead_type ?? null) as LeadType | null;
+  const verdict = await deps.classify({
+    transcript,
+    userMessage: input.userMessage,
+    priorFields,
+    priorType,
+    brandName,
+  });
   if (!verdict) return { isLead: !!row, skipped: 'classifier_unavailable' };
   if (!verdict.is_lead && !row) return { isLead: false };
 
   const fields = mergeFields(priorFields, verdict.fields || {});
-  const fieldsChanged = JSON.stringify(fields) !== JSON.stringify(priorFields);
+  const leadType = mergeLeadType(priorType, verdict.lead_type);
+  const fieldsChanged =
+    JSON.stringify(fields) !== JSON.stringify(priorFields) || leadType !== priorType;
 
   // Post-brief turns: silently absorb new details; the flush cron sends the update.
   if (briefAlreadySent) {
@@ -285,6 +439,7 @@ export async function runLeadCaptureCheck(
             lead: {
               ...(row.metadata?.lead || {}),
               fields,
+              lead_type: leadType,
               fields_changed_after_brief: true,
               last_activity_at: nowIso,
             },
@@ -293,7 +448,12 @@ export async function runLeadCaptureCheck(
         })
         .eq('id', row.id);
     }
-    return { isLead: true, briefSent: false, skipped: fieldsChanged ? undefined : 'already_sent' };
+    return {
+      isLead: true,
+      briefSent: false,
+      leadType,
+      skipped: fieldsChanged ? undefined : 'already_sent',
+    };
   }
 
   const contactLabel = [input.contact?.name?.trim() || '', input.contact?.username ? `@${input.contact.username.trim()}` : '']
@@ -304,6 +464,8 @@ export async function runLeadCaptureCheck(
     ...(row?.metadata?.lead || {}),
     state: 'gathering',
     fields,
+    lead_type: leadType,
+    channel,
     last_activity_at: nowIso,
     ig: {
       ...(row?.metadata?.lead?.ig || {}),
@@ -325,28 +487,36 @@ export async function runLeadCaptureCheck(
       .from('support_requests')
       .insert({
         account_id: input.accountId,
-        customer_name: contactLabel || fields.contact_name || 'ליד מאינסטגרם',
+        customer_name: contactLabel || fields.contact_name || (channel === 'dm' ? 'ליד מאינסטגרם' : 'ליד מהאתר'),
         customer_phone: fields.contact_phone || null,
         message: input.userMessage,
         session_id: input.sessionId,
         status: 'in_progress',
-        source: 'ig_lead',
+        source,
         metadata: { lead: leadMeta },
       })
       .select('id, session_id, metadata')
       .single();
     leadRow = inserted;
   }
-  if (!leadRow) return { isLead: true, skipped: 'row_write_failed' };
+  if (!leadRow) return { isLead: true, leadType, skipped: 'row_write_failed' };
 
   // 6) enough gathered → full brief now
   if (verdict.readiness === 'ready') {
     const fullTranscript = [...transcript, { role: 'user', content: input.userMessage }];
-    const sent = await sendBrief({ deps, leadConfig, brandName, row: leadRow, briefType: 'full', transcript: fullTranscript });
-    return { isLead: true, briefSent: sent };
+    const sent = await sendBrief({
+      deps,
+      leadConfig,
+      brandName,
+      row: leadRow,
+      briefType: 'full',
+      channel,
+      transcript: fullTranscript,
+    });
+    return { isLead: true, briefSent: sent, leadType };
   }
 
-  return { isLead: true, briefSent: false };
+  return { isLead: true, briefSent: false, leadType };
 }
 
 // ── Hourly sweep: leads that went quiet mid-qualification → partial brief ──
@@ -365,8 +535,8 @@ export async function flushStaleLeads(
   const weekAgo = new Date(deps.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: rows } = await supabase
     .from('support_requests')
-    .select('id, account_id, session_id, metadata')
-    .eq('source', 'ig_lead')
+    .select('id, account_id, session_id, source, metadata')
+    .in('source', LEAD_SOURCES)
     .gte('created_at', weekAgo)
     .limit(200);
 
@@ -406,7 +576,8 @@ export async function flushStaleLeads(
 
       const brandName = config.brandName || config.display_name || config.username || 'Account';
       const briefType = row.metadata?.lead?.state === 'sent' ? 'updated' : 'partial';
-      await sendBrief({ deps, leadConfig, brandName, row, briefType, transcript });
+      const channel: LeadChannel = row.metadata?.lead?.channel || channelOfSource(row.source);
+      await sendBrief({ deps, leadConfig, brandName, row, briefType, channel, transcript });
       flushed++;
     } catch (e) {
       console.error('[lead-capture] flush failed for row', row.id, (e as Error).message);

@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import { processSandwichMessageWithMetadata } from './sandwichBot';
 import { resolvePreviousResponseId } from './chain-ttl';
 import { runEscalationCheck } from '@/engines/escalation/dispatch';
+import { runLeadCaptureCheck, leadDiggingInstruction } from '@/engines/escalation/lead-capture';
 import { buildPersonalityFromDB } from './personality-wrapper';
 import { turnTimings } from '@/lib/analytics/value-proof/timings';
 import { updateRollingSummary, shouldUpdateSummary } from './conversation-memory';
@@ -174,6 +175,17 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     conversationHistory.unshift({
       role: 'assistant' as const,
       content: `[סיכום שיחה קודמת: ${session.rolling_summary}]`,
+    });
+  }
+
+  // Lead-capture accounts get the "digging" behavior (Yoav: בוט חופר ולא חכם):
+  // answer briefly, qualify with ONE question per turn until a brief can be sent.
+  // Same instruction the DM path injects — a lead must be worked the same way
+  // whichever surface it walked in through.
+  if (config?.lead_capture?.enabled === true) {
+    conversationHistory.unshift({
+      role: 'assistant' as const,
+      content: leadDiggingInstruction(config.display_name || config.username || 'העסק'),
     });
   }
 
@@ -497,6 +509,16 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     userMessage: message,
     source: 'widget',
   }).catch((e: any) => console.error('[escalation] widget hook failed:', e?.message || e));
+
+  // Lead-capture check — same fire-and-forget contract as escalation. No-op
+  // unless config.lead_capture.enabled; emails a lane-routed brief once the
+  // qualifying questions gathered enough (see engines/escalation/lead-capture.ts).
+  runLeadCaptureCheck({
+    accountId,
+    sessionId: sessionId!,
+    userMessage: message,
+    channel: 'widget',
+  }).catch((e: any) => console.error('[lead-capture] widget hook failed:', e?.message || e));
 
   // Auto-file a support ticket when the visitor has a real service problem and
   // left something actionable. Same opt-in gate and same one-per-session dedup

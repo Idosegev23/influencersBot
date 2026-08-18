@@ -1,5 +1,8 @@
 /**
- * Hourly sweep for IG DM leads that went quiet mid-qualification.
+ * Hourly sweep for leads that went quiet mid-qualification, on EVERY surface —
+ * IG DM, the chat page, and the site widget. The route keeps its ig-lead-flush
+ * path because vercel.json's cron entry points at it; the sweep itself is no
+ * longer Instagram-only (see LEAD_SOURCES in engines/escalation/lead-capture).
  *
  * A lead that answered two digging questions and disappeared is still a lead —
  * flushStaleLeads emails whatever was gathered as a "partial brief" once the
