@@ -1767,6 +1767,8 @@
       if (!text) return;
       if (isOpen || tooltipSeen()) return;
       if (document.getElementById('ibot-tip')) return;
+      // A teaser is already making this offer, with better copy.
+      if (document.getElementById('ibot-teaser')) return;
       var side = (config.position === 'bottom-left') ? 'left:20px;' : 'right:20px;';
       var el = document.createElement('div');
       el.id = 'ibot-tip';
@@ -3965,6 +3967,14 @@
           escapeHtml(text) + '</button>' +
         '<button onclick="window.__ibotTeaserDismiss()" aria-label="' + escapeHtml(locale.teaser.close) + '" ' +
           'style="background:transparent;border:none;color:var(--ibot-text-muted,#888);cursor:pointer;font-size:18px;line-height:1;flex-shrink:0;padding:6px;min-width:32px;min-height:32px;">&times;</button>';
+      // The teaser and the invitation tooltip do the same job — invite the
+      // visitor to talk — so only one may be on screen. The teaser wins
+      // because it knows the context (the product being viewed, whether
+      // support is on) where the tooltip is generic. Removed rather than
+      // dismissed: this is a replacement, not the visitor declining it.
+      var tipEl = document.getElementById('ibot-tip');
+      if (tipEl && tipEl.parentNode) tipEl.parentNode.removeChild(tipEl);
+
       document.body.appendChild(el);
       document.addEventListener('keydown', teaserEscHandler);
       widgetTrack('widget_teaser_shown', { reason: reason });
