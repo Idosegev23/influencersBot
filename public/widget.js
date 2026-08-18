@@ -510,17 +510,27 @@
     var url = BASE_URL + '/api/analytics/widget';
     try {
       if (navigator && typeof navigator.sendBeacon === 'function') {
-        var blob = new Blob([body], { type: 'application/json' });
+        // text/plain, NOT application/json. sendBeacon always sends with
+        // credentials mode "include", and an application/json body makes the
+        // request non-simple, so the browser fires a CORS preflight — and a
+        // credentialed preflight rejects both a wildcard Allow-Origin and a
+        // missing Allow-Credentials, which is exactly what these two endpoints
+        // return. Every beacon from an embedded site was being dropped. Both
+        // routes parse the body themselves and never required the header.
+        var blob = new Blob([body], { type: 'text/plain;charset=UTF-8' });
         if (navigator.sendBeacon(url, blob)) return;
       }
     } catch (e) { /* fall through */ }
     try {
       fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // Same reason as the beacon above: keep it a simple request so no
+        // preflight is involved on this fallback path either.
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: body,
         keepalive: true,
         mode: 'cors',
+        credentials: 'omit',
       }).catch(function () { /* fire-and-forget */ });
     } catch (e) { /* fire-and-forget */ }
   }
@@ -598,17 +608,27 @@
     var url = BASE_URL + '/api/widget/events';
     try {
       if (navigator && typeof navigator.sendBeacon === 'function') {
-        var blob = new Blob([body], { type: 'application/json' });
+        // text/plain, NOT application/json. sendBeacon always sends with
+        // credentials mode "include", and an application/json body makes the
+        // request non-simple, so the browser fires a CORS preflight — and a
+        // credentialed preflight rejects both a wildcard Allow-Origin and a
+        // missing Allow-Credentials, which is exactly what these two endpoints
+        // return. Every beacon from an embedded site was being dropped. Both
+        // routes parse the body themselves and never required the header.
+        var blob = new Blob([body], { type: 'text/plain;charset=UTF-8' });
         if (navigator.sendBeacon(url, blob)) return;
       }
     } catch (e) { /* fall through */ }
     try {
       fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // Same reason as the beacon above: keep it a simple request so no
+        // preflight is involved on this fallback path either.
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: body,
         keepalive: true,
         mode: 'cors',
+        credentials: 'omit',
       }).catch(function () { /* fire-and-forget */ });
     } catch (e) { /* fire-and-forget */ }
   }

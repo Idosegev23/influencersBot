@@ -23,6 +23,11 @@ export const runtime = 'nodejs';
 function getCorsHeaders(origin: string): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': origin || '*',
+    // This response varies by request Origin, so any shared cache must key on
+    // it. Without this a cached response carrying one customer's origin can be
+    // served to another, and their widget's beacons fail CORS for no reason
+    // visible on either side.
+    'Vary': 'Origin',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
