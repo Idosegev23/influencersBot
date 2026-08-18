@@ -180,6 +180,7 @@ const CHAT_PAGE_STRINGS = {
     requiredFields: 'נא למלא את כל השדות החובה',
     submitError: 'שגיאה בשליחת הפנייה',
     csStarter: 'יש לי בעיה עם הזמנה',
+    csGreeting: 'היי! כאן שירות הלקוחות 🙂 איך אפשר לעזור?',
     csDetailsSent: 'שלחתי את הפרטים',
   },
   en: {
@@ -189,6 +190,7 @@ const CHAT_PAGE_STRINGS = {
     requiredFields: 'Please fill in all required fields.',
     submitError: 'Error submitting your request.',
     csStarter: 'I have an issue with my order',
+    csGreeting: "Hi! You've reached customer service 🙂 How can I help?",
     csDetailsSent: 'Sent my details',
   },
 } as const;
@@ -482,8 +484,10 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
 
   // Cold-start starters: a banner's pinned list wins, otherwise the dynamic
   // quickReplies. Same precedence as starterItems() in public/widget.js.
+  // Two content starters, not four. Support is offered as a third pill rather
+  // than competing with a wall of questions — same shape as the widget.
   const starterItems = useMemo(
-    () => (banner?.starters?.items?.length ? banner.starters.items : quickReplies),
+    () => (banner?.starters?.items?.length ? banner.starters.items : quickReplies).slice(0, 2),
     [banner, quickReplies],
   );
   useEffect(() => {
@@ -1927,11 +1931,29 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             sendQuickMessage(q);
                           }}
                           disabled={isTyping || isStreamActive}
-                          extraPill={
-                            (influencer.tabs || defaultTabsForLang((influencer as any).language)).some((t: { id: string }) => t.id === 'discover')
-                              ? { label: (influencer as any).language === 'en' ? 'Discover more' : 'גלו עוד', onClick: () => setActiveTab('discover') }
-                              : undefined
-                          }
+                          // Two questions and support, nothing else. "Discover more"
+                          // used to sit here too, which made four pills on a row meant
+                          // to offer a couple of openings; the discover tab is still in
+                          // the nav, where a navigation shortcut belongs.
+                          extraPills={[
+                            // Support as one more thing you might want, rather than a
+                            // question about which assistant you would like to speak to.
+                            ...(csWebEnabled
+                              ? [{
+                                  label: chatStrings(influencer).csStarter,
+                                  variant: 'quiet' as const,
+                                  onClick: () => {
+                                    track('cs_choice_clicked', { choice: 'cs', from: 'starter' });
+                                    enterCsMode();
+                                    setMessages((prev) => [...prev, {
+                                      id: Date.now().toString(),
+                                      role: 'assistant',
+                                      content: chatStrings(influencer).csGreeting,
+                                    }]);
+                                  },
+                                }]
+                              : []),
+                          ]}
                         />
                         </>
                       )}

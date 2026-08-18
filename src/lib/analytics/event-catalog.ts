@@ -98,6 +98,8 @@ export const EVENT_CATALOG: Record<string, EventDef> = {
   widget_action_dismissed: { category: 'engagement', surface: 'widget' },
   // Widget — brand-personalized bubble tooltip (mobile-only, once per visitor)
   widget_tooltip_shown: { category: 'engagement', surface: 'widget' },
+  // The invitation bubble is clickable, so it has a conversion of its own.
+  widget_tooltip_clicked: { category: 'engagement', surface: 'widget' },
   widget_navigate_confirmed: { category: 'navigation', surface: 'widget' },
   // Widget — support module
   widget_support_opened: { category: 'engagement', surface: 'widget' },

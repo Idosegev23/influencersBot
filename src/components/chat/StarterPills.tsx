@@ -6,11 +6,13 @@ interface StarterPillsProps {
   items: string[];
   onSelect: (item: string) => void;
   disabled?: boolean;
-  /** Extra pill at the end (e.g. "גלו עוד") */
-  extraPill?: {
+  /** Extra pills at the end, in order (e.g. "גלו עוד", then customer service). */
+  extraPills?: {
     label: string;
     onClick: () => void;
-  };
+    /** `quiet` renders a dashed outline — for a secondary errand like support. */
+    variant?: 'solid' | 'quiet';
+  }[];
 }
 
 /** Strip emojis from text */
@@ -22,8 +24,9 @@ function stripEmojis(text: string): string {
     .trim();
 }
 
-export function StarterPills({ items, onSelect, disabled, extraPill }: StarterPillsProps) {
-  if (items.length === 0 && !extraPill) return null;
+export function StarterPills({ items, onSelect, disabled, extraPills }: StarterPillsProps) {
+  const extras = extraPills || [];
+  if (items.length === 0 && extras.length === 0) return null;
 
   return (
     <motion.div
@@ -46,19 +49,23 @@ export function StarterPills({ items, onSelect, disabled, extraPill }: StarterPi
           {stripEmojis(item)}
         </motion.button>
       ))}
-      {extraPill && (
+      {extras.map((pill, i) => (
         <motion.button
+          key={`extra-${i}`}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 + items.length * 0.05, duration: 0.3 }}
+          transition={{ delay: 0.4 + (items.length + i) * 0.05, duration: 0.3 }}
           whileTap={{ scale: 0.96 }}
-          onClick={extraPill.onClick}
+          onClick={pill.onClick}
           className="starter-pill"
           disabled={disabled}
+          style={pill.variant === 'quiet'
+            ? { borderStyle: 'dashed', color: '#6b6b6b' }
+            : undefined}
         >
-          {extraPill.label}
+          {pill.label}
         </motion.button>
-      )}
+      ))}
     </motion.div>
   );
 }

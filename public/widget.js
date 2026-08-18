@@ -1743,7 +1743,15 @@
     }
   }
 
-  // ---- Brand-personalized bubble tooltip (mobile-only, once per visitor) ----
+  // ---- Invitation bubble beside the closed launcher (once per visitor) ----
+  //
+  // Three things kept this from ever appearing. It was gated to viewports under
+  // 640px, so nobody saw it on a desktop. It required `config.widget.tooltip`
+  // to be filled in and no account had filled it in — so the feature existed
+  // and was switched on nowhere. And it deleted itself after six seconds,
+  // which the proactive teaser two hundred lines below explicitly refuses to
+  // do, citing WCAG 2.2.1. It now runs at every width, falls back to the
+  // locale's own invitation copy, and waits to be dismissed.
   var TIP_KEY = 'ibot_tip_' + ACCOUNT_ID;
   function tooltipSeen() { try { return localStorage.getItem(TIP_KEY) === '1'; } catch (e) { return true; } }
   function markTooltipSeen() { try { localStorage.setItem(TIP_KEY, '1'); } catch (e) { /* */ } }
@@ -1753,8 +1761,10 @@
   };
   function showBubbleTooltip() {
     try {
-      if (window.innerWidth >= 640) return;          // mobile-only per spec
-      if (!config.tooltip || !config.tooltip.text) return;
+      var text = (config.tooltip && config.tooltip.text)
+        || (locale.teaser && locale.teaser.generic)
+        || '';
+      if (!text) return;
       if (isOpen || tooltipSeen()) return;
       if (document.getElementById('ibot-tip')) return;
       var side = (config.position === 'bottom-left') ? 'left:20px;' : 'right:20px;';
@@ -1764,11 +1774,24 @@
         'max-width:min(72vw,260px);background:var(--ibot-panel-bg,#fff);color:var(--ibot-text-primary,#111);' +
         'border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.18);padding:10px 12px;font-size:13.5px;line-height:1.35;' +
         'direction:' + locale.dir + ';animation:ibot-slide-up 0.3s ease-out;display:flex;gap:8px;align-items:flex-start;';
-      el.innerHTML = '<span style="flex:1;min-width:0;">' + escapeHtml(config.tooltip.text) + '</span>' +
+      el.innerHTML = '<span style="flex:1;min-width:0;">' + escapeHtml(text) + '</span>' +
         '<button onclick="window.__ibotTipDismiss()" aria-label="close" style="background:transparent;border:none;color:var(--ibot-text-muted,#888);cursor:pointer;font-size:16px;line-height:1;flex-shrink:0;">&times;</button>';
       document.body.appendChild(el);
+      // Clicking the bubble opens the chat — the invitation should be the
+      // thing you can act on, not just something to read and close.
+      el.onclick = function (ev) {
+        if (ev.target && ev.target.closest && ev.target.closest('button')) return;
+        window.__ibotTipDismiss();
+        widgetTrack('widget_tooltip_clicked', {});
+        isOpen = true;
+        inputTouched = false;
+        try { removeTeaser(); } catch (e) { /* */ }
+        widgetTrack('widget_opened', { from: 'tooltip' });
+        trackBannerViewed();
+        render();
+      };
+      el.style.cursor = 'pointer';
       widgetTrack('widget_tooltip_shown', {});
-      setTimeout(function () { try { window.__ibotTipDismiss(); } catch (e) {} }, 6000);
     } catch (e) { /* never break host page */ }
   }
 
@@ -1945,7 +1968,11 @@
 
       // ---- Smart chips row (only when no user message yet AND chips loaded) ----
       ((!csMode && starterItems().length > 0 && !messages.some(function (mm) { return mm.role === 'user'; }))
-        ? renderChipsRow(starterItems(), pc, { label: starterLabel() })
+        ? renderChipsRow(starterItems(), pc, {
+            label: starterLabel(),
+            max: 2,
+            withCs: modules.customerService.enabled,
+          })
         : '') +
 
       // ---- Footer actions row — visible only after first user turn so it
@@ -2368,7 +2395,8 @@
     var pills = '';
     var rendered = 0;
     var mob = window.innerWidth < 640;   // prominent tap targets on mobile full-screen
-    for (var i = 0; i < items.length && rendered < 4; i++) {
+    var cap = (opts && opts.max) || 4;
+    for (var i = 0; i < items.length && rendered < cap; i++) {
       var label = String(items[i] || '').trim();
       if (!label) continue;
       // Full question always shown — a chip cut to "מה מומלץ לשי…" doesn't
@@ -2386,6 +2414,20 @@
       rendered++;
     }
     if (!pills) return '';
+    // Support gets a starter of its own rather than a mode picker. It reads as
+    // one more thing you might want, which is what it is, instead of a
+    // question about which assistant you would like to speak to.
+    if (opts && opts.withCs && !isCs) {
+      pills +=
+        '<button onclick="window.__ibotCsStart(\'starter\')" ' +
+        'style="background:var(--ibot-surface);border:1px dashed var(--ibot-border);color:var(--ibot-text-secondary);cursor:pointer;' +
+        'border-radius:999px;padding:' + (mob ? '9px 15px' : '6px 11px') + ';font-size:' + (mob ? '14px' : '12.5px') + ';line-height:1.3;' +
+        (mob ? 'min-height:40px;' : '') + 'font-family:inherit;transition:transform 0.15s,border-color 0.15s;max-width:100%;" ' +
+        'onmouseover="this.style.transform=\'translateY(-1px)\';this.style.borderColor=\'' + pc + '\';" ' +
+        'onmouseout="this.style.transform=\'\';this.style.borderColor=\'var(--ibot-border)\';">' +
+        escapeHtml(locale.cs.choiceCs) + '</button>';
+    }
+
     // Optional section label above the chips ("אפשר להתחיל מכאן"). Banner-only
     // and cold-start-only — labelling the follow-up chips mid-conversation
     // would read as the bot restarting.
