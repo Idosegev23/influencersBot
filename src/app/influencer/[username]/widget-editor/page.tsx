@@ -4,7 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Save, Loader2, Check } from 'lucide-react';
 import { fetchInfluencerByUsername } from '@/lib/influencer/client';
-import { activeOverrides, resolveBanner, resolveInvitation, MAX_INVITATION } from '@/lib/widget/banner';
+import {
+  activeOverrides,
+  resolveBanner,
+  resolveInvitation,
+  MAX_INVITATION,
+  type ResolvedBanner,
+} from '@/lib/widget/banner';
 import { WidgetDraftPreview } from '@/components/influencer/WidgetDraftPreview';
 
 // Caps mirrored from src/lib/widget/banner.ts (not exported there, so kept in
@@ -59,9 +65,20 @@ export default function WidgetEditorPage() {
   const [starterItems, setStarterItems] = useState<string[]>([]);
   const [teaser, setTeaser] = useState('');
   const [tooltip, setTooltip] = useState('');
+  // What a visitor sees RIGHT NOW — the resolved banner/invitation, including
+  // any live scheduled override. Used only for placeholder text, never to
+  // seed an input's value (see the load effect below for why).
+  const [resolvedBanner, setResolvedBanner] = useState<ResolvedBanner | null>(null);
+  const [resolvedInvitation, setResolvedInvitation] = useState<{ teaser: string | null; tooltip: string | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 'open' (default, unchanged banner preview) shows the chat panel, the
+  // only way to see banner copy. 'closed' shows the launcher instead — the
+  // only way to see the teaser/tooltip bubbles, since widget.js force-opens
+  // the panel on every draft message otherwise, and both bubbles bail out
+  // while the panel is open.
+  const [previewView, setPreviewView] = useState<'open' | 'closed'>('open');
 
   useEffect(() => {
     if (!username) return;
@@ -76,22 +93,29 @@ export default function WidgetEditorPage() {
         setAccountId(influencer.id);
         setBrandName(name);
         setConfig(rawConfig);
-        // Seed every field with whatever is live today — including the
-        // generic fallback headline accounts with a reel rotation get
-        // automatically — so the customer edits what they're actually
-        // looking at, not a blank box next to a banner that already says
-        // something else.
-        const current = resolveBanner(rawConfig, 'widget', { brandName: name });
-        const invitation = resolveInvitation(rawConfig, 'widget');
-        setEyebrow(current?.eyebrow || '');
-        setHeadline(current?.headline || '');
-        setSubline(current?.subline || '');
-        setCtaLabel(current?.cta?.label || '');
-        setCtaValue(current?.cta?.value || '');
-        setStartersLabel(current?.starters?.label || '');
-        setStarterItems(current?.starters?.items || []);
-        setTeaser(invitation.teaser || '');
-        setTooltip(invitation.tooltip || '');
+        // Seed every field from the STORED base — never from a resolver's
+        // merged output. resolveBanner/resolveInvitation layer any currently
+        // active scheduled override on top of the base before returning, so
+        // seeding from them would bake a temporary promotion's copy into the
+        // permanent config the moment the customer saves an unrelated field
+        // (and it would keep showing after the promotion's `until` date
+        // passes — the config no longer reflects "no promotion", it reflects
+        // "promotion, forever"). The base is what these inputs edit; the
+        // resolved values below are used only as placeholders, so an empty
+        // field still shows what a visitor sees right now.
+        const rawBanner = rawConfig?.widget?.banner || null;
+        setEyebrow(rawBanner?.eyebrow || '');
+        setHeadline(rawBanner?.headline || '');
+        setSubline(rawBanner?.subline || '');
+        setCtaLabel(rawBanner?.cta?.label || '');
+        setCtaValue(rawBanner?.cta?.value || '');
+        setStartersLabel(rawBanner?.starters?.label || '');
+        setStarterItems(rawBanner?.starters?.items || []);
+        setTeaser(rawConfig?.widget?.teaser || '');
+        setTooltip(rawConfig?.widget?.tooltip || '');
+
+        setResolvedBanner(resolveBanner(rawConfig, 'widget', { brandName: name }));
+        setResolvedInvitation(resolveInvitation(rawConfig, 'widget'));
       } catch (err) {
         console.error('[widget-editor] failed to load account:', err);
       } finally {
@@ -227,7 +251,8 @@ export default function WidgetEditorPage() {
 
         {liveOverride ? (
           <div className="mb-4 rounded-xl px-4 py-3 text-[13px]" style={{ background: '#FFF4E5', color: '#7a4b00' }}>
-            כרגע פעיל מבצע מתוזמן ({liveOverride.from || 'ללא תאריך התחלה'} – {liveOverride.until || 'ללא תאריך סיום'}) שדורס חלק מהשדות למטה.
+            כרגע פעיל מבצע מתוזמן ({liveOverride.from || 'ללא תאריך התחלה'} – {liveOverride.until || 'ללא תאריך סיום'}) שמכסה חלק מהשדות למטה בתצוגה המקדימה ובווידג׳ט החי.
+            השדות כאן עורכים את הבסיס — מה שיחזור להיות פעיל ברגע שהמבצע יסתיים. שמירה כאן לא משנה את המבצע עצמו.
           </div>
         ) : null}
 
@@ -246,7 +271,7 @@ export default function WidgetEditorPage() {
                 value={eyebrow}
                 onChange={(e) => setEyebrow(e.target.value)}
                 maxLength={MAX_EYEBROW}
-                placeholder="לדוגמה: חדש"
+                placeholder={resolvedBanner?.eyebrow || 'לדוגמה: חדש'}
                 className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
                 style={inputStyle}
               />
@@ -264,7 +289,7 @@ export default function WidgetEditorPage() {
                 value={headline}
                 onChange={(e) => setHeadline(e.target.value)}
                 maxLength={MAX_HEADLINE}
-                placeholder="היי, אני העוזר של המותג. שאלו אותי כל דבר."
+                placeholder={resolvedBanner?.headline || 'היי, אני העוזר של המותג. שאלו אותי כל דבר.'}
                 className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
                 style={inputStyle}
               />
@@ -282,7 +307,7 @@ export default function WidgetEditorPage() {
                 value={subline}
                 onChange={(e) => setSubline(e.target.value)}
                 maxLength={MAX_SUBLINE}
-                placeholder="משפט קצר שמסביר מה אפשר לשאול"
+                placeholder={resolvedBanner?.subline || 'משפט קצר שמסביר מה אפשר לשאול'}
                 className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
                 style={inputStyle}
               />
@@ -301,7 +326,7 @@ export default function WidgetEditorPage() {
                   value={ctaLabel}
                   onChange={(e) => setCtaLabel(e.target.value)}
                   maxLength={MAX_CTA_LABEL}
-                  placeholder="לדוגמה: דברו איתי"
+                  placeholder={resolvedBanner?.cta?.label || 'לדוגמה: דברו איתי'}
                   className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
                   style={inputStyle}
                 />
@@ -318,7 +343,7 @@ export default function WidgetEditorPage() {
                   value={ctaValue}
                   onChange={(e) => setCtaValue(e.target.value)}
                   maxLength={MAX_CTA_VALUE}
-                  placeholder="הטקסט שיוזן אוטומטית לתיבת הצ׳אט"
+                  placeholder={resolvedBanner?.cta?.value || 'הטקסט שיוזן אוטומטית לתיבת הצ׳אט'}
                   className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
                   style={inputStyle}
                 />
@@ -337,7 +362,7 @@ export default function WidgetEditorPage() {
                 value={startersLabel}
                 onChange={(e) => setStartersLabel(e.target.value)}
                 maxLength={MAX_STARTERS_LABEL}
-                placeholder="לדוגמה: שאלות נפוצות"
+                placeholder={resolvedBanner?.starters?.label || 'לדוגמה: שאלות נפוצות'}
                 className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
                 style={inputStyle}
               />
@@ -396,7 +421,7 @@ export default function WidgetEditorPage() {
                   value={teaser}
                   onChange={(e) => setTeaser(e.target.value)}
                   maxLength={MAX_INVITATION}
-                  placeholder="לדוגמה: יש לי הנחה בשבילך 👋"
+                  placeholder={resolvedInvitation?.teaser || 'לדוגמה: יש לי הנחה בשבילך 👋'}
                   className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
                   style={inputStyle}
                 />
@@ -413,7 +438,7 @@ export default function WidgetEditorPage() {
                   value={tooltip}
                   onChange={(e) => setTooltip(e.target.value)}
                   maxLength={MAX_INVITATION}
-                  placeholder="לדוגמה: שאלו אותי כל דבר"
+                  placeholder={resolvedInvitation?.tooltip || 'לדוגמה: שאלו אותי כל דבר'}
                   className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
                   style={inputStyle}
                 />
@@ -448,8 +473,34 @@ export default function WidgetEditorPage() {
 
           {/* ── Live preview ── */}
           <div className="lg:sticky lg:top-6">
+            <div className="flex justify-end gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setPreviewView('open')}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                style={{
+                  background: previewView === 'open' ? 'var(--color-primary)' : 'var(--dash-bar)',
+                  color: previewView === 'open' ? '#fff' : 'var(--dash-text)',
+                  border: '1px solid var(--dash-glass-border)',
+                }}
+              >
+                תצוגת שיחה פתוחה
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewView('closed')}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                style={{
+                  background: previewView === 'closed' ? 'var(--color-primary)' : 'var(--dash-bar)',
+                  color: previewView === 'closed' ? '#fff' : 'var(--dash-text)',
+                  border: '1px solid var(--dash-glass-border)',
+                }}
+              >
+                תצוגת כפתור סגור
+              </button>
+            </div>
             {accountId && previewDraft ? (
-              <WidgetDraftPreview accountId={accountId} draft={previewDraft} />
+              <WidgetDraftPreview accountId={accountId} draft={previewDraft} view={previewView} />
             ) : null}
           </div>
         </div>

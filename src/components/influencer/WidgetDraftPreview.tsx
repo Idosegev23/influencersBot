@@ -18,14 +18,29 @@ import { useEffect, useRef } from 'react';
  * caller resolves via `resolveBanner`/`resolveInvitation` before handing it
  * here, so an active scheduled override is reflected in preview exactly as
  * it will be in production.
+ *
+ * `view` picks what the iframe shows: `'open'` (default) force-opens the
+ * chat panel, which is the only way to see the banner — but it also means
+ * the invitation bubbles (teaser/tooltip) can never render, since both
+ * early-return while the panel is open. `'closed'` renders the launcher
+ * instead and makes widget.js explicitly surface those bubbles so they're
+ * previewable at all (see public/widget.js's `ibot:draft` handler).
  */
-export function WidgetDraftPreview({ accountId, draft }: { accountId: string; draft: unknown }) {
+export function WidgetDraftPreview({
+  accountId,
+  draft,
+  view = 'open',
+}: {
+  accountId: string;
+  draft: unknown;
+  view?: 'open' | 'closed';
+}) {
   const ref = useRef<HTMLIFrameElement>(null);
   const ready = useRef(false);
 
   useEffect(() => {
     const post = () => ref.current?.contentWindow?.postMessage(
-      { type: 'ibot:draft', config: draft }, '*',
+      { type: 'ibot:draft', config: draft, view }, '*',
     );
     if (ready.current) post();
     // The widget only starts listening after its own config request resolves,
@@ -33,7 +48,7 @@ export function WidgetDraftPreview({ accountId, draft }: { accountId: string; dr
     const t = setInterval(() => { if (ready.current) post(); }, 400);
     const stop = setTimeout(() => clearInterval(t), 4000);
     return () => { clearInterval(t); clearTimeout(stop); };
-  }, [draft]);
+  }, [draft, view]);
 
   return (
     <iframe

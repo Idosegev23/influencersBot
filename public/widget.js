@@ -20,6 +20,11 @@
   var SCRIPT = document.currentScript;
   var ACCOUNT_ID = SCRIPT && SCRIPT.getAttribute('data-account-id');
   var BASE_URL = SCRIPT && SCRIPT.src ? new URL(SCRIPT.src).origin : '';
+  // The customer's own dashboard editor, not a visitor. Persistence guards
+  // ("already seen this tooltip", "dismissed this teaser forever") exist to
+  // protect a visitor's browsing experience — they must not blank the
+  // account owner's own preview of copy they just typed.
+  var PREVIEW_MODE = !!(SCRIPT && SCRIPT.getAttribute('data-preview') === 'true');
 
   if (!ACCOUNT_ID) {
     console.error('[bestieAI Widget] Missing data-account-id attribute');
@@ -1192,7 +1197,7 @@
   // The editor renders the real widget in an iframe and pushes unsaved changes
   // in. Gated on data-preview so a customer's site can never be driven by a
   // message from an embedding page.
-  if (SCRIPT && SCRIPT.getAttribute('data-preview') === 'true') {
+  if (PREVIEW_MODE) {
     window.addEventListener('message', function (ev) {
       // The preview route is unauthenticated and framable by anyone, so the
       // data-preview attribute alone does not establish that the sender is our
@@ -1210,8 +1215,32 @@
         pickBannerReel();
         applyLocaleAssets();
         bannerViewTracked = true;   // a draft is not a visitor impression
-        if (!isOpen) { isOpen = true; }
-        render();
+        if (msg.view === 'closed') {
+          // The only way the teaser/tooltip bubbles can be previewed at all:
+          // both early-return while the panel is open, and the panel is
+          // forced open below for every other message. Force it shut
+          // instead, clear any stale bubble from a previous draft, redraw
+          // the closed launcher, then explicitly ask both bubble renderers
+          // to run — they no longer wait for a real trigger in preview mode.
+          isOpen = false;
+          var staleTip = document.getElementById('ibot-tip');
+          if (staleTip && staleTip.parentNode) staleTip.parentNode.removeChild(staleTip);
+          var staleTeaser = document.getElementById('ibot-teaser');
+          if (staleTeaser && staleTeaser.parentNode) staleTeaser.parentNode.removeChild(staleTeaser);
+          render();
+          // Teaser first: it has no "nothing to show" bail (always falls
+          // back to locale copy) and unconditionally removes any tooltip
+          // on its way in, so calling it before the tooltip mirrors the
+          // precedence the widget already enforces for real visitors.
+          showProactiveTeaser('preview');
+          showBubbleTooltip();
+        } else {
+          // Every other message (including one with no `view`, e.g. an
+          // older cached draft) keeps today's behaviour: force the panel
+          // open, which is the only way to preview the banner.
+          if (!isOpen) { isOpen = true; }
+          render();
+        }
       } catch (e) { /* never break the editor */ }
     });
   }
@@ -1816,7 +1845,11 @@
         || (locale.teaser && locale.teaser.generic)
         || '';
       if (!text) return;
-      if (isOpen || tooltipSeen()) return;
+      if (isOpen) return;
+      // The "seen once already" guard is for real visitors only — skipped in
+      // preview mode so a dismissed-once cookie in this browser can't blank
+      // the account owner's own preview.
+      if (!PREVIEW_MODE && tooltipSeen()) return;
       if (document.getElementById('ibot-tip')) return;
       // A teaser is already making this offer, with better copy.
       if (document.getElementById('ibot-teaser')) return;
@@ -4002,7 +4035,10 @@
   };
   function showProactiveTeaser(reason) {
     try {
-      if (isOpen || teaserDismissedForever()) return;
+      if (isOpen) return;
+      // Same reasoning as showBubbleTooltip: "dismissed forever" is a
+      // real-visitor guard, skipped in preview mode.
+      if (!PREVIEW_MODE && teaserDismissedForever()) return;
       if (document.getElementById('ibot-teaser')) return;
       var ctx = pageContext || {};
       var text = (config.invitation && config.invitation.teaser) || (ctx && ctx.product && ctx.product.name
