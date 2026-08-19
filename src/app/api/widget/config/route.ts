@@ -3,11 +3,12 @@
  * GET /api/widget/config?accountId=xxx
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { signWidgetToken } from '@/lib/analytics/widget-token';
 import { resolveBanner } from '@/lib/widget/banner';
 import { demoAccessFromConfig } from '@/lib/demo/guard';
+import { recordInstallPing } from '@/lib/telemetry/install-ping';
 
 function getCorsHeaders(origin: string): Record<string, string> {
   return {
@@ -92,6 +93,26 @@ export async function GET(req: NextRequest) {
         enabled: (config as any)?.cs_web?.enabled === true,
       },
     };
+
+    // Install beacon. Runs after the response is sent so it costs the visitor
+    // nothing, and is wrapped so a telemetry failure can never affect the widget.
+    after(async () => {
+      try {
+        await recordInstallPing({
+          accountId,
+          origin: req.headers.get('origin'),
+          referer: req.headers.get('referer'),
+          path: (() => {
+            const r = req.headers.get('referer');
+            if (!r) return null;
+            try { return new URL(r).pathname; } catch { return null; }
+          })(),
+          widgetVersion: req.nextUrl.searchParams.get('v'),
+        });
+      } catch (e: any) {
+        console.error('[widget/config] install beacon failed:', e?.message);
+      }
+    });
 
     return NextResponse.json(
       {
