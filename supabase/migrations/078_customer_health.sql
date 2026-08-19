@@ -324,9 +324,17 @@ as $$
           select h.channel,
                  (array_agg(h.status order by h.date desc))[1] as status,
                  max(h.date) filter (where h.status <> 'never_installed') as last_seen,
-                 sum(h.opens)  filter (where h.date > current_date - 7) as opens7d,
-                 sum(h.loads)  filter (where h.date > current_date - 7) as loads7d,
-                 sum(h.errors) filter (where h.date > current_date - 7) as errors7d,
+                 -- coalesce to 0 (fix round 1, Finding 1): a filtered sum() over
+                 -- zero matching rows is NULL, not 0, in Postgres. That happens
+                 -- for real whenever a channel's most recent recorded day falls
+                 -- outside the 7-day window but inside the p_days display
+                 -- window. HealthRow declares these as `number` on the TS side,
+                 -- so an un-coalesced NULL crossed the API boundary against its
+                 -- own contract and rendered as the literal text "(null)" in the
+                 -- erroring chip. Fixed at the root, not the render site.
+                 coalesce(sum(h.opens)  filter (where h.date > current_date - 7), 0) as opens7d,
+                 coalesce(sum(h.loads)  filter (where h.date > current_date - 7), 0) as loads7d,
+                 coalesce(sum(h.errors) filter (where h.date > current_date - 7), 0) as errors7d,
                  array_agg(h.loads order by h.date) as spark
           from public.account_health_daily h
           where h.account_id = c.account_id

@@ -38,6 +38,7 @@ export default function HealthPage() {
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<Record<string, any>>({});
+  const [detailError, setDetailError] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let alive = true;
@@ -57,15 +58,33 @@ export default function HealthPage() {
     return () => { alive = false; };
   }, []);
 
-  async function toggle(accountId: string) {
+  // Fix round 1, Finding 2: the original toggle() had no try/catch and no
+  // else branch — a thrown fetch() became an unhandled promise rejection,
+  // and a non-ok response left `detail[accountId]` unset forever, so
+  // "טוען פירוט…" displayed indefinitely with no error and no way to
+  // retry. loadDetail() is the single place that fetches and always lands
+  // in either `detail` or `detailError`, never neither.
+  async function loadDetail(accountId: string) {
+    setDetailError((d) => {
+      if (!(accountId in d)) return d;
+      const { [accountId]: _drop, ...rest } = d;
+      return rest;
+    });
+    try {
+      const r = await fetch(`/api/admin/health/${accountId}`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || 'failed');
+      setDetail((d) => ({ ...d, [accountId]: j }));
+    } catch (e: any) {
+      setDetailError((d) => ({ ...d, [accountId]: e?.message || 'טעינת הפירוט נכשלה' }));
+    }
+  }
+
+  function toggle(accountId: string) {
     if (openId === accountId) { setOpenId(null); return; }
     setOpenId(accountId);
     if (detail[accountId]) return;
-    const r = await fetch(`/api/admin/health/${accountId}`);
-    if (r.ok) {
-      const j = await r.json();
-      setDetail((d) => ({ ...d, [accountId]: j }));
-    }
+    loadDetail(accountId);
   }
 
   // A brand-new paying customer with no account_health_daily rows yet (before
@@ -139,13 +158,22 @@ export default function HealthPage() {
                   )}
                   {r.channels.map((c: any) => {
                     const m = STATUS_META[c.status] || STATUS_META.never_installed;
+                    // Belt and braces alongside the RPC-side coalesce (fix
+                    // round 1, Finding 1): the RPC now always returns 0 for a
+                    // channel with no rows in the trailing 7 days, but the
+                    // TS side never enforced that contract (HealthRow types
+                    // these as `number`, not `number | null`), so guard here
+                    // too rather than trust it silently forever.
+                    const opens7d = c.opens7d ?? 0;
+                    const loads7d = c.loads7d ?? 0;
+                    const errors7d = c.errors7d ?? 0;
                     return (
                       <div key={c.channel} className="flex flex-col items-end gap-1">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${m.cls}`}>
                           {m.icon} {CHANNEL_LABEL[c.channel] || c.channel} · {m.label}
-                          {c.status === 'dormant' && c.loads7d > 0 &&
-                            ` (${((c.opens7d / c.loads7d) * 100).toFixed(1)}%)`}
-                          {c.status === 'erroring' && ` (${c.errors7d})`}
+                          {c.status === 'dormant' && loads7d > 0 &&
+                            ` (${((opens7d / loads7d) * 100).toFixed(1)}%)`}
+                          {c.status === 'erroring' && ` (${errors7d})`}
                         </span>
                         {/* Evidence, subordinate to the chip's verdict above: the
                             14-day daily-loads trend plus the last day the channel
@@ -162,7 +190,20 @@ export default function HealthPage() {
 
               {openId === r.accountId && (
                 <div className="border-t border-gray-100 p-4 bg-gray-50 text-sm space-y-4">
-                  {!detail[r.accountId] && <div className="text-gray-400">טוען פירוט…</div>}
+                  {!detail[r.accountId] && !detailError[r.accountId] && (
+                    <div className="text-gray-400">טוען פירוט…</div>
+                  )}
+                  {detailError[r.accountId] && (
+                    <div className="bg-red-50 text-red-700 p-3 rounded-lg text-xs flex items-center justify-between gap-3">
+                      <span>שגיאה בטעינת הפירוט: {detailError[r.accountId]}</span>
+                      <button
+                        onClick={() => loadDetail(r.accountId)}
+                        className="px-2 py-1 rounded bg-white border border-red-200 hover:bg-red-100 shrink-0"
+                      >
+                        נסו שוב
+                      </button>
+                    </div>
+                  )}
                   {detail[r.accountId] && (
                     <>
                       <section>
