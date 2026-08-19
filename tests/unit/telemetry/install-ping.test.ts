@@ -110,4 +110,113 @@ describe('recordInstallPing', () => {
       accountId: 'acc-1', origin: 'https://a.com', referer: null, path: '/', widgetVersion: '4.0',
     })).resolves.toBe('skipped');
   });
+
+  // Fix 3 (whole-branch review, 2026-08-19): our own preview/demo/editor
+  // surfaces load the real widget.js against a real account-id — that must
+  // never manufacture install evidence. See the comment on recordInstallPing
+  // for the two-signal rationale.
+  describe('preview-surface filtering (Fix 3)', () => {
+    beforeEach(() => {
+      redisMock.isRedisAvailable.mockReturnValue(true);
+      redisMock.redisSetNx.mockResolvedValue(true);
+    });
+
+    it('still records a genuine customer origin, distinct from our own app', async () => {
+      const r = await recordInstallPing({
+        accountId: 'acc-1',
+        origin: 'https://argania-oil.co.il',
+        referer: 'https://argania-oil.co.il/products/oil',
+        path: '/products/oil',
+        widgetVersion: '4.0',
+        requestOrigin: 'https://app.bestie.ai',
+      });
+      expect(r).toBe('written');
+      expect(rpcMock).toHaveBeenCalledOnce();
+    });
+
+    it('skips when the ping origin equals the origin serving this request (self-load)', async () => {
+      // /demo/[id] and /widget-preview load widget.js via
+      // `${window.location.origin}/widget.js` — the browser's Origin header
+      // on the resulting /api/widget/config fetch is therefore our own app's
+      // origin, whatever domain alias is currently serving it.
+      const r = await recordInstallPing({
+        accountId: 'acc-1',
+        origin: 'https://app.bestie.ai',
+        referer: 'https://app.bestie.ai/demo/acc-1',
+        path: '/demo/acc-1',
+        widgetVersion: '4.0',
+        requestOrigin: 'https://app.bestie.ai',
+      });
+      expect(r).toBe('skipped');
+      expect(rpcMock).not.toHaveBeenCalled();
+    });
+
+    it('skips a self-load even under a customer-branded domain alias (production evidence)', async () => {
+      // Verified in production: origin https://bestie.ldrsgroup.com, sample_path
+      // /api/widget/preview/de38eac6-... — admin previewing LDRS's own widget
+      // under a branded alias. The self-referential check (origin ===
+      // requestOrigin) still catches this because both sides resolve to
+      // whatever alias is currently serving the app, not a hardcoded domain.
+      const r = await recordInstallPing({
+        accountId: 'acc-1',
+        origin: 'https://bestie.ldrsgroup.com',
+        referer: 'https://bestie.ldrsgroup.com/api/widget/preview/acc-1',
+        path: '/api/widget/preview/acc-1',
+        widgetVersion: '4.0',
+        requestOrigin: 'https://bestie.ldrsgroup.com',
+      });
+      expect(r).toBe('skipped');
+      expect(rpcMock).not.toHaveBeenCalled();
+    });
+
+    it('skips via the referer-path backstop even when origins differ (proxy-injected page)', async () => {
+      // The widget-preview PROXY fetches the customer's real site and
+      // injects widget.js into it, so the ping's own origin *could* differ
+      // from requestOrigin in a future variant of this surface. Path match
+      // alone must still catch it.
+      const r = await recordInstallPing({
+        accountId: 'acc-1',
+        origin: 'https://some-customer-domain.com',
+        referer: 'https://app.bestie.ai/api/widget/preview/acc-1?path=/',
+        path: '/api/widget/preview/acc-1',
+        widgetVersion: '4.0',
+        requestOrigin: 'https://app.bestie.ai',
+      });
+      expect(r).toBe('skipped');
+      expect(rpcMock).not.toHaveBeenCalled();
+    });
+
+    it('skips /widget-preview, /admin/, and localhost preview paths', async () => {
+      for (const path of ['/widget-preview', '/admin/websites/acc-1/preview', '/demo/acc-1']) {
+        rpcMock.mockClear();
+        const r = await recordInstallPing({
+          accountId: 'acc-1',
+          origin: 'http://localhost:3001',
+          referer: `http://localhost:3001${path}`,
+          path,
+          widgetVersion: '4.0',
+          requestOrigin: 'http://localhost:3001',
+        });
+        expect(r).toBe('skipped');
+        expect(rpcMock).not.toHaveBeenCalled();
+      }
+    });
+
+    it('does not skip a real customer path that merely contains "admin" mid-segment', async () => {
+      // Guard against an overly loose prefix match: PREVIEW_PATH_PREFIXES
+      // checks startsWith, so a genuine customer path like /administration
+      // (not one of our routes) must NOT be caught by the '/admin/' prefix
+      // requiring a trailing slash boundary.
+      const r = await recordInstallPing({
+        accountId: 'acc-1',
+        origin: 'https://some-customer-domain.com',
+        referer: 'https://some-customer-domain.com/administration/dashboard',
+        path: '/administration/dashboard',
+        widgetVersion: '4.0',
+        requestOrigin: 'https://app.bestie.ai',
+      });
+      expect(r).toBe('written');
+      expect(rpcMock).toHaveBeenCalledOnce();
+    });
+  });
 });

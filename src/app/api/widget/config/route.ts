@@ -108,6 +108,12 @@ export async function GET(req: NextRequest) {
             try { return new URL(r).pathname; } catch { return null; }
           })(),
           widgetVersion: req.nextUrl.searchParams.get('v'),
+          // Our own preview/demo/editor surfaces (widget-preview, the proxy,
+          // /demo/[id], the manage editor iframe) load the real widget.js
+          // against a real account-id from THIS app — so the ping's origin
+          // ends up equal to the origin serving this very request. See the
+          // comment on recordInstallPing for the full rationale.
+          requestOrigin: req.nextUrl.origin,
         });
       } catch (e: any) {
         console.error('[widget/config] install beacon failed:', e?.message);

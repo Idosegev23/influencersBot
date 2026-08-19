@@ -138,17 +138,38 @@ as $$
     from public.install_pings
     where account_id = p_account_id and day <= p_day
   ),
+  -- Fix 1b (whole-branch review, 2026-08-19): every window below is now
+  -- upper-bounded at (p_day + 1)::timestamptz, not just lower-bounded. This
+  -- was harmless while the cron defaulted `p_day` to today (the upper bound
+  -- was implicitly "now", which IS (p_day+1) minus a few hours) but becomes
+  -- an active defect the moment Fix 1 makes the cron default to yesterday: a
+  -- lower-bound-only window measured against a PAST p_day keeps counting
+  -- everything from that day's start through the moment the RPC actually
+  -- runs — e.g. rolling up 2026-08-18 on 2026-08-19 would silently absorb ~14
+  -- extra hours of the 19th into the 18th's "24h"/"7d" facts. sess_ever /
+  -- wa_ever below already got this treatment in an earlier round; this CTE
+  -- copies their shape.
   wev as (
     select count(*) filter (where type = 'widget_loaded'
-             and created_at > (p_day + 1)::timestamptz - interval '24 hours') as loads_24h,
+             and created_at > (p_day + 1)::timestamptz - interval '24 hours'
+             and created_at <= (p_day + 1)::timestamptz)                       as loads_24h,
            count(*) filter (where type = 'widget_opened'
-             and created_at > (p_day + 1)::timestamptz - interval '7 days')    as opens_7d,
+             and created_at > (p_day + 1)::timestamptz - interval '7 days'
+             and created_at <= (p_day + 1)::timestamptz)                       as opens_7d,
+           -- Fix 2 (whole-branch review): the day's OWN opens, bounded to
+           -- exactly p_day. This is what account_health_daily.opens must hold
+           -- from now on — see the jsonb_build_object comment below for why.
+           count(*) filter (where type = 'widget_opened'
+             and created_at::date = p_day)                                    as opens_day,
            count(*) filter (where type in ('client_error','config_load_failed','csp_blocked')
-             and created_at > (p_day + 1)::timestamptz - interval '24 hours') as errors_24h,
+             and created_at > (p_day + 1)::timestamptz - interval '24 hours'
+             and created_at <= (p_day + 1)::timestamptz)                       as errors_24h,
            count(*) filter (where type = 'widget_message_sent'
              and created_at::date = p_day)                                    as messages
     from public.widget_events
-    where account_id = p_account_id and created_at > (p_day + 1)::timestamptz - interval '8 days'
+    where account_id = p_account_id
+      and created_at > (p_day + 1)::timestamptz - interval '8 days'
+      and created_at <= (p_day + 1)::timestamptz
   ),
   -- chat_page "ever" facts (review round 1, Finding 1): everPinged /
   -- opensLast7d / loadsLast24h must reflect activity up to and including
@@ -187,12 +208,30 @@ as $$
     select count(*) as n from public.whatsapp_cs_sessions
     where active_account_id = p_account_id and last_activity_at::date = p_day
   )
+  -- Fix 2 (whole-branch review, 2026-08-19): every channel below now also
+  -- exposes `opensToday` — the day's OWN opens, bounded to p_day — alongside
+  -- the pre-existing `opensLast7d`. rollup.ts writes `opensToday` into
+  -- account_health_daily.opens (a DAILY row), matching every sibling column
+  -- (loads, errors, messages, sessions), which are all genuinely per-day.
+  -- Before this, rollup.ts wrote the 7-day rolling `opensLast7d` into that
+  -- daily column, and admin_health_board's sum() over 7 trailing daily rows
+  -- summed seven overlapping 7-day windows — a ~7x inflation (measured live:
+  -- Studio Pasha chat_page loads=50/24h vs opens=366/7d). `opensLast7d`
+  -- itself is UNCHANGED and still the value deriveChannelStatus's `dormant`
+  -- rule needs — do not remove it.
+  --
+  -- For chat_page and whatsapp there is no separate "loaded vs opened"
+  -- signal — a session IS the open — so opensToday is simply that channel's
+  -- day-scoped session count (sess_day.n / wa_day.n), the same source
+  -- `sessions` already reads. Widget is the only channel with a distinct
+  -- widget_opened event, computed in wev.opens_day above.
   select jsonb_build_object(
     'widget', jsonb_build_object(
       'everPinged', coalesce((select ever from ping), false),
       -- Anchored to p_day (Finding 2), not now() — see comment above sess_ever.
       'hoursSinceLastPing', (select extract(epoch from ((p_day + 1)::timestamptz - last_seen)) / 3600 from ping),
       'opensLast7d', (select opens_7d from wev),
+      'opensToday', (select opens_day from wev),
       'errorsLast24h', (select errors_24h from wev),
       'loadsLast24h', (select loads_24h from wev),
       'activeMinutes', (select minutes from ping),
@@ -204,6 +243,7 @@ as $$
       'everPinged', coalesce((select ever from sess_ever), false),
       'hoursSinceLastPing', (select extract(epoch from ((p_day + 1)::timestamptz - last_seen)) / 3600 from sess_ever),
       'opensLast7d', (select opens_7d from sess_ever),
+      'opensToday', (select n from sess_day),
       'loadsLast24h', (select loads_24h from sess_ever),
       -- errorsLast24h is a real hardcoded 0, not a measurement (review round 1,
       -- Minor 2): chat_page has no error signal wired up yet — widget_events
@@ -218,6 +258,7 @@ as $$
       'everPinged', coalesce((select ever from wa_ever), false),
       'hoursSinceLastPing', (select extract(epoch from ((p_day + 1)::timestamptz - last_seen)) / 3600 from wa_ever),
       'opensLast7d', (select opens_7d from wa_ever),
+      'opensToday', (select n from wa_day),
       'loadsLast24h', (select loads_24h from wa_ever),
       -- Same v1 scope limit as chat_page above (review round 1, Minor 2): no
       -- error signal wired up for WhatsApp yet, so this is a real hardcoded 0.
@@ -227,7 +268,7 @@ as $$
     ),
     'instagram', jsonb_build_object(
       'everPinged', false, 'hoursSinceLastPing', null,
-      'opensLast7d', 0, 'errorsLast24h', 0, 'loadsLast24h', 0,
+      'opensLast7d', 0, 'opensToday', 0, 'errorsLast24h', 0, 'loadsLast24h', 0,
       'activeMinutes', 0, 'distinctOrigins', 0, 'messages', 0, 'sessions', 0
     )
   );
@@ -295,8 +336,20 @@ grant  execute on function public.backfill_install_pings() to service_role;
 -- "last seen" as this morning's cron time, the exact inverse of what this
 -- column exists to tell. h.date is the last day the channel actually showed
 -- signs of life; day granularity, not a timestamp, is the honest trade-off.
--- The `filter` clause is kept so a channel whose every row is
--- 'never_installed' still yields null, not a date.
+--
+-- Fix 4 (whole-branch review, 2026-08-19): the `filter` clause below was
+-- `h.status <> 'never_installed'`, which is too narrow — R5 caught the
+-- computed_at inversion but missed a second one. The nightly rollup writes a
+-- row for EVERY expected channel EVERY day regardless of activity, so a
+-- channel that died and is now correctly reported as 'silent' still passes
+-- `<> 'never_installed'` and its `date` (today's cron run) wins the max() —
+-- collapsing "last seen" to today-or-null for exactly the accounts this
+-- column exists to flag (measured live: KUNI and החמניה both showed
+-- status='silent' with lastSeen=today, rendered under the 🔴 "נדם" chip).
+-- Filtering to the statuses that represent actual life — live / dormant /
+-- erroring — fixes it: 'silent' and 'never_installed' both correctly fall
+-- through to whatever earlier date last had real activity, or null if none
+-- ever did.
 create or replace function public.admin_health_board(p_days int default 14)
 returns jsonb
 language sql
@@ -323,7 +376,7 @@ as $$
         from (
           select h.channel,
                  (array_agg(h.status order by h.date desc))[1] as status,
-                 max(h.date) filter (where h.status <> 'never_installed') as last_seen,
+                 max(h.date) filter (where h.status in ('live','dormant','erroring')) as last_seen,
                  -- coalesce to 0 (fix round 1, Finding 1): a filtered sum() over
                  -- zero matching rows is NULL, not 0, in Postgres. That happens
                  -- for real whenever a channel's most recent recorded day falls

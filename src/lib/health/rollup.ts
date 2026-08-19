@@ -43,7 +43,14 @@ export async function rollupAccountHealth(day: string): Promise<{ accounts: numb
         active_minutes: f.activeMinutes ?? 0,
         distinct_origins: f.distinctOrigins ?? 0,
         loads: f.loadsLast24h ?? 0,
-        opens: f.opensLast7d ?? 0,
+        // Fix 2 (whole-branch review, 2026-08-19): `opens` is a DAILY column,
+        // so it must hold the day's OWN opens — `opensToday` — not the
+        // rolling `opensLast7d`. Writing the 7-day figure here made
+        // admin_health_board's sum() over 7 trailing daily rows sum seven
+        // overlapping 7-day windows (~7x inflation). `opensLast7d` is still
+        // read separately below for deriveChannelStatus's `dormant` rule —
+        // that meaning is unchanged.
+        opens: f.opensToday ?? 0,
         messages: f.messages ?? 0,
         sessions: f.sessions ?? 0,
         // `leads` is reserved by the schema but NOT populated in v1 — lead
