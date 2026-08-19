@@ -278,3 +278,68 @@ end $$;
 
 revoke execute on function public.backfill_install_pings() from public, anon, authenticated;
 grant  execute on function public.backfill_install_pings() to service_role;
+
+-- Task 9: admin health board. One jsonb object per paying account, with one
+-- channel entry per channel that actually has rows in account_health_daily
+-- for the window (a channel with zero rows — e.g. never rolled up — is
+-- simply absent, not synthesized as never_installed here; the nightly rollup
+-- is what writes never_installed rows). Same R9 posture as the three
+-- functions above: SECURITY INVOKER (the default — no `security definer`),
+-- search_path pinned, execute revoked from public/anon/authenticated and
+-- granted only to service_role. The only caller is the service-role client
+-- from @/lib/supabase used by /api/admin/health.
+--
+-- Ruling R5: last_seen is max(h.date), NOT max(h.computed_at). computed_at is
+-- when the nightly cron RAN, which is near-identical across every row written
+-- in the same batch — using it would make a channel that died a week ago show
+-- "last seen" as this morning's cron time, the exact inverse of what this
+-- column exists to tell. h.date is the last day the channel actually showed
+-- signs of life; day granularity, not a timestamp, is the honest trade-off.
+-- The `filter` clause is kept so a channel whose every row is
+-- 'never_installed' still yields null, not a date.
+create or replace function public.admin_health_board(p_days int default 14)
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  select coalesce(jsonb_agg(row), '[]'::jsonb) from (
+    select jsonb_build_object(
+      'account_id', c.account_id,
+      'name', coalesce(a.config->>'display_name', a.config->>'username', left(c.account_id::text, 8)),
+      'contractEnd', c.contract_end,
+      'trialEnd', c.trial_end,
+      'owner', c.owner,
+      'channels', (
+        select coalesce(jsonb_agg(jsonb_build_object(
+          'channel', ch.channel,
+          'status',  ch.status,
+          'lastSeen', ch.last_seen,
+          'opens7d', ch.opens7d,
+          'loads7d', ch.loads7d,
+          'errors7d', ch.errors7d,
+          'spark', ch.spark
+        )), '[]'::jsonb)
+        from (
+          select h.channel,
+                 (array_agg(h.status order by h.date desc))[1] as status,
+                 max(h.date) filter (where h.status <> 'never_installed') as last_seen,
+                 sum(h.opens)  filter (where h.date > current_date - 7) as opens7d,
+                 sum(h.loads)  filter (where h.date > current_date - 7) as loads7d,
+                 sum(h.errors) filter (where h.date > current_date - 7) as errors7d,
+                 array_agg(h.loads order by h.date) as spark
+          from public.account_health_daily h
+          where h.account_id = c.account_id
+            and h.date > current_date - p_days
+          group by h.channel
+        ) ch
+      )
+    ) as row
+    from public.account_contracts c
+    join public.accounts a on a.id = c.account_id
+    where c.is_paying = true
+  ) t;
+$$;
+
+revoke execute on function public.admin_health_board(int) from public, anon, authenticated;
+grant  execute on function public.admin_health_board(int) to service_role;
