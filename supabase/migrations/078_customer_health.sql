@@ -324,9 +324,17 @@ as $$
           select h.channel,
                  (array_agg(h.status order by h.date desc))[1] as status,
                  max(h.date) filter (where h.status <> 'never_installed') as last_seen,
-                 sum(h.opens)  filter (where h.date > current_date - 7) as opens7d,
-                 sum(h.loads)  filter (where h.date > current_date - 7) as loads7d,
-                 sum(h.errors) filter (where h.date > current_date - 7) as errors7d,
+                 -- coalesce to 0 (fix round 1, Finding 1): a filtered sum() over
+                 -- zero matching rows is NULL, not 0, in Postgres. That happens
+                 -- for real whenever a channel's most recent recorded day falls
+                 -- outside the 7-day window but inside the p_days display
+                 -- window. HealthRow declares these as `number` on the TS side,
+                 -- so an un-coalesced NULL crossed the API boundary against its
+                 -- own contract and rendered as the literal text "(null)" in the
+                 -- erroring chip. Fixed at the root, not the render site.
+                 coalesce(sum(h.opens)  filter (where h.date > current_date - 7), 0) as opens7d,
+                 coalesce(sum(h.loads)  filter (where h.date > current_date - 7), 0) as loads7d,
+                 coalesce(sum(h.errors) filter (where h.date > current_date - 7), 0) as errors7d,
                  array_agg(h.loads order by h.date) as spark
           from public.account_health_daily h
           where h.account_id = c.account_id
@@ -343,3 +351,45 @@ $$;
 
 revoke execute on function public.admin_health_board(int) from public, anon, authenticated;
 grant  execute on function public.admin_health_board(int) to service_role;
+
+-- Ruling R16 (fix round 1): the drill-down route's per-version breakdown was
+-- summing active_minutes in JS over a `.limit(100)`-bounded install_pings
+-- fetch. That is both a "never aggregate in JS" violation AND silently lossy
+-- on real accounts: install_pings is one row per account per ORIGIN per DAY,
+-- so a 30-day window costs 30 rows per origin — LA BEAUTÉ alone (3 live
+-- origins) already spends ~90 of the 100-row cap. Ordered last_seen_at desc,
+-- the rows that get truncated first are the OLDEST — exactly where a stale,
+-- un-updated widget_version would show up, so the "who's stuck on old code"
+-- signal degrades silently on the busiest accounts first. This function moves
+-- the aggregation into Postgres with no row cap.
+--
+-- Null widget_version is real, not a bug: pings recorded between Tasks 3 and
+-- 5 (before the version param existed) have none, and backfill_install_pings
+-- rows (from historical widget_events, no version info available) never will.
+-- Explicit choice: bucket both under the literal 'unknown' label, matching
+-- what the JS reduce() it replaces already did (`p.widget_version || 'unknown'`).
+--
+-- Same R9 posture as the four functions above: SECURITY INVOKER (the
+-- default — no `security definer`), search_path pinned, execute revoked from
+-- public/anon/authenticated and granted only to service_role. The only
+-- caller is the service-role client from @/lib/supabase used by
+-- /api/admin/health/[accountId].
+create or replace function public.account_install_versions(p_account_id uuid, p_since date)
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('version', version, 'loads', loads) order by loads desc), '[]'::jsonb)
+  from (
+    select coalesce(widget_version, 'unknown') as version,
+           sum(active_minutes) as loads
+    from public.install_pings
+    where account_id = p_account_id
+      and day >= p_since
+    group by coalesce(widget_version, 'unknown')
+  ) v;
+$$;
+
+revoke execute on function public.account_install_versions(uuid, date) from public, anon, authenticated;
+grant  execute on function public.account_install_versions(uuid, date) to service_role;
