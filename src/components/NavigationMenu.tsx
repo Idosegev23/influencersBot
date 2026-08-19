@@ -16,6 +16,7 @@ import {
   Instagram,
   Sun,
   Moon,
+  Paintbrush,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getDashboardStrings, dashboardDir, type DashboardLang } from '@/lib/i18n/dashboard';
@@ -27,7 +28,7 @@ const BRAND_LIKE_ARCHETYPES = new Set(['brand', 'local_business', 'b2b_saas']);
 
 type NavKey =
   | 'dashboard' | 'instagram' | 'analytics' | 'partnerships' | 'coupons' | 'products'
-  | 'conversations' | 'support' | 'attribution' | 'settings';
+  | 'conversations' | 'support' | 'attribution' | 'widget-editor' | 'settings';
 
 const BASE_NAV_ITEMS: {
   key: NavKey;
@@ -45,6 +46,7 @@ const BASE_NAV_ITEMS: {
   { key: 'conversations', icon: MessageCircle },
   { key: 'support', icon: LifeBuoy, brandOnly: true },
   { key: 'attribution', icon: TrendingUp, brandOnly: true },
+  { key: 'widget-editor', icon: Paintbrush },
   { key: 'settings', icon: Settings },
 ];
 
