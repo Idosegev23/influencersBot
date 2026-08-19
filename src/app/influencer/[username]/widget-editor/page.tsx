@@ -8,9 +8,11 @@ import {
   activeOverrides,
   resolveBanner,
   resolveInvitation,
+  todayInIsrael,
   MAX_INVITATION,
   MAX_REELS,
   type ResolvedBanner,
+  type BannerOverride,
 } from '@/lib/widget/banner';
 import { WidgetDraftPreview } from '@/components/influencer/WidgetDraftPreview';
 
@@ -75,6 +77,79 @@ const inputStyle = {
   border: '1px solid var(--dash-glass-border)',
 } as const;
 
+type OverrideBadge = 'active' | 'scheduled' | 'ended';
+
+const OVERRIDE_BADGE_LABEL: Record<OverrideBadge, string> = {
+  active: 'פעיל עכשיו',
+  scheduled: 'מתוזמן',
+  ended: 'הסתיים',
+};
+const OVERRIDE_BADGE_STYLE: Record<OverrideBadge, { bg: string; fg: string }> = {
+  active: { bg: '#DCFCE7', fg: '#15803D' },
+  scheduled: { bg: '#DBEAFE', fg: '#1D4ED8' },
+  ended: { bg: '#F3F4F6', fg: '#6B7280' },
+};
+
+/**
+ * 'active' / 'scheduled' / 'ended', computed with the same `activeOverrides`
+ * the real resolvers use — not a reimplementation of the date comparison. A
+ * single-entry, dates-untouched config is fed through it so the inclusive-
+ * `until` and surface-matching rules apply exactly as they do at render time
+ * (see `activeOverrides` in src/lib/widget/banner.ts: `until === today` is
+ * still open, which is what a customer means by "until Friday").
+ */
+function overrideBadgeState(row: BannerOverride): OverrideBadge {
+  const targetSurface = row.surface === 'chat' ? 'chat' : 'widget';
+  const isActive = activeOverrides({ overrides: [row] }, targetSurface).length > 0;
+  if (isActive) return 'active';
+  const today = todayInIsrael();
+  if (typeof row.until === 'string' && row.until < today) return 'ended';
+  return 'scheduled';
+}
+
+/** Reads one of the untyped copy fields (they fall under BannerOverride's index signature). */
+function overrideField(row: BannerOverride, field: 'eyebrow' | 'headline' | 'subline'): string {
+  const v = (row as Record<string, unknown>)[field];
+  return typeof v === 'string' ? v : '';
+}
+
+const OVERRIDE_FIELD_LABELS: [key: 'eyebrow' | 'headline' | 'subline' | 'teaser' | 'tooltip', label: string][] = [
+  ['eyebrow', 'תגית עילית'],
+  ['headline', 'כותרת ראשית'],
+  ['subline', 'שורת משנה'],
+  ['teaser', 'בועה שמופיעה מעצמה'],
+  ['tooltip', 'בועה ליד הכפתור הסגור'],
+];
+
+/** Which fields this row actually replaces — for the "מחליף: …" summary line. */
+function overrideFieldLabels(row: BannerOverride): string[] {
+  return OVERRIDE_FIELD_LABELS
+    .filter(([key]) => {
+      const v = (row as Record<string, unknown>)[key];
+      return typeof v === 'string' && v.trim().length > 0;
+    })
+    .map(([, label]) => label);
+}
+
+function overrideSurfaceLabel(surface: BannerOverride['surface']): string {
+  if (surface === 'widget') return 'ווידג׳ט בלבד';
+  if (surface === 'chat') return 'צ׳אט בלבד';
+  return 'ווידג׳ט וצ׳אט';
+}
+
+function overrideWindowLabel(row: BannerOverride): string {
+  return `${row.from || 'ללא תאריך התחלה'} – ${row.until || 'ללא תאריך סיום'}`;
+}
+
+function makeOverrideId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  } catch {
+    // fall through
+  }
+  return `promo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export default function WidgetEditorPage() {
   const params = useParams();
   const username = params.username as string;
@@ -108,6 +183,19 @@ export default function WidgetEditorPage() {
   // next unrelated save would shrink the account's rotation from 5 to 4
   // without the customer touching reel selection at all.
   const [selectedReels, setSelectedReels] = useState<{ video: string; poster: string | null }[]>([]);
+  // The scheduled-promotion rows — seeded RAW from config.overrides (same
+  // load moment as every other field on this page), edited directly (no
+  // resolved-value layer to seed from, see Task 8 brief invariant 3: these
+  // rows ARE the raw layer), and posted back as a top-level `overrides` key
+  // on save (invariant 1 — not nested under `widget`). Order matters: later
+  // entries win at render time (resolveBanner reduces the array in order),
+  // so every mutation below (add/edit/remove) must preserve the order of
+  // the rest of the array rather than re-sorting or rebuilding it.
+  const [overridesDraft, setOverridesDraft] = useState<BannerOverride[]>([]);
+  // Which row's "preview this promotion" control is active, or null. Forces
+  // that one row into the preview regardless of its dates (Step 4) — see
+  // `previewConfig` below for how the dates get ignored.
+  const [previewingOverrideIndex, setPreviewingOverrideIndex] = useState<number | null>(null);
   // What a visitor sees RIGHT NOW — the resolved banner/invitation, including
   // any live scheduled override. Used only for placeholder text, never to
   // seed an input's value (see the load effect below for why).
@@ -183,6 +271,15 @@ export default function WidgetEditorPage() {
 
         setResolvedBanner(resolveBanner(rawConfig, 'widget', { brandName: name }));
         setResolvedInvitation(resolveInvitation(rawConfig, 'widget'));
+
+        // Raw, unresolved — same reasoning as selectedReels above: these
+        // rows edit config.overrides directly, so there is no separate
+        // "resolved" value to seed from.
+        const rawOverrides: unknown[] = Array.isArray(rawConfig?.overrides) ? rawConfig.overrides : [];
+        setOverridesDraft(
+          rawOverrides.filter((o): o is BannerOverride => !!o && typeof o === 'object'),
+        );
+        setPreviewingOverrideIndex(null);
       } catch (err) {
         console.error('[widget-editor] failed to load account:', err);
       } finally {
@@ -226,6 +323,24 @@ export default function WidgetEditorPage() {
       if (prev.length >= MAX_REELS) return prev; // cap enforced — silently ignore, button is disabled anyway
       return [...prev, { video, poster: candidate.poster }];
     });
+  }
+
+  function addOverride() {
+    setOverridesDraft((rows) => [...rows, { id: makeOverrideId(), surface: 'both' }]);
+  }
+  function updateOverrideField(index: number, patch: Partial<BannerOverride>) {
+    setOverridesDraft((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+  function removeOverride(index: number) {
+    setOverridesDraft((rows) => rows.filter((_, i) => i !== index));
+    setPreviewingOverrideIndex((cur) => {
+      if (cur === null) return null;
+      if (cur === index) return null;
+      return cur > index ? cur - 1 : cur;
+    });
+  }
+  function togglePreviewOverride(index: number) {
+    setPreviewingOverrideIndex((cur) => (cur === index ? null : index));
   }
 
   // The list of starter questions the customer actually typed, trimmed and
@@ -279,6 +394,17 @@ export default function WidgetEditorPage() {
   // here rather than folded into bannerDraft.
   const previewConfig = useMemo(() => {
     if (!config) return null;
+    // Normally the preview reflects the current draft of every row, exactly
+    // as production will once the customer saves — a row inside its live
+    // window shows up, one outside it doesn't, later rows win over earlier
+    // ones (resolveBanner reduces in array order). "Preview this promotion"
+    // (Step 4) is the one exception: it isolates a single row and strips its
+    // dates so it always applies, regardless of whether its window is open
+    // today — otherwise a promotion can only be checked on the day it goes
+    // live, which is the day it's too late to fix a typo.
+    const overrides = previewingOverrideIndex !== null && overridesDraft[previewingOverrideIndex]
+      ? [{ ...overridesDraft[previewingOverrideIndex], from: undefined, until: undefined }]
+      : overridesDraft;
     return {
       ...config,
       // Account-level, not nested under `widget` (resolveArt reads
@@ -287,9 +413,10 @@ export default function WidgetEditorPage() {
       // above, so unlike the copy fields there's no separate fetch to wait
       // on here.
       reels: selectedReels,
+      overrides,
       widget: { ...(config.widget || {}), banner: bannerDraft, teaser, tooltip },
     };
-  }, [config, bannerDraft, teaser, tooltip, selectedReels]);
+  }, [config, bannerDraft, teaser, tooltip, selectedReels, overridesDraft, previewingOverrideIndex]);
 
   const previewDraft = useMemo(() => {
     if (!previewConfig) return null;
@@ -331,6 +458,11 @@ export default function WidgetEditorPage() {
           // the separate /api/influencer/reels candidate fetch, so there is
           // no "hasn't resolved yet" state to guard against here.
           reels: selectedReels,
+          // Top-level sibling of `widget`/`reels`, not nested under `widget`
+          // — /api/influencer/settings runs this through sanitizeOverrides,
+          // which drops malformed dates and content-free rows rather than
+          // storing them (see src/lib/widget/banner.ts).
+          overrides: overridesDraft,
         }),
       });
       if (res.ok) {
@@ -339,6 +471,7 @@ export default function WidgetEditorPage() {
               ...prev,
               widget: { ...(prev.widget || {}), banner: bannerDraft, teaser, tooltip },
               reels: selectedReels,
+              overrides: overridesDraft,
             }
           : prev);
         setSaved(true);
@@ -647,6 +780,218 @@ export default function WidgetEditorPage() {
                   {tooltip.length}/{MAX_INVITATION} תווים. שדה ריק יציג טקסט ברירת מחדל כללי.
                 </p>
               </div>
+            </div>
+
+            <div className="pt-4 border-t" style={{ borderColor: 'var(--dash-glass-border)' }}>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
+                  מבצעים מתוזמנים
+                </label>
+                <button
+                  type="button"
+                  onClick={addOverride}
+                  className="text-xs font-medium"
+                  style={{ color: 'var(--color-primary)' }}
+                >
+                  + הוספת מבצע
+                </button>
+              </div>
+              <p className="text-xs mb-3" style={{ color: 'var(--dash-text-3)' }}>
+                כל שדה במבצע הוא זמני: הוא מחליף את הבסיס למעלה רק בין התאריכים
+                שנבחרו, ואז חוזר לבד לברירת המחדל. שדה שנשאר ריק לא משנה כלום —
+                אין צורך למלא הכול.
+              </p>
+
+              {overridesDraft.length === 0 ? (
+                <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>אין מבצעים מתוזמנים.</p>
+              ) : (
+                <div className="space-y-3">
+                  {overridesDraft.map((row, index) => {
+                    const badge = overrideBadgeState(row);
+                    const fieldLabels = overrideFieldLabels(row);
+                    const isPreviewing = previewingOverrideIndex === index;
+                    return (
+                      <div
+                        key={row.id || index}
+                        className="rounded-lg border p-3"
+                        style={{
+                          borderColor: 'var(--dash-glass-border)',
+                          background: 'var(--dash-bar)',
+                          opacity: badge === 'ended' ? 0.55 : 1,
+                        }}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[11px] font-medium"
+                              style={{
+                                background: OVERRIDE_BADGE_STYLE[badge].bg,
+                                color: OVERRIDE_BADGE_STYLE[badge].fg,
+                              }}
+                            >
+                              {OVERRIDE_BADGE_LABEL[badge]}
+                            </span>
+                            <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                              {overrideWindowLabel(row)}
+                            </span>
+                            <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                              · {overrideSurfaceLabel(row.surface)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => togglePreviewOverride(index)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium"
+                              style={{
+                                background: isPreviewing ? 'var(--color-primary)' : 'var(--dash-bar)',
+                                color: isPreviewing ? '#fff' : 'var(--dash-text)',
+                                border: '1px solid var(--dash-glass-border)',
+                              }}
+                            >
+                              {isPreviewing ? 'מוצג בתצוגה המקדימה' : 'תצוגה מקדימה של המבצע'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeOverride(index)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium"
+                              style={{ color: '#dc2626', border: '1px solid var(--dash-glass-border)' }}
+                            >
+                              הסרה
+                            </button>
+                          </div>
+                        </div>
+
+                        {fieldLabels.length > 0 ? (
+                          <p className="text-xs mb-2" style={{ color: 'var(--dash-text-3)' }}>
+                            מחליף: {fieldLabels.join(', ')}
+                          </p>
+                        ) : (
+                          <p className="text-xs mb-2" style={{ color: 'var(--dash-text-3)' }}>
+                            לא הוגדר שום שדה — המבצע לא ישנה כלום עד שיתמלא לפחות שדה אחד.
+                          </p>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                              מתאריך
+                            </label>
+                            <input
+                              type="date"
+                              value={row.from || ''}
+                              onChange={(e) => updateOverrideField(index, { from: e.target.value || undefined })}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              style={inputStyle}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                              עד תאריך
+                            </label>
+                            <input
+                              type="date"
+                              value={row.until || ''}
+                              onChange={(e) => updateOverrideField(index, { until: e.target.value || undefined })}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              style={inputStyle}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mb-2">
+                          <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                            איפה מוצג
+                          </label>
+                          <select
+                            value={row.surface || 'both'}
+                            onChange={(e) => updateOverrideField(index, { surface: e.target.value as BannerOverride['surface'] })}
+                            className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                            style={inputStyle}
+                          >
+                            <option value="both">ווידג׳ט וצ׳אט</option>
+                            <option value="widget">ווידג׳ט בלבד</option>
+                            <option value="chat">צ׳אט בלבד</option>
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                              תגית עילית
+                            </label>
+                            <input
+                              type="text"
+                              value={overrideField(row, 'eyebrow')}
+                              maxLength={MAX_EYEBROW}
+                              placeholder="ללא שינוי"
+                              onChange={(e) => updateOverrideField(index, { eyebrow: e.target.value })}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              style={inputStyle}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                              כותרת ראשית
+                            </label>
+                            <input
+                              type="text"
+                              value={overrideField(row, 'headline')}
+                              maxLength={MAX_HEADLINE}
+                              placeholder="ללא שינוי"
+                              onChange={(e) => updateOverrideField(index, { headline: e.target.value })}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              style={inputStyle}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                              שורת משנה
+                            </label>
+                            <input
+                              type="text"
+                              value={overrideField(row, 'subline')}
+                              maxLength={MAX_SUBLINE}
+                              placeholder="ללא שינוי"
+                              onChange={(e) => updateOverrideField(index, { subline: e.target.value })}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              style={inputStyle}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                              בועה שמופיעה מעצמה
+                            </label>
+                            <input
+                              type="text"
+                              value={row.teaser || ''}
+                              maxLength={MAX_INVITATION}
+                              placeholder="ללא שינוי"
+                              onChange={(e) => updateOverrideField(index, { teaser: e.target.value })}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              style={inputStyle}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                              בועה ליד הכפתור הסגור
+                            </label>
+                            <input
+                              type="text"
+                              value={row.tooltip || ''}
+                              maxLength={MAX_INVITATION}
+                              placeholder="ללא שינוי"
+                              onChange={(e) => updateOverrideField(index, { tooltip: e.target.value })}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              style={inputStyle}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {error ? (
