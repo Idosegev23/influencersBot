@@ -74,3 +74,24 @@ create index if not exists account_health_daily_date on public.account_health_da
 alter table public.account_contracts    enable row level security;
 alter table public.install_pings        enable row level security;
 alter table public.account_health_daily enable row level security;
+
+-- Task 2: recordInstallPing() RPC (src/lib/telemetry/install-ping.ts). security
+-- definer is intentional — the recorder runs on the service-role client which
+-- already bypasses RLS, but the RPC must also work if that ever changes.
+create or replace function public.upsert_install_ping(
+  p_account_id uuid,
+  p_origin text,
+  p_widget_version text,
+  p_sample_path text
+) returns void language plpgsql security definer as $$
+begin
+  insert into public.install_pings
+    (account_id, origin, day, first_seen_at, last_seen_at, active_minutes, widget_version, sample_path)
+  values
+    (p_account_id, p_origin, current_date, now(), now(), 1, p_widget_version, p_sample_path)
+  on conflict (account_id, origin, day) do update set
+    last_seen_at   = now(),
+    active_minutes = public.install_pings.active_minutes + 1,
+    widget_version = coalesce(excluded.widget_version, public.install_pings.widget_version),
+    sample_path    = coalesce(public.install_pings.sample_path, excluded.sample_path);
+end $$;
