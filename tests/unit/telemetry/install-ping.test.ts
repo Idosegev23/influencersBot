@@ -111,11 +111,12 @@ describe('recordInstallPing', () => {
     })).resolves.toBe('skipped');
   });
 
-  // Fix 3 (whole-branch review, 2026-08-19): our own preview/demo/editor
-  // surfaces load the real widget.js against a real account-id — that must
-  // never manufacture install evidence. See the comment on recordInstallPing
-  // for the two-signal rationale.
-  describe('preview-surface filtering (Fix 3)', () => {
+  // Fix 3 (whole-branch review, 2026-08-19), amended by Ruling R19: our own
+  // preview/demo/editor surfaces load the real widget.js against a real
+  // account-id — that must never manufacture install evidence. Origin
+  // identity (self-load) is the ONLY signal used — see the comment on
+  // recordInstallPing for why a referer-path check was tried and removed.
+  describe('preview-surface filtering (Fix 3 / R19)', () => {
     beforeEach(() => {
       redisMock.isRedisAvailable.mockReturnValue(true);
       redisMock.redisSetNx.mockResolvedValue(true);
@@ -169,49 +170,31 @@ describe('recordInstallPing', () => {
       expect(rpcMock).not.toHaveBeenCalled();
     });
 
-    it('skips via the referer-path backstop even when origins differ (proxy-injected page)', async () => {
-      // The widget-preview PROXY fetches the customer's real site and
-      // injects widget.js into it, so the ping's own origin *could* differ
-      // from requestOrigin in a future variant of this surface. Path match
-      // alone must still catch it.
+    // Ruling R19 regression coverage: a referer-path check (removed) would
+    // have silently swallowed these. `path` is the pathname of the
+    // CUSTOMER'S OWN page, not ours — a "book a demo" landing page under
+    // /demo/... or a back-office under /admin/... on the customer's own
+    // domain must still be RECORDED, because the request's actual origin is
+    // genuinely the customer's, not ours.
+    it('records a genuine customer origin even when its own page path starts with /admin/', async () => {
       const r = await recordInstallPing({
         accountId: 'acc-1',
-        origin: 'https://some-customer-domain.com',
-        referer: 'https://app.bestie.ai/api/widget/preview/acc-1?path=/',
-        path: '/api/widget/preview/acc-1',
+        origin: 'https://argania-oil.co.il',
+        referer: 'https://argania-oil.co.il/admin/inventory',
+        path: '/admin/inventory',
         widgetVersion: '4.0',
         requestOrigin: 'https://app.bestie.ai',
       });
-      expect(r).toBe('skipped');
-      expect(rpcMock).not.toHaveBeenCalled();
+      expect(r).toBe('written');
+      expect(rpcMock).toHaveBeenCalledOnce();
     });
 
-    it('skips /widget-preview, /admin/, and localhost preview paths', async () => {
-      for (const path of ['/widget-preview', '/admin/websites/acc-1/preview', '/demo/acc-1']) {
-        rpcMock.mockClear();
-        const r = await recordInstallPing({
-          accountId: 'acc-1',
-          origin: 'http://localhost:3001',
-          referer: `http://localhost:3001${path}`,
-          path,
-          widgetVersion: '4.0',
-          requestOrigin: 'http://localhost:3001',
-        });
-        expect(r).toBe('skipped');
-        expect(rpcMock).not.toHaveBeenCalled();
-      }
-    });
-
-    it('does not skip a real customer path that merely contains "admin" mid-segment', async () => {
-      // Guard against an overly loose prefix match: PREVIEW_PATH_PREFIXES
-      // checks startsWith, so a genuine customer path like /administration
-      // (not one of our routes) must NOT be caught by the '/admin/' prefix
-      // requiring a trailing slash boundary.
+    it('records a genuine customer origin even when its own page path starts with /demo/', async () => {
       const r = await recordInstallPing({
         accountId: 'acc-1',
-        origin: 'https://some-customer-domain.com',
-        referer: 'https://some-customer-domain.com/administration/dashboard',
-        path: '/administration/dashboard',
+        origin: 'https://studiopasha.co.il',
+        referer: 'https://studiopasha.co.il/demo/book-a-call',
+        path: '/demo/book-a-call',
         widgetVersion: '4.0',
         requestOrigin: 'https://app.bestie.ai',
       });

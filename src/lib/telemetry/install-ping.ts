@@ -35,44 +35,47 @@ function cleanPath(p: string | null): string | null {
   return p.split('?')[0].slice(0, 512);
 }
 
-// Fix 3 (whole-branch review, 2026-08-19): our own preview/demo/editor
-// surfaces load the REAL public/widget.js against a REAL data-account-id —
-// that's the whole point of them (single source of truth, no reimplemented
-// drift-prone copy). But that means every one of them also hits
-// /api/widget/config exactly like a genuine embed does, manufacturing install
-// evidence for an account nobody actually installed anything on. Verified in
-// production: /api/widget/preview/[accountId] and /widget-preview pings
-// landed in install_pings with sample_path starting with those routes.
+// Fix 3 (whole-branch review, 2026-08-19), amended by Ruling R19: our own
+// preview/demo/editor surfaces load the REAL public/widget.js against a REAL
+// data-account-id — that's the whole point of them (single source of truth,
+// no reimplemented drift-prone copy). But that means every one of them also
+// hits /api/widget/config exactly like a genuine embed does, manufacturing
+// install evidence for an account nobody actually installed anything on.
+// Verified in production: /api/widget/preview/[accountId] and
+// /widget-preview pings landed in install_pings with sample_path starting
+// with those routes.
 //
-// Two independent, ORed signals are enough to catch every known surface
-// (/api/widget/preview/[accountId], /widget-preview, /demo/[id],
-// /admin/websites/[id]/preview, and the manage/[token] widget editor iframe):
+// ORIGIN IDENTITY IS THE ONLY SIGNAL USED HERE. The ping's own normalized
+// origin is compared against the origin that served THIS /api/widget/config
+// request (requestOrigin). Every preview surface — the widget-preview proxy
+// (/api/widget/preview/[accountId]), /widget-preview, /demo/[id],
+// /admin/websites/[id]/preview, and the manage/[token] widget editor iframe —
+// loads widget.js via `${window.location.origin}/widget.js` or
+// `req.nextUrl.origin`, i.e. our own app loading its own script against
+// itself from a page whose document.location is our own domain. So the
+// resulting Origin/Referer host is necessarily wherever the CURRENT
+// deployment is being served from (localhost in dev, a Vercel preview
+// domain, or whatever hostname/alias admin is using in prod — even a
+// customer-branded alias like bestie.ldrsgroup.com, which is exactly why
+// this check is self-referential instead of a hardcoded allowlist). A real
+// customer's storefront origin can never equal the origin serving our own
+// Next.js app. This covers the widget-preview PROXY too: it serves the
+// injected HTML from OUR OWN route, so the browser's document.location — and
+// therefore the Origin/Referer the config fetch carries — is our origin
+// regardless of whose site content got proxied into the page.
 //
-//   1. the ping's own normalized origin equals the origin that served THIS
-//      /api/widget/config request. Every preview surface loads widget.js via
-//      `${window.location.origin}/widget.js` or `req.nextUrl.origin` — i.e.
-//      our own app loading its own script against itself — so the resulting
-//      Origin/Referer host is necessarily wherever the CURRENT deployment is
-//      being served from (localhost:3001 in dev, a Vercel preview domain, or
-//      whatever hostname/alias admin is using in prod — even a customer-
-//      branded alias like bestie.ldrsgroup.com, which is exactly why this
-//      check is self-referential instead of a hardcoded allowlist). A real
-//      customer's storefront origin can never equal the origin serving our
-//      own Next.js app.
-//   2. the referer PATH starts with one of our known preview routes. This
-//      catches the one case signal 1 can legitimately miss: the widget
-//      preview PROXY (/api/widget/preview/[accountId]) fetches the
-//      customer's real site and injects widget.js into it — so the
-//      config-fetching browser tab's location is our proxy path, but nothing
-//      stops a future surface built the same way from putting the widget on
-//      a different visible origin. Path match is a cheap, reliable backstop.
-const PREVIEW_PATH_PREFIXES = ['/api/widget/preview', '/widget-preview', '/demo/', '/admin/'];
-
-function isPreviewSurface(path: string | null): boolean {
-  if (!path) return false;
-  return PREVIEW_PATH_PREFIXES.some((p) => path.startsWith(p));
-}
-
+// A previous revision of this function also matched on the referer PATH
+// (e.g. any request whose referer started with `/admin/` or `/demo/`) as a
+// second, independent signal. Ruling R19 removed it: `path` is
+// `new URL(referer).pathname`, and for a GENUINE customer embed that path is
+// the pathname of the CUSTOMER'S OWN PAGE — entirely outside our control. A
+// real paying customer with a "book a demo" landing page at `/demo/...` or a
+// back-office at `/admin/...` (both common) would have had every install
+// ping from that page silently skipped, with no error and no row to audit
+// afterwards — reading as never-installed on the health board, the single
+// worst failure mode this feature exists to prevent. Do not re-add a
+// referer-path check for this reason: origin identity is the only signal
+// that cannot collide with a customer's own site structure.
 export async function recordInstallPing(input: {
   accountId: string;
   origin: string | null;
@@ -88,7 +91,6 @@ export async function recordInstallPing(input: {
   if (input.requestOrigin && origin === normalizeOrigin(input.requestOrigin, null)) {
     return 'skipped';
   }
-  if (isPreviewSurface(input.path)) return 'skipped';
 
   // One write per account+origin per minute. redisSetNx returns false BOTH when
   // the key exists AND when Redis is unavailable, so we must ask isRedisAvailable()
