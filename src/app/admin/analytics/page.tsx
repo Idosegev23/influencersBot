@@ -88,6 +88,12 @@ export default function AdminAnalyticsIndexPage() {
             >
               עלויות WhatsApp →
             </Link>
+            <Link
+              href="/admin/health"
+              className="px-3 py-1 rounded text-sm bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200"
+            >
+              בריאות לקוחות →
+            </Link>
             <input
               type="text"
               value={filter}
