@@ -332,7 +332,7 @@ export function sanitizeOverrides(input: unknown): BannerOverride[] {
   return out;
 }
 
-const MAX_INVITATION = 140;
+export const MAX_INVITATION = 140;
 
 export interface ResolvedInvitation {
   /** Proactive bubble copy. null = keep the locale default in widget.js. */
