@@ -1291,6 +1291,10 @@
   // playing reel alone. Empty until the first draft arrives.
   var previewReelSig = null;
 
+  // Fingerprint of the last draft actually applied — see the dedupe guard in
+  // the message handler below.
+  var previewLastDraft = null;
+
   // render() rewrites container.innerHTML, so the <video> node the customer
   // was watching is gone and a fresh one starts at 0. Putting it back where
   // it was is the difference between "the preview updated" and "the preview
@@ -1331,6 +1335,17 @@
       var msg = ev && ev.data;
       if (!msg || msg.type !== 'ibot:draft' || !msg.config) return;
       try {
+        // Applying a draft costs a full render(), so an unchanged one must
+        // cost nothing. This is not just an optimisation: an editor page
+        // still running the pre-handshake code re-posts the SAME draft every
+        // 400ms, and without this guard that repaints the widget twice a
+        // second forever — the strobing this whole path was fixed for. The
+        // guard makes the flicker impossible from the widget's side, whatever
+        // version of the editor is driving it.
+        var fingerprint;
+        try { fingerprint = JSON.stringify(msg.config) + '|' + String(msg.view || ''); } catch (e) { fingerprint = null; }
+        if (fingerprint !== null && fingerprint === previewLastDraft) return;
+        previewLastDraft = fingerprint;
         if (msg.config.banner !== undefined) config.banner = msg.config.banner;
         if (msg.config.invitation !== undefined) config.invitation = msg.config.invitation;
         if (typeof msg.config.primaryColor === 'string'
