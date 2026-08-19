@@ -1295,6 +1295,9 @@
   // the message handler below.
   var previewLastDraft = null;
 
+  // Structure of the banner currently on screen — see bannerStructureSignature.
+  var previewStructSig = null;
+
   // render() rewrites container.innerHTML, so the <video> node the customer
   // was watching is gone and a fresh one starts at 0. Putting it back where
   // it was is the difference between "the preview updated" and "the preview
@@ -1316,6 +1319,39 @@
     if (body.length === 3) return '#' + body[0] + body[0] + body[1] + body[1] + body[2] + body[2];
     if (body.length >= 6) return '#' + body.slice(0, 6);
     return null;
+  }
+
+  // Everything about a banner EXCEPT the three copy strings. If this is
+  // unchanged between two drafts, the difference is text only and the three
+  // nodes can be rewritten in place — no render(), so nothing else in the
+  // widget is torn down and rebuilt.
+  function bannerStructureSignature(banner, view) {
+    if (!banner) return 'none|' + String(view || '');
+    var parts = [
+      banner.enabled === false ? '0' : '1',
+      // Presence, not content: an eyebrow appearing or disappearing adds or
+      // removes a node, which patching cannot do.
+      banner.eyebrow ? 'e' : '-',
+      banner.subline ? 's' : '-',
+      JSON.stringify(banner.art || null),
+      JSON.stringify(banner.cta || null),
+      JSON.stringify(banner.starters || null),
+      String(view || ''),
+    ];
+    return parts.join('|');
+  }
+
+  // Applies a text-only change directly to the DOM. Returns false when the
+  // change needs a real render — the caller then falls back to one.
+  function patchBannerText(banner) {
+    var head = document.getElementById('ibot-banner-headline');
+    if (!head) return false;   // banner not currently on screen (collapsed strip, panel closed)
+    head.textContent = banner.headline || '';
+    var eyebrow = document.getElementById('ibot-banner-eyebrow');
+    if (eyebrow) eyebrow.textContent = banner.eyebrow || '';
+    var subline = document.getElementById('ibot-banner-subline');
+    if (subline) subline.textContent = banner.subline || '';
+    return true;
   }
 
   function reelSignature(banner) {
@@ -1364,6 +1400,18 @@
         var resumeAt = priorVideo ? priorVideo.currentTime : 0;
         applyLocaleAssets();
         bannerViewTracked = true;   // a draft is not a visitor impression
+
+        // Typing a headline changes three characters of text, so it should
+        // cost three characters of DOM work. render() rewrites the whole
+        // widget — every keystroke tore down the avatar, the chips, the
+        // video and the thread and built them again, which is what reads as
+        // flicker even at one render per letter. When only the copy changed,
+        // patch the copy.
+        var structSig = bannerStructureSignature(config.banner, msg.view);
+        if (structSig === previewStructSig && patchBannerText(config.banner || {})) {
+          return;
+        }
+        previewStructSig = structSig;
         if (msg.view === 'teaser' || msg.view === 'tooltip') {
           // Calling both bubble renderers at once always converges on the
           // teaser (no empty-text bail, unconditionally clears any tooltip
@@ -1730,13 +1778,13 @@
       bannerVideoHtml() +
       '<div style="position:relative;display:flex;flex-direction:column;align-items:flex-start;text-align:start;">' +
       (b.eyebrow
-        ? '<div style="font-size:11.5px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;' +
+        ? '<div id="ibot-banner-eyebrow" style="font-size:11.5px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;' +
           'color:var(--ibot-on-banner-dim);margin-bottom:6px;">' + escapeHtml(b.eyebrow) + '</div>'
         : '') +
-      '<div style="font-size:' + (isMobile ? '21px' : '25px') + ';line-height:1.18;font-weight:800;' +
+      '<div id="ibot-banner-headline" style="font-size:' + (isMobile ? '21px' : '25px') + ';line-height:1.18;font-weight:800;' +
       'color:var(--ibot-on-banner);text-shadow:0 1px 12px rgba(0,0,0,0.25);">' + escapeHtml(b.headline) + '</div>' +
       (b.subline
-        ? '<div style="font-size:13.5px;line-height:1.45;font-weight:400;margin-top:7px;' +
+        ? '<div id="ibot-banner-subline" style="font-size:13.5px;line-height:1.45;font-weight:400;margin-top:7px;' +
           'color:var(--ibot-on-banner-dim);">' + escapeHtml(b.subline) + '</div>'
         : '') +
       bannerCtaHtml() +
