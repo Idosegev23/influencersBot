@@ -385,14 +385,30 @@ And in the teaser text selection inside `showTeaser`, replace the assignment of 
 
 - [ ] **Step 7: Verify in a browser**
 
-Set a teaser on the demo account, then load the preview:
+Set a tooltip on the demo account, run the dev server, and check the bubble.
 
-```bash
-npm run dev  # separate shell
-node -e "0" # placeholder; use the DB to set config.widget.teaser = 'בדיקה'
+```sql
+-- danielamit
+update accounts
+set config = jsonb_set(config, '{widget,tooltip}', '"בדיקת טולטיפ"'::jsonb, true)
+where id = '038fd490-906d-431f-b428-ff9203ce4968';
 ```
 
-Run a Playwright check from the repo root (not the scratchpad — `@playwright/test` will not resolve there) against `http://localhost:3000/api/widget/preview/038fd490-906d-431f-b428-ff9203ce4968`, assert `document.getElementById('ibot-tip').innerText` contains the configured text.
+```js
+// widget-check.mjs — run from the REPO ROOT; @playwright/test will not
+// resolve from the scratchpad directory.
+import { chromium } from '@playwright/test';
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
+await p.goto('http://localhost:3000/api/widget/preview/038fd490-906d-431f-b428-ff9203ce4968',
+  { waitUntil: 'domcontentloaded' });
+await p.waitForTimeout(9000);
+console.log(await p.evaluate(() => document.getElementById('ibot-tip')?.innerText || 'NO TIP'));
+await b.close();
+```
+
+Expected: the output contains `בדיקת טולטיפ`. Then revert the SQL with
+`config #- '{widget,tooltip}'`.
 
 - [ ] **Step 8: Commit**
 
