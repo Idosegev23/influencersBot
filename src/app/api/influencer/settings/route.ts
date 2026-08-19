@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
+import { sanitizeOverrides, MAX_REELS } from '@/lib/widget/banner';
 
 const COOKIE_PREFIX = 'influencer_session_';
 
@@ -54,6 +55,18 @@ export async function POST(req: NextRequest) {
         ...(currentConfig.widget || {}),
         ...body.widget,
       };
+    }
+
+    // Account-level, not per-surface: an override applies to whichever
+    // surfaces it names, and the reel rotation is shared by both.
+    if (body.overrides !== undefined) {
+      updatedConfig.overrides = sanitizeOverrides(body.overrides);
+    }
+    if (Array.isArray(body.reels)) {
+      updatedConfig.reels = body.reels
+        .filter((r: any) => r && typeof r.video === 'string' && /^https:\/\//.test(r.video))
+        .slice(0, MAX_REELS)
+        .map((r: any) => ({ video: r.video, poster: typeof r.poster === 'string' ? r.poster : null }));
     }
 
     // Theme (colors, fonts, darkMode)

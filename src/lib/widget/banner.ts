@@ -74,7 +74,7 @@ const MAX_HEADLINE = 70;
 const MAX_SUBLINE = 110;
 const MAX_STARTERS = 4;
 /** Rotation cap. Each reel is a few MB of stored mp4 and a config payload row. */
-const MAX_REELS = 5;
+export const MAX_REELS = 5;
 /** Bestie's brand purple — the same value `--color-primary` carries in globals.css. */
 export const BESTIE_PRIMARY = '#9334EB';
 
@@ -265,6 +265,57 @@ export function activeOverrides(
     if (typeof o.until === 'string' && o.until < today) return false;
     return true;
   });
+}
+
+const MAX_OVERRIDES = 20;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Validate overrides on the way in. A malformed date is dropped rather than
+ * stored, because an unparseable `until` reads as "no upper bound" at render
+ * time — a promotion that never ends, with no error anywhere to explain it.
+ */
+export function sanitizeOverrides(input: unknown): BannerOverride[] {
+  if (!Array.isArray(input)) return [];
+  const out: BannerOverride[] = [];
+
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue;
+    const o = raw as Record<string, unknown>;
+
+    const from = typeof o.from === 'string' && ISO_DATE.test(o.from) ? o.from : undefined;
+    const until = typeof o.until === 'string' && ISO_DATE.test(o.until) ? o.until : undefined;
+    if (from && until && until < from) continue;
+
+    const surface: BannerOverride['surface'] =
+      o.surface === 'widget' || o.surface === 'chat' ? o.surface : 'both';
+
+    const entry: BannerOverride = { surface };
+    if (from) entry.from = from;
+    if (until) entry.until = until;
+    if (typeof o.id === 'string' && o.id.trim()) entry.id = o.id.trim().slice(0, 60);
+
+    const eyebrow = copy(o.eyebrow, MAX_EYEBROW);
+    const headline = copy(o.headline, MAX_HEADLINE);
+    const subline = copy(o.subline, MAX_SUBLINE);
+    const teaser = copy(o.teaser, MAX_INVITATION);
+    const tooltip = copy(o.tooltip, MAX_INVITATION);
+    if (eyebrow) entry.eyebrow = eyebrow;
+    if (headline) entry.headline = headline;
+    if (subline) entry.subline = subline;
+    if (teaser) entry.teaser = teaser;
+    if (tooltip) entry.tooltip = tooltip;
+
+    const starters = resolveStarters(o.starters);
+    if (starters) entry.starters = starters;
+
+    const hasContent = eyebrow || headline || subline || teaser || tooltip || starters;
+    if (!hasContent) continue;
+
+    out.push(entry);
+    if (out.length >= MAX_OVERRIDES) break;
+  }
+  return out;
 }
 
 const MAX_INVITATION = 140;
