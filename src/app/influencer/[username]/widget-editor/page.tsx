@@ -34,8 +34,23 @@ interface ReelCandidate {
   poster: string | null;
   /** null = never persisted (scripts/persist-reel-videos.ts hasn't run for it) — not selectable. */
   video: string | null;
-  /** Whether this shortcode is currently in config.reels (the raw, saved selection). */
+  /**
+   * Whether this shortcode is currently in config.reels. Informational only
+   * — NOT used to seed or drive the picker's checked state (see
+   * `selectedReels` below): that's what made an aged-out reel invisible in
+   * the first place, since this flag only exists on rows the route already
+   * decided to return.
+   */
   selected: boolean;
+  /**
+   * True when there is no live `instagram_posts` row for this shortcode
+   * (the underlying Instagram post was deleted, or similar) — the route
+   * still returns a tile for it, built from the poster/video already stored
+   * in config.reels, so a selected-but-orphaned reel can always be seen and
+   * deselected rather than becoming a silent 5/5-with-only-4-checked dead
+   * end.
+   */
+  postMissing: boolean;
 }
 
 /**
@@ -148,14 +163,22 @@ export default function WidgetEditorPage() {
         // (src/lib/widget/banner.ts). Raw, not resolved: reels have no
         // override/promotion layer, so this already IS the value a visitor
         // gets right now.
+        //
+        // NOT capped to MAX_REELS on seed — scripts/persist-reel-videos.ts's
+        // --shortcodes= path is uncapped and writes straight to config.reels,
+        // bypassing /api/influencer/settings' own MAX_REELS slice, so a
+        // stored array CAN be over-cap. Seeding the full array and enforcing
+        // the cap only when the customer ADDS a selection (toggleReel below)
+        // means an over-cap account is visibly over-cap and removable down to
+        // the limit here, rather than silently trimmed on the first save —
+        // even a no-interaction one.
         const rawReels: unknown[] = Array.isArray(rawConfig?.reels) ? rawConfig.reels : [];
         const isReel = (r: unknown): r is { video: string; poster?: unknown } =>
           !!r && typeof r === 'object' && typeof (r as { video?: unknown }).video === 'string';
         setSelectedReels(
           rawReels
             .filter(isReel)
-            .map((r) => ({ video: r.video, poster: typeof r.poster === 'string' ? r.poster : null }))
-            .slice(0, MAX_REELS),
+            .map((r) => ({ video: r.video, poster: typeof r.poster === 'string' ? r.poster : null })),
         );
 
         setResolvedBanner(resolveBanner(rawConfig, 'widget', { brandName: name }));
@@ -539,7 +562,13 @@ export default function WidgetEditorPage() {
                           type="button"
                           onClick={() => toggleReel(candidate)}
                           disabled={disabled}
-                          title={!isPlayable ? 'הסרטון הזה עוד לא עובד לשידור — הוא יופיע כאן כשיהיה מוכן' : undefined}
+                          title={
+                            !isPlayable
+                              ? 'הסרטון הזה עוד לא עובד לשידור — הוא יופיע כאן כשיהיה מוכן'
+                              : candidate.postMissing
+                              ? 'הפוסט המקורי כבר לא באינסטגרם, אבל הסרטון הזה עדיין מוצג בווידג׳ט'
+                              : undefined
+                          }
                           className="relative aspect-square rounded-lg overflow-hidden"
                           style={{
                             border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--dash-glass-border)',
@@ -562,6 +591,14 @@ export default function WidgetEditorPage() {
                               style={{ background: 'var(--color-primary)', color: '#fff' }}
                             >
                               <Check className="w-3 h-3" />
+                            </span>
+                          ) : null}
+                          {candidate.postMissing ? (
+                            <span
+                              className="absolute bottom-0 inset-x-0 text-center text-[9px] leading-tight px-0.5 py-0.5"
+                              style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+                            >
+                              לא באינסטגרם
                             </span>
                           ) : null}
                         </button>
