@@ -114,3 +114,122 @@ end $$;
 
 revoke execute on function public.upsert_install_ping(uuid, text, text, text) from public, anon, authenticated;
 grant  execute on function public.upsert_install_ping(uuid, text, text, text) to service_role;
+
+-- Task 8: nightly rollup facts. Returns per-channel raw facts for one account
+-- and day, as a single jsonb object keyed by channel — one round trip per
+-- account instead of four, and aggregated in Postgres never in JS (PostgREST
+-- caps a row fetch at 1000, which is the bug that silently truncated counts
+-- for high-volume accounts before). Same security posture as
+-- upsert_install_ping above (Ruling R9): the only caller is the service-role
+-- client from @/lib/supabase, which already bypasses RLS, so SECURITY DEFINER
+-- would only add an escalation vector for no benefit. Runs SECURITY INVOKER
+-- (the default) with search_path pinned.
+create or replace function public.account_health_facts(p_account_id uuid, p_day date)
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  with ping as (
+    select max(last_seen_at) as last_seen,
+           bool_or(true)     as ever,
+           count(distinct origin) as origins,
+           coalesce(sum(active_minutes), 0) as minutes
+    from public.install_pings
+    where account_id = p_account_id and day <= p_day
+  ),
+  wev as (
+    select count(*) filter (where type = 'widget_loaded'
+             and created_at > (p_day + 1)::timestamptz - interval '24 hours') as loads_24h,
+           count(*) filter (where type = 'widget_opened'
+             and created_at > (p_day + 1)::timestamptz - interval '7 days')    as opens_7d,
+           count(*) filter (where type in ('client_error','config_load_failed','csp_blocked')
+             and created_at > (p_day + 1)::timestamptz - interval '24 hours') as errors_24h,
+           count(*) filter (where type = 'widget_message_sent'
+             and created_at::date = p_day)                                    as messages
+    from public.widget_events
+    where account_id = p_account_id and created_at > (p_day + 1)::timestamptz - interval '8 days'
+  ),
+  sess as (
+    select count(*) as n from public.chat_sessions
+    where account_id = p_account_id and created_at::date = p_day
+  ),
+  wa as (
+    select count(*) as n, max(last_activity_at) as last_seen
+    from public.whatsapp_cs_sessions
+    where active_account_id = p_account_id and last_activity_at::date = p_day
+  )
+  select jsonb_build_object(
+    'widget', jsonb_build_object(
+      'everPinged', coalesce((select ever from ping), false),
+      'hoursSinceLastPing', (select extract(epoch from (now() - last_seen)) / 3600 from ping),
+      'opensLast7d', (select opens_7d from wev),
+      'errorsLast24h', (select errors_24h from wev),
+      'loadsLast24h', (select loads_24h from wev),
+      'activeMinutes', (select minutes from ping),
+      'distinctOrigins', (select origins from ping),
+      'messages', (select messages from wev),
+      'sessions', (select n from sess)
+    ),
+    'chat_page', jsonb_build_object(
+      'everPinged', (select n from sess) > 0,
+      'hoursSinceLastPing', case when (select n from sess) > 0 then 0 else null end,
+      'opensLast7d', (select n from sess),
+      'errorsLast24h', 0, 'loadsLast24h', (select n from sess),
+      'activeMinutes', 0, 'distinctOrigins', 0, 'messages', 0,
+      'sessions', (select n from sess)
+    ),
+    'whatsapp', jsonb_build_object(
+      'everPinged', (select n from wa) > 0,
+      'hoursSinceLastPing',
+        (select extract(epoch from (now() - last_seen)) / 3600 from wa),
+      'opensLast7d', (select n from wa),
+      'errorsLast24h', 0, 'loadsLast24h', (select n from wa),
+      'activeMinutes', 0, 'distinctOrigins', 0, 'messages', (select n from wa),
+      'sessions', (select n from wa)
+    ),
+    'instagram', jsonb_build_object(
+      'everPinged', false, 'hoursSinceLastPing', null,
+      'opensLast7d', 0, 'errorsLast24h', 0, 'loadsLast24h', 0,
+      'activeMinutes', 0, 'distinctOrigins', 0, 'messages', 0, 'sessions', 0
+    )
+  );
+$$;
+
+revoke execute on function public.account_health_facts(uuid, date) from public, anon, authenticated;
+grant  execute on function public.account_health_facts(uuid, date) to service_role;
+
+-- Task 8: one-time backfill of install_pings from the widget_loaded events
+-- already sitting in widget_events, so the health board isn't born
+-- all-never_installed on day one (see scripts/backfill-install-history.ts for
+-- the full rationale and the synthetic-origin caveat). Same R9 posture as the
+-- two functions above: SECURITY INVOKER, search_path pinned, execute revoked
+-- from public/anon/authenticated and granted only to service_role — the only
+-- caller is the one-time backfill script's service-role client.
+create or replace function public.backfill_install_pings()
+returns int
+language plpgsql
+set search_path = public
+as $$
+declare n int;
+begin
+  insert into public.install_pings
+    (account_id, origin, day, first_seen_at, last_seen_at, active_minutes, widget_version, sample_path)
+  select account_id,
+         'backfill://widget_events',
+         created_at::date,
+         min(created_at),
+         max(created_at),
+         count(*),
+         null,
+         null
+  from public.widget_events
+  where type = 'widget_loaded'
+  group by account_id, created_at::date
+  on conflict (account_id, origin, day) do nothing;
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+revoke execute on function public.backfill_install_pings() from public, anon, authenticated;
+grant  execute on function public.backfill_install_pings() to service_role;
