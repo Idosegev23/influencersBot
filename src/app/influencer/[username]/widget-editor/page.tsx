@@ -15,6 +15,7 @@ import {
   type ResolvedBanner,
   type BannerOverride,
 } from '@/lib/widget/banner';
+import { buildBannerDraft } from '@/lib/widget/banner-draft';
 import { WidgetDraftPreview } from '@/components/influencer/WidgetDraftPreview';
 
 // Caps mirrored from src/lib/widget/banner.ts (not exported there, so kept in
@@ -214,7 +215,18 @@ export default function WidgetEditorPage() {
   const [accountId, setAccountId] = useState<string>('');
   const [brandName, setBrandName] = useState<string>('');
   const [config, setConfig] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // Three states, not a boolean: 'loading' and 'failed' both render nothing
+  // editable (see the early returns below `handleSave`'s definition). This
+  // is what makes a failed fetchInfluencerByUsername() call — which resolves
+  // to `null` rather than throwing, so the old catch block was dead code —
+  // impossible to mistake for a successful-but-empty load. Losing that
+  // distinction is what let a customer's Save post `reels: []` /
+  // `overrides: []` over a form that never received their real config.
+  const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'failed'>('loading');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Bumped by the retry button to re-run the load effect without duplicating
+  // its fetch logic.
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [eyebrow, setEyebrow] = useState('');
   const [headline, setHeadline] = useState('');
   const [subline, setSubline] = useState('');
@@ -222,6 +234,13 @@ export default function WidgetEditorPage() {
   const [ctaValue, setCtaValue] = useState('');
   const [startersLabel, setStartersLabel] = useState('');
   const [starterItems, setStarterItems] = useState<string[]>([]);
+  // Explicit on/off control for `widget.banner.enabled`, seeded from the
+  // stored value (same predicate the old inline `enabled: currentBanner?.enabled
+  // !== false` used) and editable here — see `buildBannerDraft` for how this
+  // combines with `hasReels` so the reel-driven auto-banner keeps resolving
+  // without this page ever manufacturing `enabled: true` for an account that
+  // never had a banner or reels at all.
+  const [bannerEnabled, setBannerEnabled] = useState(true);
   const [teaser, setTeaser] = useState('');
   const [tooltip, setTooltip] = useState('');
   // The candidate pool from GET /api/influencer/reels — what's shown/
@@ -231,6 +250,11 @@ export default function WidgetEditorPage() {
   // selected — see `selectedReels` below.
   const [reelCandidates, setReelCandidates] = useState<ReelCandidate[]>([]);
   const [reelsLoaded, setReelsLoaded] = useState(false);
+  // True only when the GET actually failed (bad status, network error, bad
+  // JSON) — kept apart from `reelCandidates.length === 0`, which is a real
+  // empty result, so the two don't share one "no reels" message. A failed
+  // fetch reading as "your reels are gone" is its own bug.
+  const [reelsFailed, setReelsFailed] = useState(false);
   // The actual draft rotation — {video, poster} pairs, seeded RAW from
   // config.reels (see the load effect) and never keyed by shortcode. Keying
   // selection by shortcode against only the fetched candidate window would
@@ -291,6 +315,10 @@ export default function WidgetEditorPage() {
     setCtaValue(rawBanner?.cta?.value || '');
     setStartersLabel(rawBanner?.starters?.label || '');
     setStarterItems(rawBanner?.starters?.items || []);
+    // Off only when explicitly stored `false` — absent/true both seed "on",
+    // matching resolveBanner's own treatment of those two states as
+    // rendering (see buildBannerDraft's header comment for the full tri-state).
+    setBannerEnabled(rawBanner?.enabled !== false);
     setTeaser(rawConfig?.widget?.teaser || '');
     setTooltip(rawConfig?.widget?.tooltip || '');
     // Account-level, not nested under `widget` — same field
@@ -335,23 +363,36 @@ export default function WidgetEditorPage() {
     if (!username) return;
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      setLoadState('loading');
+      setLoadError(null);
       try {
         const influencer = await fetchInfluencerByUsername(username);
-        if (!influencer || cancelled) return;
+        if (cancelled) return;
+        // fetchInfluencerByUsername never throws — a bad response, a bad
+        // fetch, or a missing account all collapse to `null` inside it. This
+        // branch is therefore the ONLY place a failed/missing load surfaces;
+        // the catch below is defense in depth, not the primary path.
+        if (!influencer) {
+          setLoadState('failed');
+          setLoadError('לא הצלחנו לטעון את הגדרות הווידג׳ט. ייתכן שהחיבור נכשל או שהחשבון לא נמצא.');
+          return;
+        }
         const rawConfig = (influencer as any)._rawConfig || {};
         const name = influencer.display_name || influencer.username || '';
         setAccountId(influencer.id);
         setBrandName(name);
         applyRawConfig(rawConfig, name);
+        setLoadState('loaded');
       } catch (err) {
         console.error('[widget-editor] failed to load account:', err);
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoadState('failed');
+          setLoadError('לא הצלחנו לטעון את הגדרות הווידג׳ט. ייתכן שהחיבור נכשל או שהחשבון לא נמצא.');
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [username]);
+  }, [username, reloadNonce]);
 
   // Candidates to render as pickable tiles — independent of the account load
   // above (its own endpoint, its own loading lifecycle). This list only
@@ -363,13 +404,19 @@ export default function WidgetEditorPage() {
     (async () => {
       try {
         const res = await fetch(`/api/influencer/reels?username=${encodeURIComponent(username)}`);
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        if (!res.ok) {
+          setReelsFailed(true);
+          return;
+        }
         const data = await res.json();
         const list: ReelCandidate[] = Array.isArray(data.reels) ? data.reels : [];
         if (cancelled) return;
         setReelCandidates(list);
+        setReelsFailed(false);
       } catch (err) {
         console.error('[widget-editor] failed to load reels:', err);
+        if (!cancelled) setReelsFailed(true);
       } finally {
         if (!cancelled) setReelsLoaded(true);
       }
@@ -462,30 +509,27 @@ export default function WidgetEditorPage() {
   // matters — /api/influencer/settings replaces `widget.banner` wholesale, so
   // dropping an existing field here (art, valueLine, anything this page
   // doesn't expose yet) would silently erase it on save.
+  //
+  // The `enabled` key is NOT simply "true unless stored false" any more —
+  // that collapsed resolveBanner's documented third state ("enabled absent
+  // -> render only if a headline resolves") into `true` on every save,
+  // forcing a generic-headline banner onto accounts that never asked for
+  // one. See buildBannerDraft (src/lib/widget/banner-draft.ts) for the
+  // corrected predicate and why the reel-driven case still needs `true`
+  // written explicitly.
   const currentBanner = config?.widget?.banner || null;
+  const hasReels = selectedReels.length > 0;
   const bannerDraft = useMemo(
-    () => ({
-      ...(currentBanner || {}),
-      // Accounts with reels but no stored banner get one automatically —
-      // resolveBanner's fallback fires only while `widget.banner` is
-      // undefined/null. The moment this editor writes ANY object there
-      // (which it always does, even with every field left blank), that
-      // fallback stops applying unless `enabled` says so explicitly. Default
-      // true so a reel-only account's banner keeps resolving after its first
-      // save here; preserve an existing explicit `false` so a banner someone
-      // deliberately turned off does not get silently resurrected.
-      enabled: currentBanner?.enabled !== false,
+    () => buildBannerDraft(currentBanner, bannerEnabled, hasReels, {
       eyebrow,
       headline,
       subline,
-      cta: { ...(currentBanner?.cta || {}), label: ctaLabel, value: ctaValue },
-      starters: {
-        ...(currentBanner?.starters || {}),
-        label: startersLabel.trim() || null,
-        items: filledStarterItems.length ? filledStarterItems : null,
-      },
+      ctaLabel,
+      ctaValue,
+      startersLabel,
+      starterItems: filledStarterItems,
     }),
-    [currentBanner, eyebrow, headline, subline, ctaLabel, ctaValue, startersLabel, filledStarterItems],
+    [currentBanner, bannerEnabled, hasReels, eyebrow, headline, subline, ctaLabel, ctaValue, startersLabel, filledStarterItems],
   );
 
   // Same layering the live widget goes through — the default banner PLUS
@@ -571,6 +615,15 @@ export default function WidgetEditorPage() {
       setError('יש לתקן תאריכים לא תקינים במבצעים למעלה (תאריך סיום לפני תאריך התחלה) לפני השמירה.');
       return;
     }
+    // Defense in depth, mirroring the guard above — the form (and its Save
+    // button) only render at all once `loadState === 'loaded'` (see the
+    // early returns below), so this should be unreachable. It exists so no
+    // future change to the render branches can reopen a path where a config
+    // that never loaded gets posted over the account's real one.
+    if (loadState !== 'loaded') {
+      setError('הגדרות הווידג׳ט עדיין לא נטענו — לא ניתן לשמור.');
+      return;
+    }
     setSaving(true);
     setSaved(false);
     setError(null);
@@ -627,13 +680,40 @@ export default function WidgetEditorPage() {
     }
   }
 
-  if (loading) {
+  if (loadState === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center animate-slide-up" style={{ background: 'transparent' }}>
         <div
           className="animate-spin rounded-full h-12 w-12 border-b-2 animate-slide-up"
           style={{ borderColor: 'var(--color-primary)' }}
         ></div>
+      </div>
+    );
+  }
+
+  // A failed/missing load must never fall through to the editable form below
+  // — an empty draft with `accountId === ''` would still let Save post
+  // `reels: []` / `overrides: []` over the account's real config. Retrying
+  // re-runs the same load effect via `reloadNonce`.
+  if (loadState === 'failed') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 animate-slide-up" style={{ background: 'transparent' }}>
+        <div
+          className="max-w-md w-full rounded-xl border p-6 text-center space-y-4"
+          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
+        >
+          <p className="text-sm" style={{ color: '#dc2626' }}>
+            {loadError || 'לא הצלחנו לטעון את הגדרות הווידג׳ט.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => setReloadNonce((n) => n + 1)}
+            className="px-4 py-2 rounded-xl text-sm font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+            style={{ background: 'var(--color-primary)', color: '#fff' }}
+          >
+            ניסיון נוסף
+          </button>
+        </div>
       </div>
     );
   }
@@ -661,6 +741,57 @@ export default function WidgetEditorPage() {
             className="rounded-xl border p-6 space-y-4"
             style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
           >
+            {/*
+              Explicit on/off control for the banner — previously there was
+              none: every save forced `enabled: true` (see buildBannerDraft),
+              so an account that wanted no banner had no way to say so, and
+              an account already stored with `enabled: false` had no visible
+              indication that the fields below were being edited into a void.
+            */}
+            <div
+              className="rounded-lg border p-3"
+              style={{ borderColor: 'var(--dash-glass-border)', background: 'var(--dash-bar)' }}
+            >
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
+                  באנר פתיחה בווידג׳ט
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBannerEnabled(true)}
+                    disabled={saving}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      background: bannerEnabled ? 'var(--color-primary)' : 'var(--dash-bar)',
+                      color: bannerEnabled ? '#fff' : 'var(--dash-text)',
+                      border: '1px solid var(--dash-glass-border)',
+                    }}
+                  >
+                    פעיל
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBannerEnabled(false)}
+                    disabled={saving}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      background: !bannerEnabled ? 'var(--color-primary)' : 'var(--dash-bar)',
+                      color: !bannerEnabled ? '#fff' : 'var(--dash-text)',
+                      border: '1px solid var(--dash-glass-border)',
+                    }}
+                  >
+                    כבוי
+                  </button>
+                </div>
+              </div>
+              <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                {bannerEnabled
+                  ? 'הבאנר מוצג למבקרים. השדות שמתחת קובעים את התוכן שלו.'
+                  : 'הבאנר כבוי — השדות שמתחת לא יוצגו לאף מבקר, עד שתחזירו אותו למצב פעיל.'}
+              </p>
+            </div>
+
             <div>
               <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
                 תגית עילית
@@ -778,7 +909,7 @@ export default function WidgetEditorPage() {
 
             <div>
               <p className="text-xs text-[#655e51]">
-                בלי שאלות משלכם, הוויג׳ט מציע שאלות שמתעדכנות לבד לפי התוכן שלכם.
+                בלי שאלות משלכם, הווידג׳ט מציע שאלות שמתעדכנות לבד לפי התוכן שלכם.
                 ברגע שתכתבו שאלות כאן, הן יוצגו כמו שהן ולא יתעדכנו.
               </p>
               <div className="space-y-2 mt-2">
@@ -825,6 +956,10 @@ export default function WidgetEditorPage() {
               </label>
               {!reelsLoaded ? (
                 <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>טוען סרטונים…</p>
+              ) : reelsFailed ? (
+                <p className="text-sm" style={{ color: '#dc2626' }}>
+                  לא הצלחנו לטעון את רשימת הסרטונים כרגע. רענון הדף בדרך כלל פותר את זה — הסרטונים שכבר נבחרו לא נפגעו.
+                </p>
               ) : reelCandidates.length === 0 ? (
                 <p className="text-sm text-[#655e51]">
                   עוד לא הופקו סרטונים לחשבון הזה. אחרי הסריקה הבאה הם יופיעו כאן.
@@ -887,7 +1022,7 @@ export default function WidgetEditorPage() {
                     })}
                   </div>
                   <p className="text-xs text-[#655e51] mt-2">
-                    נבחרו {selectedReels.length} מתוך 5. הסרטונים מתחלפים בין מבקרים.
+                    נבחרו {selectedReels.length} מתוך {MAX_REELS}. הסרטונים מתחלפים בין מבקרים.
                   </p>
                 </>
               )}
@@ -1270,7 +1405,7 @@ export default function WidgetEditorPage() {
                   border: '1px solid var(--dash-glass-border)',
                 }}
               >
-                בועת הזמנה
+                בועה שמופיעה מעצמה
               </button>
               <button
                 type="button"
@@ -1282,7 +1417,7 @@ export default function WidgetEditorPage() {
                   border: '1px solid var(--dash-glass-border)',
                 }}
               >
-                טולטיפ
+                בועה ליד הכפתור הסגור
               </button>
             </div>
             {accountId && previewDraft ? (
