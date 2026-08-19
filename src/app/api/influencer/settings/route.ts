@@ -160,7 +160,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true });
+    // The sanitiser (sanitizeOverrides, MAX_REELS filtering above) is the
+    // authority on what actually got stored — e.g. an override row with an
+    // inverted date window is dropped, not stored. Returning `updatedConfig`
+    // (not re-fetched, since it's exactly what was just written) lets callers
+    // show what exists rather than optimistically echoing back what they
+    // posted, which would silently disagree with the DB the moment the
+    // sanitiser rejected something.
+    return NextResponse.json({ success: true, config: updatedConfig });
   } catch (error: any) {
     console.error('[influencer/settings] Error:', error);
     return NextResponse.json(

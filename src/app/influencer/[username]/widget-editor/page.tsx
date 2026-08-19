@@ -8,6 +8,7 @@ import {
   activeOverrides,
   resolveBanner,
   resolveInvitation,
+  sanitizeOverrides,
   todayInIsrael,
   MAX_INVITATION,
   MAX_REELS,
@@ -77,28 +78,48 @@ const inputStyle = {
   border: '1px solid var(--dash-glass-border)',
 } as const;
 
-type OverrideBadge = 'active' | 'scheduled' | 'ended';
+type OverrideBadge = 'active' | 'scheduled' | 'ended' | 'invalid';
 
 const OVERRIDE_BADGE_LABEL: Record<OverrideBadge, string> = {
   active: 'פעיל עכשיו',
   scheduled: 'מתוזמן',
   ended: 'הסתיים',
+  invalid: 'תאריכים לא תקינים',
 };
 const OVERRIDE_BADGE_STYLE: Record<OverrideBadge, { bg: string; fg: string }> = {
   active: { bg: '#DCFCE7', fg: '#15803D' },
   scheduled: { bg: '#DBEAFE', fg: '#1D4ED8' },
   ended: { bg: '#F3F4F6', fg: '#6B7280' },
+  invalid: { bg: '#FEE2E2', fg: '#B91C1C' },
 };
 
 /**
- * 'active' / 'scheduled' / 'ended', computed with the same `activeOverrides`
- * the real resolvers use — not a reimplementation of the date comparison. A
- * single-entry, dates-untouched config is fed through it so the inclusive-
- * `until` and surface-matching rules apply exactly as they do at render time
- * (see `activeOverrides` in src/lib/widget/banner.ts: `until === today` is
- * still open, which is what a customer means by "until Friday").
+ * `until` earlier than `from` — the one shape `sanitizeOverrides` rejects
+ * outright (banner.ts: `if (from && until && until < from) continue;`),
+ * dropping the whole row rather than storing it as "ended". Dragging the end
+ * date backward past a start date that didn't move is the single most
+ * natural way a customer tries to end a promotion early, so this is checked
+ * client-side to block the save (with a visible reason) instead of letting
+ * it silently vanish on the next reload.
+ */
+function overrideInvalidDateOrder(row: BannerOverride): boolean {
+  return typeof row.from === 'string' && typeof row.until === 'string' && row.until < row.from;
+}
+
+/**
+ * 'active' / 'scheduled' / 'ended' / 'invalid', computed with the same
+ * `activeOverrides` the real resolvers use — not a reimplementation of the
+ * date comparison. A single-entry, dates-untouched config is fed through it
+ * so the inclusive-`until` and surface-matching rules apply exactly as they
+ * do at render time (see `activeOverrides` in src/lib/widget/banner.ts:
+ * `until === today` is still open, which is what a customer means by "until
+ * Friday"). An inverted window short-circuits to 'invalid' before any of
+ * that — activeOverrides has no opinion on a shape sanitizeOverrides would
+ * reject entirely, so computing active/scheduled/ended for it would just be
+ * a second, contradictory claim next to the inline error.
  */
 function overrideBadgeState(row: BannerOverride): OverrideBadge {
+  if (overrideInvalidDateOrder(row)) return 'invalid';
   const targetSurface = row.surface === 'chat' ? 'chat' : 'widget';
   const isActive = activeOverrides({ overrides: [row] }, targetSurface).length > 0;
   if (isActive) return 'active';
@@ -113,10 +134,33 @@ function overrideField(row: BannerOverride, field: 'eyebrow' | 'headline' | 'sub
   return typeof v === 'string' ? v : '';
 }
 
-const OVERRIDE_FIELD_LABELS: [key: 'eyebrow' | 'headline' | 'subline' | 'teaser' | 'tooltip', label: string][] = [
+/**
+ * Reads the override's starters object (same raw `{label, items}` shape as
+ * the default banner's `starters` — see `resolveStarters` in banner.ts,
+ * which both `resolveBanner` and `sanitizeOverrides` run this through). No
+ * client-side trimming/null-collapsing here on purpose: the sanitiser (and,
+ * for preview, `sanitizeOverrides` itself — see `previewConfig` below) is
+ * what turns "both empty" into "no starters key at all", which is what
+ * makes an empty override fall back to the default rather than replacing it
+ * with nothing.
+ */
+function overrideStarters(row: BannerOverride): { label: string; items: string[] } {
+  const raw = (row as Record<string, unknown>).starters;
+  const obj = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const label = typeof obj.label === 'string' ? obj.label : '';
+  const items = Array.isArray(obj.items) ? obj.items.filter((i): i is string => typeof i === 'string') : [];
+  return { label, items };
+}
+function overrideHasStartersContent(row: BannerOverride): boolean {
+  const { label, items } = overrideStarters(row);
+  return label.trim().length > 0 || items.some((i) => i.trim().length > 0);
+}
+
+const OVERRIDE_FIELD_LABELS: [key: 'eyebrow' | 'headline' | 'subline' | 'starters' | 'teaser' | 'tooltip', label: string][] = [
   ['eyebrow', 'תגית עילית'],
   ['headline', 'כותרת ראשית'],
   ['subline', 'שורת משנה'],
+  ['starters', 'שאלות פתיחה'],
   ['teaser', 'בועה שמופיעה מעצמה'],
   ['tooltip', 'בועה ליד הכפתור הסגור'],
 ];
@@ -125,6 +169,7 @@ const OVERRIDE_FIELD_LABELS: [key: 'eyebrow' | 'headline' | 'subline' | 'teaser'
 function overrideFieldLabels(row: BannerOverride): string[] {
   return OVERRIDE_FIELD_LABELS
     .filter(([key]) => {
+      if (key === 'starters') return overrideHasStartersContent(row);
       const v = (row as Record<string, unknown>)[key];
       return typeof v === 'string' && v.trim().length > 0;
     })
@@ -148,6 +193,18 @@ function makeOverrideId(): string {
     // fall through
   }
   return `promo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Backfills a stable `id` on any row loaded without one (legacy data written
+ * before this page existed, or before Task 4's `sanitizeOverrides` started
+ * persisting `id`). Without this, the list's React `key` falls back to array
+ * index (page.tsx's row `.map`), which can misattribute focus/input state
+ * across a mid-list add or remove. Order is untouched — only the `id` field
+ * is added, in place, to rows that lack one.
+ */
+function withStableIds(rows: BannerOverride[]): BannerOverride[] {
+  return rows.map((r) => (r.id ? r : { ...r, id: makeOverrideId() }));
 }
 
 export default function WidgetEditorPage() {
@@ -213,6 +270,67 @@ export default function WidgetEditorPage() {
   // sharing a single "closed" state.
   const [previewView, setPreviewView] = useState<'open' | 'teaser' | 'tooltip'>('open');
 
+  // Seeds every draft field from a STORED config — never from a resolver's
+  // merged output (resolveBanner/resolveInvitation layer any currently
+  // active scheduled override on top of the base, so seeding from them
+  // would bake a temporary promotion's copy into the permanent config the
+  // moment the customer saves an unrelated field). Used both on initial
+  // load and — critically — after a successful save, where `rawConfig` is
+  // what the server actually stored (post-sanitisation), not what this page
+  // posted. Re-seeding from that response rather than trusting the posted
+  // draft is what makes the page honest about a row `sanitizeOverrides`
+  // rejected (e.g. an inverted date window): the row disappears from the
+  // UI because it's actually gone, not because of an optimistic guess.
+  function applyRawConfig(rawConfig: any, name: string) {
+    setConfig(rawConfig);
+    const rawBanner = rawConfig?.widget?.banner || null;
+    setEyebrow(rawBanner?.eyebrow || '');
+    setHeadline(rawBanner?.headline || '');
+    setSubline(rawBanner?.subline || '');
+    setCtaLabel(rawBanner?.cta?.label || '');
+    setCtaValue(rawBanner?.cta?.value || '');
+    setStartersLabel(rawBanner?.starters?.label || '');
+    setStarterItems(rawBanner?.starters?.items || []);
+    setTeaser(rawConfig?.widget?.teaser || '');
+    setTooltip(rawConfig?.widget?.tooltip || '');
+    // Account-level, not nested under `widget` — same field
+    // scripts/persist-reel-videos.ts writes and resolveArt reads
+    // (src/lib/widget/banner.ts). Raw, not resolved: reels have no
+    // override/promotion layer, so this already IS the value a visitor
+    // gets right now.
+    //
+    // NOT capped to MAX_REELS on seed — scripts/persist-reel-videos.ts's
+    // --shortcodes= path is uncapped and writes straight to config.reels,
+    // bypassing /api/influencer/settings' own MAX_REELS slice, so a
+    // stored array CAN be over-cap. Seeding the full array and enforcing
+    // the cap only when the customer ADDS a selection (toggleReel below)
+    // means an over-cap account is visibly over-cap and removable down to
+    // the limit here, rather than silently trimmed on the first save —
+    // even a no-interaction one.
+    const rawReels: unknown[] = Array.isArray(rawConfig?.reels) ? rawConfig.reels : [];
+    const isReel = (r: unknown): r is { video: string; poster?: unknown } =>
+      !!r && typeof r === 'object' && typeof (r as { video?: unknown }).video === 'string';
+    setSelectedReels(
+      rawReels
+        .filter(isReel)
+        .map((r) => ({ video: r.video, poster: typeof r.poster === 'string' ? r.poster : null })),
+    );
+
+    setResolvedBanner(resolveBanner(rawConfig, 'widget', { brandName: name }));
+    setResolvedInvitation(resolveInvitation(rawConfig, 'widget'));
+
+    // Raw, unresolved — same reasoning as selectedReels above: these rows
+    // edit config.overrides directly, so there is no separate "resolved"
+    // value to seed from. `withStableIds` backfills an `id` on any legacy
+    // row that was stored without one, so the list's React key never falls
+    // back to array index.
+    const rawOverrides: unknown[] = Array.isArray(rawConfig?.overrides) ? rawConfig.overrides : [];
+    setOverridesDraft(
+      withStableIds(rawOverrides.filter((o): o is BannerOverride => !!o && typeof o === 'object')),
+    );
+    setPreviewingOverrideIndex(null);
+  }
+
   useEffect(() => {
     if (!username) return;
     let cancelled = false;
@@ -225,61 +343,7 @@ export default function WidgetEditorPage() {
         const name = influencer.display_name || influencer.username || '';
         setAccountId(influencer.id);
         setBrandName(name);
-        setConfig(rawConfig);
-        // Seed every field from the STORED base — never from a resolver's
-        // merged output. resolveBanner/resolveInvitation layer any currently
-        // active scheduled override on top of the base before returning, so
-        // seeding from them would bake a temporary promotion's copy into the
-        // permanent config the moment the customer saves an unrelated field
-        // (and it would keep showing after the promotion's `until` date
-        // passes — the config no longer reflects "no promotion", it reflects
-        // "promotion, forever"). The base is what these inputs edit; the
-        // resolved values below are used only as placeholders, so an empty
-        // field still shows what a visitor sees right now.
-        const rawBanner = rawConfig?.widget?.banner || null;
-        setEyebrow(rawBanner?.eyebrow || '');
-        setHeadline(rawBanner?.headline || '');
-        setSubline(rawBanner?.subline || '');
-        setCtaLabel(rawBanner?.cta?.label || '');
-        setCtaValue(rawBanner?.cta?.value || '');
-        setStartersLabel(rawBanner?.starters?.label || '');
-        setStarterItems(rawBanner?.starters?.items || []);
-        setTeaser(rawConfig?.widget?.teaser || '');
-        setTooltip(rawConfig?.widget?.tooltip || '');
-        // Account-level, not nested under `widget` — same field
-        // scripts/persist-reel-videos.ts writes and resolveArt reads
-        // (src/lib/widget/banner.ts). Raw, not resolved: reels have no
-        // override/promotion layer, so this already IS the value a visitor
-        // gets right now.
-        //
-        // NOT capped to MAX_REELS on seed — scripts/persist-reel-videos.ts's
-        // --shortcodes= path is uncapped and writes straight to config.reels,
-        // bypassing /api/influencer/settings' own MAX_REELS slice, so a
-        // stored array CAN be over-cap. Seeding the full array and enforcing
-        // the cap only when the customer ADDS a selection (toggleReel below)
-        // means an over-cap account is visibly over-cap and removable down to
-        // the limit here, rather than silently trimmed on the first save —
-        // even a no-interaction one.
-        const rawReels: unknown[] = Array.isArray(rawConfig?.reels) ? rawConfig.reels : [];
-        const isReel = (r: unknown): r is { video: string; poster?: unknown } =>
-          !!r && typeof r === 'object' && typeof (r as { video?: unknown }).video === 'string';
-        setSelectedReels(
-          rawReels
-            .filter(isReel)
-            .map((r) => ({ video: r.video, poster: typeof r.poster === 'string' ? r.poster : null })),
-        );
-
-        setResolvedBanner(resolveBanner(rawConfig, 'widget', { brandName: name }));
-        setResolvedInvitation(resolveInvitation(rawConfig, 'widget'));
-
-        // Raw, unresolved — same reasoning as selectedReels above: these
-        // rows edit config.overrides directly, so there is no separate
-        // "resolved" value to seed from.
-        const rawOverrides: unknown[] = Array.isArray(rawConfig?.overrides) ? rawConfig.overrides : [];
-        setOverridesDraft(
-          rawOverrides.filter((o): o is BannerOverride => !!o && typeof o === 'object'),
-        );
-        setPreviewingOverrideIndex(null);
+        applyRawConfig(rawConfig, name);
       } catch (err) {
         console.error('[widget-editor] failed to load account:', err);
       } finally {
@@ -343,6 +407,45 @@ export default function WidgetEditorPage() {
     setPreviewingOverrideIndex((cur) => (cur === index ? null : index));
   }
 
+  // Starter-question editing for one promotion row — same shape, same cap
+  // (MAX_STARTER_ITEMS), same "empty means fall back to the default" intent
+  // as the default banner's starters editor below. Unlike the default
+  // fields' `filledStarterItems` (which trims/nulls client-side before
+  // sending), these are left raw: `sanitizeOverrides` already runs every
+  // override's `starters` through the same `resolveStarters` the default
+  // banner uses at render time, so trimming/blank-filtering/null-collapsing
+  // happens once, server-side, for both — and `previewConfig` below runs
+  // drafts through `sanitizeOverrides` too, so the live preview matches.
+  function overrideStartersPatch(row: BannerOverride, next: { label?: string; items?: string[] }): Partial<BannerOverride> {
+    const cur = overrideStarters(row);
+    return { starters: { label: next.label ?? cur.label, items: next.items ?? cur.items } };
+  }
+  function updateOverrideStartersLabel(index: number, value: string) {
+    setOverridesDraft((rows) => rows.map((r, i) => (i === index ? { ...r, ...overrideStartersPatch(r, { label: value }) } : r)));
+  }
+  function addOverrideStarterItem(index: number) {
+    setOverridesDraft((rows) => rows.map((r, i) => {
+      if (i !== index) return r;
+      const { items } = overrideStarters(r);
+      if (items.length >= MAX_STARTER_ITEMS) return r;
+      return { ...r, ...overrideStartersPatch(r, { items: [...items, ''] }) };
+    }));
+  }
+  function updateOverrideStarterItem(index: number, itemIndex: number, value: string) {
+    setOverridesDraft((rows) => rows.map((r, i) => {
+      if (i !== index) return r;
+      const { items } = overrideStarters(r);
+      return { ...r, ...overrideStartersPatch(r, { items: items.map((it, j) => (j === itemIndex ? value : it)) }) };
+    }));
+  }
+  function removeOverrideStarterItem(index: number, itemIndex: number) {
+    setOverridesDraft((rows) => rows.map((r, i) => {
+      if (i !== index) return r;
+      const { items } = overrideStarters(r);
+      return { ...r, ...overrideStartersPatch(r, { items: items.filter((_, j) => j !== itemIndex) }) };
+    }));
+  }
+
   // The list of starter questions the customer actually typed, trimmed and
   // emptied of blank rows. An empty result must be saved as `null`, never
   // `[]` — a present-but-empty list at the boundary reads as "the customer
@@ -402,9 +505,22 @@ export default function WidgetEditorPage() {
     // dates so it always applies, regardless of whether its window is open
     // today — otherwise a promotion can only be checked on the day it goes
     // live, which is the day it's too late to fix a typo.
+    //
+    // Run through `sanitizeOverrides` — the same function the save path
+    // uses — rather than passing the raw draft straight to resolveBanner.
+    // Two reasons: (1) it's the single source of truth for "empty means
+    // fall back to the default" (an override with a blank starters object
+    // would otherwise whole-object-replace the base's real starters with
+    // nothing, since resolveBanner's per-field merge is whole-object, not
+    // deep — sanitizeOverrides is what drops the key entirely when there's
+    // no content); (2) it means the preview shows exactly what would be
+    // saved, including a row `sanitizeOverrides` would reject (e.g. an
+    // inverted date window) simply vanishing — which matches reality, since
+    // the save button is disabled for that row anyway (see
+    // `hasInvalidOverrideDates` below).
     const overrides = previewingOverrideIndex !== null && overridesDraft[previewingOverrideIndex]
-      ? [{ ...overridesDraft[previewingOverrideIndex], from: undefined, until: undefined }]
-      : overridesDraft;
+      ? sanitizeOverrides([{ ...overridesDraft[previewingOverrideIndex], from: undefined, until: undefined }])
+      : sanitizeOverrides(overridesDraft);
     return {
       ...config,
       // Account-level, not nested under `widget` (resolveArt reads
@@ -432,6 +548,11 @@ export default function WidgetEditorPage() {
     return activeOverrides(config, 'widget')[0] || null;
   }, [config]);
 
+  // Blocks Save while any promotion row has `until` earlier than `from` —
+  // sanitizeOverrides would otherwise drop that row entirely (not mark it
+  // "ended") with no error surfaced anywhere. See overrideInvalidDateOrder.
+  const hasInvalidOverrideDates = overridesDraft.some(overrideInvalidDateOrder);
+
   function addStarterItem() {
     setStarterItems((items) => (items.length >= MAX_STARTER_ITEMS ? items : [...items, '']));
   }
@@ -443,6 +564,13 @@ export default function WidgetEditorPage() {
   }
 
   async function handleSave() {
+    // Defense in depth — the Save button is already disabled for this case
+    // (see hasInvalidOverrideDates), but handleSave itself must never post
+    // a row sanitizeOverrides will silently drop.
+    if (hasInvalidOverrideDates) {
+      setError('יש לתקן תאריכים לא תקינים במבצעים למעלה (תאריך סיום לפני תאריך התחלה) לפני השמירה.');
+      return;
+    }
     setSaving(true);
     setSaved(false);
     setError(null);
@@ -466,14 +594,25 @@ export default function WidgetEditorPage() {
         }),
       });
       if (res.ok) {
-        setConfig((prev: any) => prev
-          ? {
-              ...prev,
-              widget: { ...(prev.widget || {}), banner: bannerDraft, teaser, tooltip },
-              reels: selectedReels,
-              overrides: overridesDraft,
-            }
-          : prev);
+        const data = await res.json().catch(() => ({}));
+        // The sanitiser is the authority on what actually got stored — a
+        // row this page posted can still be dropped (malformed date,
+        // content-free) or reshaped server-side. Re-seed every field from
+        // the server's own response rather than optimistically writing back
+        // the posted draft, so the page shows what exists, not what was
+        // merely sent. Falls back to a fresh profile fetch if an older
+        // deployment of the route hasn't started returning `config` yet.
+        if (data?.config) {
+          applyRawConfig(data.config, brandName);
+        } else {
+          try {
+            const influencer = await fetchInfluencerByUsername(username);
+            const rawConfig = (influencer as any)?._rawConfig || {};
+            applyRawConfig(rawConfig, brandName);
+          } catch (refetchErr) {
+            console.error('[widget-editor] post-save refetch failed:', refetchErr);
+          }
+        }
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       } else {
@@ -899,6 +1038,12 @@ export default function WidgetEditorPage() {
                           </div>
                         </div>
 
+                        {overrideInvalidDateOrder(row) ? (
+                          <p className="text-xs mb-2" style={{ color: '#dc2626' }}>
+                            תאריך הסיום קודם לתאריך ההתחלה — לא ניתן לשמור עד שהתאריכים יתוקנו.
+                          </p>
+                        ) : null}
+
                         <div className="mb-2">
                           <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
                             איפה מוצג
@@ -987,12 +1132,69 @@ export default function WidgetEditorPage() {
                             />
                           </div>
                         </div>
+
+                        <div className="mt-2">
+                          <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
+                            כותרת לרשימת השאלות (במבצע)
+                          </label>
+                          <input
+                            type="text"
+                            value={overrideStarters(row).label}
+                            maxLength={MAX_STARTERS_LABEL}
+                            placeholder="ללא שינוי"
+                            onChange={(e) => updateOverrideStartersLabel(index, e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg text-sm outline-none mb-2"
+                            style={inputStyle}
+                          />
+                          <div className="space-y-2">
+                            {overrideStarters(row).items.map((item, itemIndex) => (
+                              <div key={itemIndex} className="flex gap-2">
+                                <input
+                                  type="text"
+                                  value={item}
+                                  maxLength={MAX_STARTER_ITEM}
+                                  placeholder={`שאלה ${itemIndex + 1}`}
+                                  onChange={(e) => updateOverrideStarterItem(index, itemIndex, e.target.value)}
+                                  className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+                                  style={inputStyle}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeOverrideStarterItem(index, itemIndex)}
+                                  className="px-3 rounded-lg text-xs font-medium"
+                                  style={{ background: 'var(--dash-bar)', color: '#dc2626', border: '1px solid var(--dash-glass-border)' }}
+                                >
+                                  הסרה
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          {overrideStarters(row).items.length < MAX_STARTER_ITEMS ? (
+                            <button
+                              type="button"
+                              onClick={() => addOverrideStarterItem(index)}
+                              className="mt-2 text-xs font-medium"
+                              style={{ color: 'var(--color-primary)' }}
+                            >
+                              + הוספת שאלה
+                            </button>
+                          ) : null}
+                          <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
+                            ריק (גם כותרת וגם שאלות) = משאיר את שאלות ברירת המחדל כמו שהן.
+                          </p>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
               )}
             </div>
+
+            {hasInvalidOverrideDates ? (
+              <p className="text-xs" style={{ color: '#dc2626' }}>
+                יש לתקן תאריכים לא תקינים במבצעים למעלה (תאריך סיום לפני תאריך התחלה) לפני השמירה.
+              </p>
+            ) : null}
 
             {error ? (
               <p className="text-xs" style={{ color: '#dc2626' }}>{error}</p>
@@ -1001,7 +1203,8 @@ export default function WidgetEditorPage() {
             <div className="flex justify-end">
               <button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || hasInvalidOverrideDates}
+                title={hasInvalidOverrideDates ? 'יש לתקן תאריכים לא תקינים במבצעים לפני השמירה' : undefined}
                 className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50 shadow-lg hover:shadow-xl"
                 style={{ background: saved ? '#17A34A' : 'var(--color-primary)', color: '#fff' }}
               >
