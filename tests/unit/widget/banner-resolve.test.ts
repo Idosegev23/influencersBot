@@ -418,10 +418,17 @@ describe('todayInIsrael', () => {
     expect(todayInIsrael(new Date('2026-08-19T09:00:00Z'))).toBe('2026-08-19');
   });
 
-  it('is still the 31st just before midnight in Israel, when UTC has moved on', () => {
-    // 2026-08-31T21:30Z is 00:30 on the 1st in UTC terms but 00:30 Israel = still Sept 1.
-    // 2026-08-31T20:30Z is 23:30 on the 31st in Israel.
+  it('follows Israel across the date line, not UTC', () => {
+    // 20:30Z is 23:30 on the 31st in Israel (UTC+3 in August) — both agree.
     expect(todayInIsrael(new Date('2026-08-31T20:30:00Z'))).toBe('2026-08-31');
+    // 21:30Z is 00:30 on Sept 1 in Israel while UTC still reads Aug 31.
+    // This is the assertion a UTC-based implementation fails.
+    expect(todayInIsrael(new Date('2026-08-31T21:30:00Z'))).toBe('2026-09-01');
+  });
+
+  it('follows Israel in winter too, when the offset is UTC+2', () => {
+    // 22:30Z is 00:30 on Jan 1 in Israel (UTC+2 in January).
+    expect(todayInIsrael(new Date('2025-12-31T22:30:00Z'))).toBe('2026-01-01');
   });
 });
 
@@ -464,6 +471,13 @@ describe('activeOverrides', () => {
   it('treats "both" and a missing surface as applying everywhere', () => {
     const cfg = { overrides: [{ surface: 'both', headline: 'x' }, { headline: 'y' }] };
     expect(activeOverrides(cfg, 'widget', at('2026-08-20'))).toHaveLength(2);
+  });
+
+  it('closes the window on Israel time, not UTC', () => {
+    // Still Aug 31 in Israel — the promotion is live.
+    expect(activeOverrides(base, 'widget', new Date('2026-08-31T20:30:00Z'))).toHaveLength(1);
+    // Already Sept 1 in Israel, though UTC still says Aug 31 — it is over.
+    expect(activeOverrides(base, 'widget', new Date('2026-08-31T21:30:00Z'))).toHaveLength(0);
   });
 });
 
