@@ -1061,6 +1061,9 @@
     styleEl.textContent =
       vars +
       '@keyframes ibot-slide-up{from{opacity:0;transform:translateY(20px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}' +
+      // Rises from the launcher rather than fading in place, so the bubble
+      // reads as something the button said.
+      '@keyframes ibot-teaser-in{from{opacity:0;transform:translateY(12px) scale(0.94);}to{opacity:1;transform:translateY(0) scale(1);}}' +
       '@keyframes ibot-bounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-5px);}}' +
       '@keyframes ibot-msg-in{from{opacity:0;transform:translateX(10px);}to{opacity:1;transform:translateX(0);}}' +
       '@keyframes ibot-fade-in{from{opacity:0;}to{opacity:1;}}' +
@@ -1258,17 +1261,67 @@
       render();
       setTimeout(function () { try { showBubbleTooltip(); } catch (e) {} }, 2500);
       try { initCartWatcher(onCartAdd); } catch (e) { /* */ }
+      announcePreviewReady();
     })
     .catch(function (e) {
       report('config_load_failed', { message: (e && e.message) || 'config fetch failed' });
       messages = [{ role: 'assistant', content: config.welcomeMessage }];
       render();
+      // Even a failed config must unblock the editor: it renders defaults, and
+      // a draft posted over them is still a useful preview.
+      announcePreviewReady();
     });
 
   // ---- Draft preview channel ----
   // The editor renders the real widget in an iframe and pushes unsaved changes
   // in. Gated on data-preview so a customer's site can never be driven by a
   // message from an embedding page.
+  // Tells the editor the listener below is live. Without this the editor had
+  // to re-post the same draft every 400ms hoping one landed after boot, and
+  // every one of those posts cost a full re-render — the flicker.
+  function announcePreviewReady() {
+    if (!PREVIEW_MODE) return;
+    try { window.parent.postMessage({ type: 'ibot:preview-ready' }, window.location.origin); } catch (e) { /* */ }
+  }
+
+  // Which reels the current banner would play, as a comparable string. Used
+  // only to decide whether a draft actually changed the rotation: re-picking
+  // on every keystroke swaps the video at random mid-playback.
+  // Last rotation the preview rendered, so a text-only draft leaves the
+  // playing reel alone. Empty until the first draft arrives.
+  var previewReelSig = null;
+
+  // render() rewrites container.innerHTML, so the <video> node the customer
+  // was watching is gone and a fresh one starts at 0. Putting it back where
+  // it was is the difference between "the preview updated" and "the preview
+  // flashed".
+  function restorePreviewVideo(resumeAt) {
+    if (!resumeAt) return;
+    var v = document.getElementById('ibot-banner-video');
+    if (!v) return;
+    try { v.currentTime = resumeAt; } catch (e) { /* seeking can throw before metadata */ }
+  }
+
+  // #abc -> #aabbcc, #rrggbbaa -> #rrggbb, anything else -> null. Callers append
+  // a two-digit alpha, which silently produces an invalid colour otherwise.
+  function normalizeHex6(hex) {
+    if (typeof hex !== 'string') return null;
+    var h = hex.trim();
+    if (!/^#[0-9a-fA-F]{3,8}$/.test(h)) return null;
+    var body = h.slice(1);
+    if (body.length === 3) return '#' + body[0] + body[0] + body[1] + body[1] + body[2] + body[2];
+    if (body.length >= 6) return '#' + body.slice(0, 6);
+    return null;
+  }
+
+  function reelSignature(banner) {
+    var art = banner && banner.art;
+    if (!art || art.mode !== 'video' || !art.reels || !art.reels.length) return '';
+    var out = [];
+    for (var i = 0; i < art.reels.length; i++) out.push(String(art.reels[i] && art.reels[i].video));
+    return out.join('|');
+  }
+
   if (PREVIEW_MODE) {
     window.addEventListener('message', function (ev) {
       // The preview route is unauthenticated and framable by anyone, so the
@@ -1284,7 +1337,16 @@
             && /^#[0-9a-fA-F]{3,8}$/.test(msg.config.primaryColor.trim())) {
           config.primaryColor = msg.config.primaryColor.trim();
         }
-        pickBannerReel();
+        // Editing the headline must not restart the video. Re-pick only when
+        // the rotation itself changed (a different reel selection), and carry
+        // playback position across render()'s innerHTML rewrite, which
+        // destroys and recreates the <video> element every time.
+        if (reelSignature(config.banner) !== previewReelSig) {
+          previewReelSig = reelSignature(config.banner);
+          pickBannerReel();
+        }
+        var priorVideo = document.getElementById('ibot-banner-video');
+        var resumeAt = priorVideo ? priorVideo.currentTime : 0;
         applyLocaleAssets();
         bannerViewTracked = true;   // a draft is not a visitor impression
         if (msg.view === 'teaser' || msg.view === 'tooltip') {
@@ -1307,6 +1369,7 @@
           } else {
             showBubbleTooltip();
           }
+          restorePreviewVideo(resumeAt);
         } else {
           // Every other message (including one with no `view`, an
           // unrecognised value, or an older cached draft) keeps today's
@@ -1323,6 +1386,7 @@
           if (leftoverTeaser && leftoverTeaser.parentNode) leftoverTeaser.parentNode.removeChild(leftoverTeaser);
           if (!isOpen) { isOpen = true; }
           render();
+          restorePreviewVideo(resumeAt);
         }
       } catch (e) { /* never break the editor */ }
     });
@@ -4135,17 +4199,53 @@
       // role=status + aria-live=polite: screen readers announce WITHOUT moving focus.
       el.setAttribute('role', 'status');
       el.setAttribute('aria-live', 'polite');
-      el.style.cssText = 'position:fixed;z-index:2147483646;bottom:calc(92px + env(safe-area-inset-bottom));' + side +
-        'max-width:min(78vw,300px);background:var(--ibot-panel-bg,#fff);color:var(--ibot-text-primary,#111);' +
-        'border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.18);padding:6px 8px;font-size:13.5px;line-height:1.35;' +
-        'direction:' + locale.dir + ';display:flex;gap:4px;align-items:center;' +
-        (reduced ? '' : 'animation:ibot-slide-up 0.3s ease-out;');
+      // The bubble is an invitation from a person, not a system notice, so it
+      // is built like one: the account's own face, its name as a quiet
+      // eyebrow above the line, and a tail pointing at the launcher so the
+      // two read as one object rather than a box floating nearby.
+      // Alpha is appended as hex below, which only works on a 6-digit value —
+      // safeColor also admits #abc and #rrggbbaa, so normalise first.
+      var accent = normalizeHex6(safeColor(config.primaryColor)) || '#9334EB';
+      var isRtl = locale.dir === 'rtl';
+      var avatarSrc = config.profilePic || '';
+      var brand = String(config.brandName || '').slice(0, 28);
+      var tailSide = (config.position === 'bottom-left') ? 'left:26px;' : 'right:26px;';
+      el.style.cssText = 'position:fixed;z-index:2147483646;bottom:calc(96px + env(safe-area-inset-bottom));' + side +
+        'max-width:min(78vw,306px);background:var(--ibot-panel-bg,#fff);color:var(--ibot-text-primary,#111);' +
+        // Two stacked shadows: a tight one for the edge, a wide soft one for
+        // the lift. A single 30px drop reads as a flat card sitting on glass.
+        'border-radius:20px;box-shadow:0 1px 2px rgba(16,12,24,0.06),0 12px 32px -8px rgba(16,12,24,0.22);' +
+        'padding:12px 14px;font-size:14px;line-height:1.4;' +
+        'direction:' + locale.dir + ';display:flex;gap:10px;align-items:flex-start;' +
+        (reduced ? '' : 'animation:ibot-teaser-in 0.42s cubic-bezier(0.32,0.72,0,1);');
       el.innerHTML =
+        // Tail. Rotated square behind the body, clipped by the bubble's own
+        // background so only the triangle shows.
+        '<span aria-hidden="true" style="position:absolute;bottom:-5px;' + tailSide +
+          'width:14px;height:14px;background:var(--ibot-panel-bg,#fff);transform:rotate(45deg);border-radius:3px;"></span>' +
+        (avatarSrc
+          ? '<img src="' + escapeHtml(String(avatarSrc)) + '" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;' +
+              'box-shadow:0 0 0 2px var(--ibot-panel-bg,#fff),0 0 0 3.5px ' + accent + '33;">'
+          : '<span aria-hidden="true" style="width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;' +
+              'background:' + accent + '1a;color:' + accent + ';font-size:16px;">\u2726</span>') +
         '<button onclick="window.__ibotTeaserOpen()" aria-label="' + escapeHtml(locale.teaser.open) + '" ' +
-          'style="background:transparent;border:none;cursor:pointer;font-family:inherit;font-size:inherit;line-height:inherit;color:inherit;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';padding:6px;flex:1;min-width:0;">' +
-          escapeHtml(text) + '</button>' +
+          'style="background:transparent;border:none;cursor:pointer;font-family:inherit;color:inherit;text-align:' + (isRtl ? 'right' : 'left') + ';' +
+          'padding:0;flex:1;min-width:0;display:block;">' +
+          // Uppercase + tracking is a Latin typographic device: Hebrew has no
+          // case, and letter-spacing pulls its letters apart into something
+          // that reads as broken rather than refined. So the label only gets
+          // that treatment when the name is actually Latin.
+          (brand
+            ? '<span style="display:block;font-size:10.5px;color:var(--ibot-text-muted,#8a8a8f);margin-bottom:3px;' +
+                (/^[\x20-\x7F]+$/.test(brand) ? 'letter-spacing:0.07em;text-transform:uppercase;' : 'font-weight:600;') +
+                '">' + escapeHtml(brand) + '</span>'
+            : '') +
+          '<span style="display:block;font-size:14px;line-height:1.4;">' + escapeHtml(text) + '</span>' +
+        '</button>' +
         '<button onclick="window.__ibotTeaserDismiss()" aria-label="' + escapeHtml(locale.teaser.close) + '" ' +
-          'style="background:transparent;border:none;color:var(--ibot-text-muted,#888);cursor:pointer;font-size:18px;line-height:1;flex-shrink:0;padding:6px;min-width:32px;min-height:32px;">&times;</button>';
+          'style="background:transparent;border:none;color:var(--ibot-text-muted,#9a9aa0);cursor:pointer;font-size:15px;line-height:1;' +
+          'flex-shrink:0;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;' +
+          'margin:-2px -4px 0 -4px;">&times;</button>';
       // The teaser and the invitation tooltip do the same job — invite the
       // visitor to talk — so only one may be on screen. The teaser wins
       // because it knows the context (the product being viewed, whether
