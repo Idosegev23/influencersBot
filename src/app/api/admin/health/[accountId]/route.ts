@@ -18,13 +18,22 @@ export async function GET(
   const { accountId } = await params;
 
   const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const sinceDay = since.slice(0, 10);
 
-  const [originsRes, errorsRes] = await Promise.all([
+  // Origins: a display list, so .limit(100) here is fine and intentional
+  // (Ruling R16). The version breakdown below is NOT a display list — it's an
+  // aggregate over the same table — so it goes through a Postgres RPC with no
+  // row cap instead of being reduce()'d over this bounded fetch. install_pings
+  // is one row per account per ORIGIN per DAY: a 30-day window already costs
+  // ~90 rows for a 3-origin account, and .limit(100) ordered last_seen_at desc
+  // would silently drop the OLDEST rows first — exactly where a stale
+  // widget_version would show up.
+  const [originsRes, errorsRes, versionsRes] = await Promise.all([
     supabase
       .from('install_pings')
-      .select('origin, last_seen_at, active_minutes, sample_path, widget_version')
+      .select('origin, last_seen_at, active_minutes, sample_path')
       .eq('account_id', accountId)
-      .gte('day', since.slice(0, 10))
+      .gte('day', sinceDay)
       .order('last_seen_at', { ascending: false })
       .limit(100),
     supabase
@@ -35,16 +44,17 @@ export async function GET(
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(50),
+    supabase.rpc('account_install_versions', { p_account_id: accountId, p_since: sinceDay }),
   ]);
 
   const pings = originsRes.data || [];
-  const versions = Object.entries(
-    pings.reduce((acc: Record<string, number>, p: any) => {
-      const v = p.widget_version || 'unknown';
-      acc[v] = (acc[v] || 0) + (p.active_minutes || 0);
-      return acc;
-    }, {}),
-  ).map(([version, loads]) => ({ version, loads }));
+  if (versionsRes.error) {
+    console.error('[admin/health/:accountId] version rpc error:', versionsRes.error.message);
+  }
+  const versions = ((versionsRes.data || []) as Array<{ version: string; loads: number }>).map((v) => ({
+    version: v.version,
+    loads: Number(v.loads) || 0,
+  }));
 
   return NextResponse.json({
     origins: pings.map((p: any) => ({
