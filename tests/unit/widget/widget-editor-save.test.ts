@@ -36,4 +36,18 @@ describe('sanitizeOverrides', () => {
   it('drops an override with no content — a window over nothing is not a promotion', () => {
     expect(sanitizeOverrides([{ from: '2026-08-01', until: '2026-08-31' }])).toEqual([]);
   });
+
+  it('rejects a date that is shaped right but is not a real date', () => {
+    expect(sanitizeOverrides([{ until: '2026-13-45', headline: 'x' }])[0].until).toBeUndefined();
+    expect(sanitizeOverrides([{ until: '9999-99-99', headline: 'x' }])[0].until).toBeUndefined();
+  });
+
+  it('rejects a day that does not exist in that month', () => {
+    // Date would silently roll this forward to March 2nd.
+    expect(sanitizeOverrides([{ until: '2026-02-30', headline: 'x' }])[0].until).toBeUndefined();
+  });
+
+  it('keeps a leap day that does exist', () => {
+    expect(sanitizeOverrides([{ until: '2028-02-29', headline: 'x' }])[0].until).toBe('2028-02-29');
+  });
 });

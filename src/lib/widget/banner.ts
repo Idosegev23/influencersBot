@@ -271,6 +271,20 @@ const MAX_OVERRIDES = 20;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * A real calendar date in YYYY-MM-DD, not merely ten characters shaped like
+ * one. The shape check alone admits '2026-13-45', which is then compared as a
+ * string at render time and sorts above every real date — a promotion that
+ * never ends. Re-serialising the parsed value catches both impossible fields
+ * and silent overflow ('2026-02-30' becomes March 2nd).
+ */
+function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !ISO_DATE.test(value)) return false;
+  const parsed = new Date(value + 'T00:00:00Z');
+  return !Number.isNaN(parsed.getTime())
+    && parsed.toISOString().slice(0, 10) === value;
+}
+
+/**
  * Validate overrides on the way in. A malformed date is dropped rather than
  * stored, because an unparseable `until` reads as "no upper bound" at render
  * time — a promotion that never ends, with no error anywhere to explain it.
@@ -283,8 +297,8 @@ export function sanitizeOverrides(input: unknown): BannerOverride[] {
     if (!raw || typeof raw !== 'object') continue;
     const o = raw as Record<string, unknown>;
 
-    const from = typeof o.from === 'string' && ISO_DATE.test(o.from) ? o.from : undefined;
-    const until = typeof o.until === 'string' && ISO_DATE.test(o.until) ? o.until : undefined;
+    const from = isCalendarDate(o.from) ? o.from : undefined;
+    const until = isCalendarDate(o.until) ? o.until : undefined;
     if (from && until && until < from) continue;
 
     const surface: BannerOverride['surface'] =
