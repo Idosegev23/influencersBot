@@ -408,6 +408,7 @@
     banner: null,
     socialLinks: [],
     tooltip: null,
+    invitation: null,
     enabled: true,
     primaryColor: '#0c1013',
     darkMode: false,
@@ -1129,6 +1130,7 @@
         // case the open-time call found no banner to report.
         if (isOpen) trackBannerViewed();
       }
+      if (data.invitation) config.invitation = data.invitation;
       if (Array.isArray(data.socialLinks)) config.socialLinks = data.socialLinks;
       if (data.cartWatcher) config.cartWatcher = data.cartWatcher;
       if (data.tooltip && data.tooltip.text) config.tooltip = data.tooltip;
@@ -1781,7 +1783,8 @@
   };
   function showBubbleTooltip() {
     try {
-      var text = (config.tooltip && config.tooltip.text)
+      var text = (config.invitation && config.invitation.tooltip)
+        || (config.tooltip && config.tooltip.text)
         || (locale.teaser && locale.teaser.generic)
         || '';
       if (!text) return;
@@ -3965,9 +3968,9 @@
       if (isOpen || teaserDismissedForever()) return;
       if (document.getElementById('ibot-teaser')) return;
       var ctx = pageContext || {};
-      var text = (ctx.product && ctx.product.name)
+      var text = (config.invitation && config.invitation.teaser) || (ctx && ctx.product && ctx.product.name
         ? locale.teaser.product.replace('{product}', String(ctx.product.name).slice(0, 40))
-        : (modules.customerService.enabled ? locale.teaser.cs : locale.teaser.generic);
+        : (modules.customerService.enabled ? locale.teaser.cs : locale.teaser.generic));
       var side = (config.position === 'bottom-left') ? 'left:20px;' : 'right:20px;';
       var reduced = false;
       try { reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { /* */ }

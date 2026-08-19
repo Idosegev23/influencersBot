@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { signWidgetToken } from '@/lib/analytics/widget-token';
-import { resolveBanner } from '@/lib/widget/banner';
+import { resolveBanner, resolveInvitation } from '@/lib/widget/banner';
 
 function getCorsHeaders(origin: string): Record<string, string> {
   return {
@@ -112,6 +112,10 @@ export async function GET(req: NextRequest) {
         // ladder (gradient from primaryColor, coverImage as art, copy caps)
         // lives in resolveBanner so widget.js and the chat page can't drift.
         banner: resolveBanner(config, 'widget', { brandName: config.display_name || config.username }),
+        // The launcher's own copy. Separate from `tooltip` below, which is the
+        // legacy string field the manage page writes; this one honours an
+        // active promotion.
+        invitation: resolveInvitation(config, 'widget'),
         socialLinks: Array.isArray(widgetConfig.socialLinks) ? widgetConfig.socialLinks : [],
         cartWatcher: (widgetConfig.cartWatcher && typeof widgetConfig.cartWatcher === 'object') ? widgetConfig.cartWatcher : null,
         tooltip: (widgetConfig.tooltip && typeof widgetConfig.tooltip === 'string' && widgetConfig.tooltip.trim())

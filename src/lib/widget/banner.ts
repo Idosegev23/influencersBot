@@ -267,6 +267,38 @@ export function activeOverrides(
   });
 }
 
+const MAX_INVITATION = 140;
+
+export interface ResolvedInvitation {
+  /** Proactive bubble copy. null = keep the locale default in widget.js. */
+  teaser: string | null;
+  /** Closed-launcher bubble copy. null = keep the locale default. */
+  tooltip: string | null;
+}
+
+/**
+ * The two bubbles shown beside a closed launcher. Kept out of ResolvedBanner
+ * because they belong to the launcher rather than the panel, and the widget
+ * needs them before any banner is on screen.
+ */
+export function resolveInvitation(
+  config: any,
+  surface: BannerSurface,
+  now: Date = new Date(),
+): ResolvedInvitation {
+  const widgetConfig = config?.widget || {};
+  let teaser = copy(widgetConfig.teaser, MAX_INVITATION);
+  let tooltip = copy(widgetConfig.tooltip, MAX_INVITATION);
+
+  for (const o of activeOverrides(config, surface, now)) {
+    const t = copy(o.teaser, MAX_INVITATION);
+    const p = copy(o.tooltip, MAX_INVITATION);
+    if (t) teaser = t;
+    if (p) tooltip = p;
+  }
+  return { teaser, tooltip };
+}
+
 /**
  * Resolve the banner for one surface, or null to keep today's behavior.
  *
