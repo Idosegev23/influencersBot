@@ -73,6 +73,7 @@ import { createPipelineMetrics, withMetrics, logPipelineMetrics, recordMetrics }
 import { getCachedSuggestionRAG, cacheSuggestionRAG, prewarmSuggestionRAG, type CachedRAGResult } from '@/lib/suggestion-cache';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 import { getSmartThinkingMessage } from '@/lib/chatbot/thinking-messages';
+import { demoAccessFromConfig } from '@/lib/demo/guard';
 
 // ============================================
 // Stream Event Types
@@ -218,6 +219,20 @@ export async function POST(req: NextRequest) {
             type: 'error',
             message: 'המשפיען לא נמצא',
             code: 'INFLUENCER_NOT_FOUND',
+          }));
+          controller.close();
+          return;
+        }
+
+        // Expired demo — refuse the turn before any model spend. `_rawConfig`
+        // is the canonical handle for JSONB-only settings on the cached
+        // influencer; accounts without config.demo resolve to 'open'.
+        const demoAccess = demoAccessFromConfig((cachedData.influencer as any)?._rawConfig);
+        if (demoAccess.state === 'locked') {
+          controller.enqueue(encodeEvent({
+            type: 'error',
+            message: 'תקופת ההתנסות בדמו הסתיימה',
+            code: 'DEMO_EXPIRED',
           }));
           controller.close();
           return;

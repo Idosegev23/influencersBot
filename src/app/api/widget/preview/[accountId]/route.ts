@@ -20,6 +20,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { demoAccessFromConfig, demoExpiredBody } from '@/lib/demo/guard';
 
 const FETCH_TIMEOUT_MS = 12000;
 
@@ -62,6 +63,16 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
   }
 
   const cfg: any = account.config || {};
+
+  // Expired demo — stop proxying the customer's site under our domain. This
+  // matters more here than on the chat surfaces: the proxy strips the origin
+  // site's X-Frame-Options and CSP to make framing work, so an expired demo
+  // left running keeps re-serving somebody else's storefront from ours.
+  const demoAccess = demoAccessFromConfig(cfg);
+  if (demoAccess.state === 'locked') {
+    return NextResponse.json(demoExpiredBody(demoAccess), { status: 403 });
+  }
+
   const domain: string | undefined = cfg?.widget?.domain;
   if (!domain) {
     return NextResponse.json({ error: 'no widget domain registered for this account' }, { status: 404 });

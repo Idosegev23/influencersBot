@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server';
 import { emitWebCsEvents } from '@/lib/cs/web-adapter';
 import { getWidgetCorsHeaders as getCorsHeaders, isWidgetOriginAllowed as isOriginAllowed } from '@/lib/widget/cors';
 import type { ProductRecommendation } from '@/lib/recommendations/engine';
+import { demoAccessFromConfig, demoExpiredBody } from '@/lib/demo/guard';
 
 // ============================================
 // OPTIONS — CORS Preflight
@@ -121,6 +122,16 @@ export async function POST(req: NextRequest) {
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
+    }
+
+    // Expired demo — refuse the turn. Accounts without config.demo (every
+    // paying customer, every demo predating this feature) resolve to 'open'.
+    const demoAccess = demoAccessFromConfig(cfg);
+    if (demoAccess.state === 'locked') {
+      return new Response(
+        JSON.stringify(demoExpiredBody(demoAccess)),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     // CS-engine mode (spec §5): when the visitor chose customer service AND the account has the

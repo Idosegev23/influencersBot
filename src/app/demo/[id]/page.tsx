@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Copy, Check, ExternalLink } from 'lucide-react';
+import { DemoLockedScreen } from '@/components/demo/DemoLockedScreen';
+import { DemoCountdownBar } from '@/components/demo/DemoCountdownBar';
+import type { DemoAccess } from '@/lib/demo/access';
 
 /**
  * Public Demo Page — the customer's own website with the real widget running on it.
@@ -21,6 +24,9 @@ interface WidgetConfig {
   profilePic: string | null;
   welcomeMessage: string;
   domain: string;
+  // Present on every response since the demo-window feature; `state: 'open'`
+  // with null dates for anything that isn't a timed demo.
+  demo?: DemoAccess;
 }
 
 export default function DemoPage() {
@@ -81,11 +87,25 @@ export default function DemoPage() {
     );
   }
 
+  // Expired demo — the customer's site is no longer proxied (the preview route
+  // 403s), so there is nothing to frame. Sell instead.
+  if (config.demo?.state === 'locked') {
+    return (
+      <DemoLockedScreen
+        accountId={accountId}
+        brandName={config.brandName}
+        logoUrl={config.profilePic}
+      />
+    );
+  }
+
   const websiteUrl = `https://${config.domain}`;
   const primaryColor = config.theme.primaryColor || '#6366f1';
 
   return (
     <div className="h-screen flex flex-col bg-gray-100" dir="rtl">
+      {/* Renders null unless this is a timed demo. */}
+      {config.demo && <DemoCountdownBar access={config.demo} surface="widget" />}
       {/* Top banner */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 bg-white border-b border-gray-200 shadow-sm z-20">
         <div className="flex items-center gap-3">

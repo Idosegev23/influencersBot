@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { getAccountByUsername } from '@/lib/supabase';
 import { dirForLang } from '@/lib/i18n/chat-ui';
+import { resolveDemoAccess } from '@/lib/demo/access';
+import { DemoLockedScreen } from '@/components/demo/DemoLockedScreen';
+import { DemoCountdownBar } from '@/components/demo/DemoCountdownBar';
 
 interface Props {
   params: Promise<{ username: string }>;
@@ -120,19 +123,40 @@ export default async function ChatLayout({
 }) {
   const { username } = await params;
   let lang = 'he';
+  let account: any = null;
   try {
-    const account = await getAccountByUsername(username);
+    account = await getAccountByUsername(username);
     lang = (account as any)?.language || (account?.config as any)?.language || 'he';
   } catch {
     // ignore — falls through to Hebrew default
   }
   const dir = dirForLang(lang);
+
+  // Expired demo — the chat never mounts. This is the UI half of the lock; the
+  // enforcing half is the 403 on /api/chat/*, because a screen alone stops
+  // nobody with devtools open. An account without config.demo (every paying
+  // customer) resolves to 'open' and falls straight through.
+  const demoAccess = resolveDemoAccess(account);
+  if (demoAccess.state === 'locked') {
+    const cfg = (account?.config as any) || {};
+    return (
+      <div lang={lang} dir={dir} style={{ direction: dir }}>
+        <DemoLockedScreen
+          accountId={account.id}
+          brandName={cfg.display_name || cfg.username || username}
+          logoUrl={cfg.avatar_url || cfg.profile_pic_url || cfg.logo_url || null}
+        />
+      </div>
+    );
+  }
   // The root <html> is locked to he/rtl (marketing site default). We override
   // for the chat subtree so English accounts (IMAI) render LTR with English
   // form controls. `lang` here is informational for screen readers and CSS
   // pseudo-classes; `dir` is what actually drives layout.
   return (
     <div lang={lang} dir={dir} style={{ direction: dir }}>
+      {/* Renders null for anything that isn't a timed demo. */}
+      <DemoCountdownBar access={demoAccess} surface="chat" />
       {children}
     </div>
   );

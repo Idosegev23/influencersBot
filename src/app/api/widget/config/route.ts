@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { signWidgetToken } from '@/lib/analytics/widget-token';
 import { resolveBanner } from '@/lib/widget/banner';
+import { demoAccessFromConfig } from '@/lib/demo/guard';
 
 function getCorsHeaders(origin: string): Record<string, string> {
   return {
@@ -123,6 +124,10 @@ export async function GET(req: NextRequest) {
         domain: widgetConfig.domain || config.username || '',
         analyticsToken,
         modules,
+        // Demo window. `state: 'open'` with null dates is what every paying
+        // account and every pre-feature demo returns, so widget.js and the
+        // /demo page can read this unconditionally without a compat branch.
+        demo: demoAccessFromConfig(config),
       },
       { headers: corsHeaders },
     );

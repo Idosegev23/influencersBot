@@ -18,6 +18,7 @@ import {
 } from '@/lib/cached-loaders';
 import { getAccountByInfluencerUsername } from '@/engines';
 import { sanitizeChatMessage, sanitizeUsername } from '@/lib/sanitize';
+import { demoAccessFromConfig, demoExpiredBody } from '@/lib/demo/guard';
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,6 +43,13 @@ export async function POST(req: NextRequest) {
         { error: 'Influencer not found' },
         { status: 404 }
       );
+    }
+
+    // Expired demo — refuse before any model spend. Accounts without
+    // config.demo (paying customers, pre-feature demos) resolve to 'open'.
+    const demoAccess = demoAccessFromConfig((influencer as any)?._rawConfig);
+    if (demoAccess.state === 'locked') {
+      return NextResponse.json(demoExpiredBody(demoAccess), { status: 403 });
     }
 
     // ⚡ FIX: Get the correct account (handles legacy_influencer_id mapping)

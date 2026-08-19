@@ -13,6 +13,7 @@ import {
   ListChecks,
   MoreHorizontal,
   FlaskConical,
+  CalendarPlus,
 } from 'lucide-react';
 import type { Influencer } from '@/types';
 import { formatNumber } from '@/lib/utils';
@@ -28,7 +29,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 type AccountFilter = 'all' | 'creator' | 'brand' | 'service' | 'demo';
 type SortKey = 'recent' | 'followers' | 'name';
-type AccountRow = Influencer & { is_demo?: boolean };
+type DemoWindow = { state: 'open' | 'expiring' | 'locked'; endsAt: string | null; daysLeft: number | null };
+type AccountRow = Influencer & { is_demo?: boolean; demo?: DemoWindow };
 
 // Real classification lives in config.archetype (surfaced by /api/admin/accounts),
 // NOT in accounts.type — which is hard-coded to 'creator' at account creation.
@@ -136,6 +138,27 @@ export default function AccountsPage() {
         prev.map((i) => (i.id === influencer.id ? { ...i, is_demo: !next } : i)),
       );
       alert('שגיאה בעדכון סטטוס דמו');
+    }
+  };
+
+  const handleExtendDemo = async (influencer: AccountRow) => {
+    if (!influencer.demo || influencer.demo.daysLeft === null) return;
+    try {
+      const res = await fetch(`/api/admin/accounts/${influencer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ extendDemoWeek: true }),
+      });
+      if (!res.ok) throw new Error('failed');
+      // Refetch rather than guessing the new end: the server measures the
+      // extension from whichever is later, now or the current end.
+      const refreshed = await fetch('/api/admin/accounts');
+      if (refreshed.ok) {
+        const data = await refreshed.json();
+        setInfluencers(data.influencers || []);
+      }
+    } catch {
+      alert('שגיאה בהארכת הדמו');
     }
   };
 
@@ -267,6 +290,7 @@ export default function AccountsPage() {
               progress={checklistProgress[i.id]}
               onDelete={() => handleDelete(i)}
               onToggleDemo={() => handleToggleDemo(i)}
+              onExtendDemo={() => handleExtendDemo(i)}
             />
           ))}
         </div>
@@ -304,11 +328,13 @@ function AccountCard({
   progress,
   onDelete,
   onToggleDemo,
+  onExtendDemo,
 }: {
   influencer: AccountRow;
   progress?: { total: number; completed: number };
   onDelete: () => void;
   onToggleDemo: () => void;
+  onExtendDemo: () => void;
 }) {
   const pct = progress ? Math.round((progress.completed / progress.total) * 100) : null;
   const isDone = pct === 100;
@@ -346,6 +372,11 @@ function AccountCard({
               )}
               {influencer.type === 'brand' && <Badge variant="accent">מותג</Badge>}
               {influencer.is_demo && <Badge variant="warning">Demo</Badge>}
+              {influencer.demo && influencer.demo.daysLeft !== null && (
+                <Badge variant={influencer.demo.state === 'locked' ? 'danger' : influencer.demo.state === 'expiring' ? 'warning' : 'neutral'}>
+                  {influencer.demo.state === 'locked' ? 'ננעל' : `${influencer.demo.daysLeft} ימים`}
+                </Badge>
+              )}
               <span className="text-[10.5px] text-[color:var(--ink-400)] ms-0.5 tabular-nums">
                 {formatNumber(influencer.followers_count)} עוקבים
               </span>
@@ -403,6 +434,20 @@ function AccountCard({
             <ExternalLink className="w-3.5 h-3.5" />
             צפייה
           </a>
+          {influencer.demo && influencer.demo.daysLeft !== null && (
+            <button
+              onClick={onExtendDemo}
+              className="ui-btn ui-btn-icon-sm ui-btn-ghost focus-ring"
+              aria-label="הארך את הדמו בשבוע"
+              title={
+                influencer.demo.state === 'locked'
+                  ? 'הדמו ננעל — הארך בשבוע ופתח אותו מחדש'
+                  : `נותרו ${influencer.demo.daysLeft} ימים — הארך בשבוע`
+              }
+            >
+              <CalendarPlus className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button
             onClick={onToggleDemo}
             className={
