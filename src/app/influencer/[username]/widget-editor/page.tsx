@@ -671,7 +671,8 @@ export default function WidgetEditorPage() {
                 onChange={(e) => setEyebrow(e.target.value)}
                 maxLength={MAX_EYEBROW}
                 placeholder={resolvedBanner?.eyebrow || 'לדוגמה: חדש'}
-                className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+                disabled={saving}
+                className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={inputStyle}
               />
               <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
@@ -689,7 +690,8 @@ export default function WidgetEditorPage() {
                 onChange={(e) => setHeadline(e.target.value)}
                 maxLength={MAX_HEADLINE}
                 placeholder={resolvedBanner?.headline || 'היי, אני העוזר של המותג. שאלו אותי כל דבר.'}
-                className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+                disabled={saving}
+                className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={inputStyle}
               />
               <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
@@ -707,7 +709,8 @@ export default function WidgetEditorPage() {
                 onChange={(e) => setSubline(e.target.value)}
                 maxLength={MAX_SUBLINE}
                 placeholder={resolvedBanner?.subline || 'משפט קצר שמסביר מה אפשר לשאול'}
-                className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+                disabled={saving}
+                className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={inputStyle}
               />
               <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
@@ -726,7 +729,8 @@ export default function WidgetEditorPage() {
                   onChange={(e) => setCtaLabel(e.target.value)}
                   maxLength={MAX_CTA_LABEL}
                   placeholder={resolvedBanner?.cta?.label || 'לדוגמה: דברו איתי'}
-                  className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+                  disabled={saving}
+                  className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   style={inputStyle}
                 />
                 <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
@@ -743,7 +747,8 @@ export default function WidgetEditorPage() {
                   onChange={(e) => setCtaValue(e.target.value)}
                   maxLength={MAX_CTA_VALUE}
                   placeholder={resolvedBanner?.cta?.value || 'הטקסט שיוזן אוטומטית לתיבת הצ׳אט'}
-                  className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+                  disabled={saving}
+                  className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   style={inputStyle}
                 />
                 <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
@@ -762,7 +767,8 @@ export default function WidgetEditorPage() {
                 onChange={(e) => setStartersLabel(e.target.value)}
                 maxLength={MAX_STARTERS_LABEL}
                 placeholder={resolvedBanner?.starters?.label || 'לדוגמה: שאלות נפוצות'}
-                className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+                disabled={saving}
+                className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={inputStyle}
               />
               <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
@@ -784,13 +790,15 @@ export default function WidgetEditorPage() {
                       onChange={(e) => updateStarterItem(index, e.target.value)}
                       maxLength={MAX_STARTER_ITEM}
                       placeholder={`שאלה ${index + 1}`}
-                      className="flex-1 px-4 py-2.5 rounded-lg text-sm outline-none"
+                      disabled={saving}
+                      className="flex-1 px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                       style={inputStyle}
                     />
                     <button
                       type="button"
                       onClick={() => removeStarterItem(index)}
-                      className="px-3 rounded-lg text-xs font-medium"
+                      disabled={saving}
+                      className="px-3 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: 'var(--dash-bar)', color: '#dc2626', border: '1px solid var(--dash-glass-border)' }}
                     >
                       הסרה
@@ -802,7 +810,8 @@ export default function WidgetEditorPage() {
                 <button
                   type="button"
                   onClick={addStarterItem}
-                  className="mt-2 text-xs font-medium"
+                  disabled={saving}
+                  className="mt-2 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ color: 'var(--color-primary)' }}
                 >
                   + הוספת שאלה
@@ -827,7 +836,7 @@ export default function WidgetEditorPage() {
                       const isSelected = !!candidate.video && selectedReels.some((r) => r.video === candidate.video);
                       const isPlayable = !!candidate.video;
                       const atCap = !isSelected && selectedReels.length >= MAX_REELS;
-                      const disabled = !isPlayable || atCap;
+                      const disabled = !isPlayable || atCap || saving;
                       return (
                         <button
                           key={candidate.shortcode}
@@ -844,7 +853,7 @@ export default function WidgetEditorPage() {
                           className="relative aspect-square rounded-lg overflow-hidden"
                           style={{
                             border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--dash-glass-border)',
-                            opacity: isPlayable ? (atCap && !isSelected ? 0.5 : 1) : 0.35,
+                            opacity: saving ? 0.5 : isPlayable ? (atCap && !isSelected ? 0.5 : 1) : 0.35,
                             cursor: disabled ? 'not-allowed' : 'pointer',
                             background: 'var(--dash-bar)',
                           }}
@@ -895,7 +904,8 @@ export default function WidgetEditorPage() {
                   onChange={(e) => setTeaser(e.target.value)}
                   maxLength={MAX_INVITATION}
                   placeholder={resolvedInvitation?.teaser || 'לדוגמה: יש לי הנחה בשבילך 👋'}
-                  className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+                  disabled={saving}
+                  className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   style={inputStyle}
                 />
                 <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
@@ -912,7 +922,8 @@ export default function WidgetEditorPage() {
                   onChange={(e) => setTooltip(e.target.value)}
                   maxLength={MAX_INVITATION}
                   placeholder={resolvedInvitation?.tooltip || 'לדוגמה: שאלו אותי כל דבר'}
-                  className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+                  disabled={saving}
+                  className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   style={inputStyle}
                 />
                 <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
@@ -929,7 +940,8 @@ export default function WidgetEditorPage() {
                 <button
                   type="button"
                   onClick={addOverride}
-                  className="text-xs font-medium"
+                  disabled={saving}
+                  className="text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ color: 'var(--color-primary)' }}
                 >
                   + הוספת מבצע
@@ -993,7 +1005,8 @@ export default function WidgetEditorPage() {
                             <button
                               type="button"
                               onClick={() => removeOverride(index)}
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium"
+                              disabled={saving}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                               style={{ color: '#dc2626', border: '1px solid var(--dash-glass-border)' }}
                             >
                               הסרה
@@ -1020,7 +1033,8 @@ export default function WidgetEditorPage() {
                               type="date"
                               value={row.from || ''}
                               onChange={(e) => updateOverrideField(index, { from: e.target.value || undefined })}
-                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              disabled={saving}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                               style={inputStyle}
                             />
                           </div>
@@ -1032,7 +1046,8 @@ export default function WidgetEditorPage() {
                               type="date"
                               value={row.until || ''}
                               onChange={(e) => updateOverrideField(index, { until: e.target.value || undefined })}
-                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              disabled={saving}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                               style={inputStyle}
                             />
                           </div>
@@ -1051,7 +1066,8 @@ export default function WidgetEditorPage() {
                           <select
                             value={row.surface || 'both'}
                             onChange={(e) => updateOverrideField(index, { surface: e.target.value as BannerOverride['surface'] })}
-                            className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                            disabled={saving}
+                            className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                             style={inputStyle}
                           >
                             <option value="both">ווידג׳ט וצ׳אט</option>
@@ -1071,7 +1087,8 @@ export default function WidgetEditorPage() {
                               maxLength={MAX_EYEBROW}
                               placeholder="ללא שינוי"
                               onChange={(e) => updateOverrideField(index, { eyebrow: e.target.value })}
-                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              disabled={saving}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                               style={inputStyle}
                             />
                           </div>
@@ -1085,7 +1102,8 @@ export default function WidgetEditorPage() {
                               maxLength={MAX_HEADLINE}
                               placeholder="ללא שינוי"
                               onChange={(e) => updateOverrideField(index, { headline: e.target.value })}
-                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              disabled={saving}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                               style={inputStyle}
                             />
                           </div>
@@ -1099,7 +1117,8 @@ export default function WidgetEditorPage() {
                               maxLength={MAX_SUBLINE}
                               placeholder="ללא שינוי"
                               onChange={(e) => updateOverrideField(index, { subline: e.target.value })}
-                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              disabled={saving}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                               style={inputStyle}
                             />
                           </div>
@@ -1113,7 +1132,8 @@ export default function WidgetEditorPage() {
                               maxLength={MAX_INVITATION}
                               placeholder="ללא שינוי"
                               onChange={(e) => updateOverrideField(index, { teaser: e.target.value })}
-                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              disabled={saving}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                               style={inputStyle}
                             />
                           </div>
@@ -1127,7 +1147,8 @@ export default function WidgetEditorPage() {
                               maxLength={MAX_INVITATION}
                               placeholder="ללא שינוי"
                               onChange={(e) => updateOverrideField(index, { tooltip: e.target.value })}
-                              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                              disabled={saving}
+                              className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                               style={inputStyle}
                             />
                           </div>
@@ -1143,7 +1164,8 @@ export default function WidgetEditorPage() {
                             maxLength={MAX_STARTERS_LABEL}
                             placeholder="ללא שינוי"
                             onChange={(e) => updateOverrideStartersLabel(index, e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg text-sm outline-none mb-2"
+                            disabled={saving}
+                            className="w-full px-3 py-2 rounded-lg text-sm outline-none mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={inputStyle}
                           />
                           <div className="space-y-2">
@@ -1155,13 +1177,15 @@ export default function WidgetEditorPage() {
                                   maxLength={MAX_STARTER_ITEM}
                                   placeholder={`שאלה ${itemIndex + 1}`}
                                   onChange={(e) => updateOverrideStarterItem(index, itemIndex, e.target.value)}
-                                  className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+                                  disabled={saving}
+                                  className="flex-1 px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                   style={inputStyle}
                                 />
                                 <button
                                   type="button"
                                   onClick={() => removeOverrideStarterItem(index, itemIndex)}
-                                  className="px-3 rounded-lg text-xs font-medium"
+                                  disabled={saving}
+                                  className="px-3 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                   style={{ background: 'var(--dash-bar)', color: '#dc2626', border: '1px solid var(--dash-glass-border)' }}
                                 >
                                   הסרה
@@ -1173,7 +1197,8 @@ export default function WidgetEditorPage() {
                             <button
                               type="button"
                               onClick={() => addOverrideStarterItem(index)}
-                              className="mt-2 text-xs font-medium"
+                              disabled={saving}
+                              className="mt-2 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                               style={{ color: 'var(--color-primary)' }}
                             >
                               + הוספת שאלה
