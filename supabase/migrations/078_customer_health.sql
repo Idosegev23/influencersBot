@@ -65,3 +65,12 @@ create table if not exists public.account_health_daily (
 );
 
 create index if not exists account_health_daily_date on public.account_health_daily (date desc);
+
+-- 073 posture: RLS with no policies, defense in depth. Every consumer of these
+-- tables (install-ping recorder, diagnostics route, nightly rollup, admin health
+-- API) uses the service-role client, which bypasses RLS entirely — this blocks
+-- nobody today. It only matters if a default-privilege ACL ever reappears (073's
+-- KNOWN RESIDUAL note: supabase_admin's own default ACL is not fixed).
+alter table public.account_contracts    enable row level security;
+alter table public.install_pings        enable row level security;
+alter table public.account_health_daily enable row level security;
