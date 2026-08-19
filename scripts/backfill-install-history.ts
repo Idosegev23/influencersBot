@@ -13,6 +13,14 @@
  * last-seen date, not enough for the per-domain drill-down. Real origins start
  * accumulating from the day Task 3 ships.
  *
+ * Second caveat (review round 1, Minor 1): the RPC sets active_minutes to a
+ * raw widget_loaded event COUNT for the day, not the Redis-deduped minute
+ * count install_pings normally holds (that column saturates at 1440 — see
+ * migration 078's comment on install_pings). A busy historical day can produce
+ * a backfilled active_minutes far above 1440. This doesn't affect the health
+ * board's status column — activeMinutes isn't part of ChannelFacts — but never
+ * render a backfilled active_minutes as real traffic or real active-minutes.
+ *
  * Run: npx tsx scripts/backfill-install-history.ts
  */
 

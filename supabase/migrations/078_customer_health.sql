@@ -150,43 +150,80 @@ as $$
     from public.widget_events
     where account_id = p_account_id and created_at > (p_day + 1)::timestamptz - interval '8 days'
   ),
-  sess as (
+  -- chat_page "ever" facts (review round 1, Finding 1): everPinged /
+  -- opensLast7d / loadsLast24h must reflect activity up to and including
+  -- p_day, not p_day's own count alone — the widget's `ping` CTE above
+  -- already gets this right with `day <= p_day`; chat_page and whatsapp did
+  -- not, so a channel live for months with zero sessions on the exact night
+  -- the cron runs reported everPinged=false and flipped the board to
+  -- never_installed. Anchored to (p_day + 1)::timestamptz throughout —
+  -- never now() (Finding 2) — so re-running a past day via ?day=YYYY-MM-DD
+  -- measures freshness against the day being rebuilt, not today's wall clock.
+  sess_ever as (
+    select bool_or(true) as ever,
+           max(created_at) as last_seen,
+           count(*) filter (where created_at > (p_day + 1)::timestamptz - interval '7 days')  as opens_7d,
+           count(*) filter (where created_at > (p_day + 1)::timestamptz - interval '24 hours') as loads_24h
+    from public.chat_sessions
+    where account_id = p_account_id and created_at <= (p_day + 1)::timestamptz
+  ),
+  -- The day's own session count stays day-scoped on purpose — this is what
+  -- account_health_daily.sessions (and chat_page's day-scoped "loads" proxy)
+  -- report, distinct from the "ever" facts above.
+  sess_day as (
     select count(*) as n from public.chat_sessions
     where account_id = p_account_id and created_at::date = p_day
   ),
-  wa as (
-    select count(*) as n, max(last_activity_at) as last_seen
+  -- Same ever-vs-day split for whatsapp (Finding 1).
+  wa_ever as (
+    select bool_or(true) as ever,
+           max(last_activity_at) as last_seen,
+           count(*) filter (where last_activity_at > (p_day + 1)::timestamptz - interval '7 days')  as opens_7d,
+           count(*) filter (where last_activity_at > (p_day + 1)::timestamptz - interval '24 hours') as loads_24h
     from public.whatsapp_cs_sessions
+    where active_account_id = p_account_id and last_activity_at <= (p_day + 1)::timestamptz
+  ),
+  wa_day as (
+    select count(*) as n from public.whatsapp_cs_sessions
     where active_account_id = p_account_id and last_activity_at::date = p_day
   )
   select jsonb_build_object(
     'widget', jsonb_build_object(
       'everPinged', coalesce((select ever from ping), false),
-      'hoursSinceLastPing', (select extract(epoch from (now() - last_seen)) / 3600 from ping),
+      -- Anchored to p_day (Finding 2), not now() — see comment above sess_ever.
+      'hoursSinceLastPing', (select extract(epoch from ((p_day + 1)::timestamptz - last_seen)) / 3600 from ping),
       'opensLast7d', (select opens_7d from wev),
       'errorsLast24h', (select errors_24h from wev),
       'loadsLast24h', (select loads_24h from wev),
       'activeMinutes', (select minutes from ping),
       'distinctOrigins', (select origins from ping),
       'messages', (select messages from wev),
-      'sessions', (select n from sess)
+      'sessions', (select n from sess_day)
     ),
     'chat_page', jsonb_build_object(
-      'everPinged', (select n from sess) > 0,
-      'hoursSinceLastPing', case when (select n from sess) > 0 then 0 else null end,
-      'opensLast7d', (select n from sess),
-      'errorsLast24h', 0, 'loadsLast24h', (select n from sess),
+      'everPinged', coalesce((select ever from sess_ever), false),
+      'hoursSinceLastPing', (select extract(epoch from ((p_day + 1)::timestamptz - last_seen)) / 3600 from sess_ever),
+      'opensLast7d', (select opens_7d from sess_ever),
+      'loadsLast24h', (select loads_24h from sess_ever),
+      -- errorsLast24h is a real hardcoded 0, not a measurement (review round 1,
+      -- Minor 2): chat_page has no error signal wired up yet — widget_events
+      -- client errors are widget-only — so deriveChannelStatus can never
+      -- return 'erroring' for chat_page in v1. Fine as a scope limit; called
+      -- out here the same way rollup.ts calls out the unpopulated `leads` field.
+      'errorsLast24h', 0,
       'activeMinutes', 0, 'distinctOrigins', 0, 'messages', 0,
-      'sessions', (select n from sess)
+      'sessions', (select n from sess_day)
     ),
     'whatsapp', jsonb_build_object(
-      'everPinged', (select n from wa) > 0,
-      'hoursSinceLastPing',
-        (select extract(epoch from (now() - last_seen)) / 3600 from wa),
-      'opensLast7d', (select n from wa),
-      'errorsLast24h', 0, 'loadsLast24h', (select n from wa),
-      'activeMinutes', 0, 'distinctOrigins', 0, 'messages', (select n from wa),
-      'sessions', (select n from wa)
+      'everPinged', coalesce((select ever from wa_ever), false),
+      'hoursSinceLastPing', (select extract(epoch from ((p_day + 1)::timestamptz - last_seen)) / 3600 from wa_ever),
+      'opensLast7d', (select opens_7d from wa_ever),
+      'loadsLast24h', (select loads_24h from wa_ever),
+      -- Same v1 scope limit as chat_page above (review round 1, Minor 2): no
+      -- error signal wired up for WhatsApp yet, so this is a real hardcoded 0.
+      'errorsLast24h', 0,
+      'activeMinutes', 0, 'distinctOrigins', 0, 'messages', (select n from wa_day),
+      'sessions', (select n from wa_day)
     ),
     'instagram', jsonb_build_object(
       'everPinged', false, 'hoursSinceLastPing', null,
@@ -220,6 +257,14 @@ begin
          created_at::date,
          min(created_at),
          max(created_at),
+         -- active_minutes here is a raw widget_loaded event COUNT, not the
+         -- Redis-deduped minute count the column is meant to hold (see the
+         -- column's own comment above, line ~28-31: it saturates at 1440 and
+         -- means "minutes in which the widget loaded at least once"). On a
+         -- busy historical day this proxy can far exceed 1440. It does not
+         -- affect status derivation — activeMinutes is not part of
+         -- ChannelFacts — but do not render this backfilled value as real
+         -- traffic or real active-minutes (review round 1, Minor 1).
          count(*),
          null,
          null
