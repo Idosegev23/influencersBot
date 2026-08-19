@@ -1069,7 +1069,7 @@
   };
   function showComplementPopup(products) {
     if (document.getElementById('ibot-comp')) return;
-    var pc = config.primaryColor;
+    var pc = safeColor(config.primaryColor);
     lastCompProducts = products.slice(0, 3);   // index in the button below maps into this array
     var cards = lastCompProducts.map(function (p, i) {
       var price = p.price != null
@@ -1194,12 +1194,19 @@
   // message from an embedding page.
   if (SCRIPT && SCRIPT.getAttribute('data-preview') === 'true') {
     window.addEventListener('message', function (ev) {
+      // The preview route is unauthenticated and framable by anyone, so the
+      // data-preview attribute alone does not establish that the sender is our
+      // editor. Same-origin is what does.
+      if (ev.origin !== window.location.origin) return;
       var msg = ev && ev.data;
       if (!msg || msg.type !== 'ibot:draft' || !msg.config) return;
       try {
         if (msg.config.banner !== undefined) config.banner = msg.config.banner;
         if (msg.config.invitation !== undefined) config.invitation = msg.config.invitation;
-        if (msg.config.primaryColor) config.primaryColor = msg.config.primaryColor;
+        if (typeof msg.config.primaryColor === 'string'
+            && /^#[0-9a-fA-F]{3,8}$/.test(msg.config.primaryColor.trim())) {
+          config.primaryColor = msg.config.primaryColor.trim();
+        }
         pickBannerReel();
         applyLocaleAssets();
         bannerViewTracked = true;   // a draft is not a visitor impression
@@ -1313,10 +1320,10 @@
     if (img) {
       return '<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(config.brandName) + '" ' +
         'style="width:100%;height:100%;object-fit:cover;border-radius:50%;" ' +
-        'onerror="this.style.display=\'none\';this.parentNode.style.background=\'' + config.primaryColor + '\';" />';
+        'onerror="this.style.display=\'none\';this.parentNode.style.background=\'' + safeColor(config.primaryColor) + '\';" />';
     }
     var letter = escapeHtml(((config.brandName || '?').trim().charAt(0) || '?').toUpperCase());
-    return '<div style="width:100%;height:100%;border-radius:50%;background:' + config.primaryColor + ';' +
+    return '<div style="width:100%;height:100%;border-radius:50%;background:' + safeColor(config.primaryColor) + ';' +
       'color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:inherit;' +
       'font-size:' + Math.round((size || 40) * 0.45) + 'px;line-height:1;">' + letter + '</div>';
   }
@@ -1875,7 +1882,7 @@
 
   // ---- Open state: chat panel ----
   function renderOpen() {
-    var pc = config.primaryColor; // per-widget color
+    var pc = safeColor(config.primaryColor); // per-widget color
     // The composer is destroyed and rebuilt by the innerHTML swap below, which
     // used to throw away whatever the visitor was mid-way through typing if a
     // reply landed while they typed. Carry the text and caret across.
@@ -2388,6 +2395,15 @@
       .replace(/"/g, '&quot;');
   }
 
+  // A colour is about to be spliced into an inline style and an inline event
+  // handler, so anything that is not plainly a colour is refused rather than
+  // escaped — this value also arrives from account config, where a stray quote
+  // would break the same two sinks.
+  function safeColor(value) {
+    var v = String(value == null ? '' : value).trim();
+    return /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : '#0c1013';
+  }
+
   // Claim Bestie's channel credit on outbound store/product links by stamping
   // utm_source=bestie + utm_medium — but DELIBERATELY never utm_content. The
   // merchant's report keeps per-field values, so omitting utm_content preserves
@@ -2622,7 +2638,7 @@
   function formatMessage(str, isUserMsg) {
     if (!str) return '';
     var textColor = isUserMsg ? '#fff' : '#000';
-    var linkColor = isUserMsg ? '#93c5fd' : config.primaryColor;
+    var linkColor = isUserMsg ? '#93c5fd' : safeColor(config.primaryColor);
     var lines = str.split('\n');
     var html = '';
     var inUl = false;
@@ -2976,7 +2992,7 @@
   }
 
   function renderSupportForm() {
-    var pc = config.primaryColor;
+    var pc = safeColor(config.primaryColor);
     var s = locale.support;
     var isMobile = window.innerWidth < 640;
     var panelStyle = isMobile
@@ -3107,7 +3123,7 @@
   }
 
   function renderSupportSuccess() {
-    var pc = config.primaryColor;
+    var pc = safeColor(config.primaryColor);
     var s = locale.support;
     var isMobile = window.innerWidth < 640;
     var panelStyle = isMobile
@@ -3455,7 +3471,7 @@
   // muscle memory transfers between them.
   // ============================================
   function formShell(opts) {
-    var pc = config.primaryColor;
+    var pc = safeColor(config.primaryColor);
     var isMobile = window.innerWidth < 640;
     var panelStyle = isMobile
       ? mobilePanelStyle()
@@ -3775,7 +3791,7 @@
   }
 
   function renderOrderResult() {
-    var pc = config.primaryColor;
+    var pc = safeColor(config.primaryColor);
     var O = locale.order;
     var isMobile = window.innerWidth < 640;
     var panelStyle = isMobile
@@ -3826,7 +3842,7 @@
   // Support has its own (renderSupportSuccess) because it surfaces the ticket ref.
   // ============================================
   function renderGenericSuccess(L) {
-    var pc = config.primaryColor;
+    var pc = safeColor(config.primaryColor);
     var isMobile = window.innerWidth < 640;
     var panelStyle = isMobile
       ? mobilePanelStyle()
