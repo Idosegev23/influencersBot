@@ -9,6 +9,7 @@ import {
   resolveBanner,
   resolveInvitation,
   MAX_INVITATION,
+  MAX_REELS,
   type ResolvedBanner,
 } from '@/lib/widget/banner';
 import { WidgetDraftPreview } from '@/components/influencer/WidgetDraftPreview';
@@ -27,14 +28,25 @@ const MAX_STARTERS_LABEL = 40;
 const MAX_STARTER_ITEM = 80;
 const MAX_STARTER_ITEMS = 4;
 
+/** One row of GET /api/influencer/reels — see that route for field meaning. */
+interface ReelCandidate {
+  shortcode: string;
+  poster: string | null;
+  /** null = never persisted (scripts/persist-reel-videos.ts hasn't run for it) — not selectable. */
+  video: string | null;
+  /** Whether this shortcode is currently in config.reels (the raw, saved selection). */
+  selected: boolean;
+}
+
 /**
  * Widget editor — customer-facing control for `config.widget.banner` and the
  * launcher's invitation bubbles, with a live preview of the real widget (not
  * a re-implementation of it).
  *
  * Covers the banner's copy fields (eyebrow, headline, subline, CTA, starter
- * questions) and the two invitation bubbles (`config.widget.teaser`/
- * `tooltip`). Reel selection and scheduled promotions remain separate
+ * questions), the two invitation bubbles (`config.widget.teaser`/`tooltip`),
+ * and which persisted reels play behind the banner (`config.reels`, account-
+ * level rather than per-surface). Scheduled promotions remain separate
  * follow-on work. This page's job is: load the account, hold a draft, drive
  * the preview iframe on every change, and save through the shared
  * /api/influencer/settings endpoint.
@@ -65,6 +77,22 @@ export default function WidgetEditorPage() {
   const [starterItems, setStarterItems] = useState<string[]>([]);
   const [teaser, setTeaser] = useState('');
   const [tooltip, setTooltip] = useState('');
+  // The candidate pool from GET /api/influencer/reels — what's shown/
+  // clickable in the grid. Kept separate from `config` (unlike the banner
+  // fields above) because this list has its own fetch/loading lifecycle,
+  // independent of the account load. NOT the source of truth for what's
+  // selected — see `selectedReels` below.
+  const [reelCandidates, setReelCandidates] = useState<ReelCandidate[]>([]);
+  const [reelsLoaded, setReelsLoaded] = useState(false);
+  // The actual draft rotation — {video, poster} pairs, seeded RAW from
+  // config.reels (see the load effect) and never keyed by shortcode. Keying
+  // selection by shortcode against only the fetched candidate window would
+  // silently drop a persisted reel from the saved rotation the moment it
+  // aged out of the top-30-by-views candidate list (danielamit has exactly
+  // this case: one of its 5 persisted reels ranks #50 by views) — the very
+  // next unrelated save would shrink the account's rotation from 5 to 4
+  // without the customer touching reel selection at all.
+  const [selectedReels, setSelectedReels] = useState<{ video: string; poster: string | null }[]>([]);
   // What a visitor sees RIGHT NOW — the resolved banner/invitation, including
   // any live scheduled override. Used only for placeholder text, never to
   // seed an input's value (see the load effect below for why).
@@ -115,6 +143,20 @@ export default function WidgetEditorPage() {
         setStarterItems(rawBanner?.starters?.items || []);
         setTeaser(rawConfig?.widget?.teaser || '');
         setTooltip(rawConfig?.widget?.tooltip || '');
+        // Account-level, not nested under `widget` — same field
+        // scripts/persist-reel-videos.ts writes and resolveArt reads
+        // (src/lib/widget/banner.ts). Raw, not resolved: reels have no
+        // override/promotion layer, so this already IS the value a visitor
+        // gets right now.
+        const rawReels: unknown[] = Array.isArray(rawConfig?.reels) ? rawConfig.reels : [];
+        const isReel = (r: unknown): r is { video: string; poster?: unknown } =>
+          !!r && typeof r === 'object' && typeof (r as { video?: unknown }).video === 'string';
+        setSelectedReels(
+          rawReels
+            .filter(isReel)
+            .map((r) => ({ video: r.video, poster: typeof r.poster === 'string' ? r.poster : null }))
+            .slice(0, MAX_REELS),
+        );
 
         setResolvedBanner(resolveBanner(rawConfig, 'widget', { brandName: name }));
         setResolvedInvitation(resolveInvitation(rawConfig, 'widget'));
@@ -126,6 +168,42 @@ export default function WidgetEditorPage() {
     })();
     return () => { cancelled = true; };
   }, [username]);
+
+  // Candidates to render as pickable tiles — independent of the account load
+  // above (its own endpoint, its own loading lifecycle). This list only
+  // drives what's shown/clickable; it is NOT the source of truth for what's
+  // selected (see `selectedReels` above and its comment).
+  useEffect(() => {
+    if (!username) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/influencer/reels?username=${encodeURIComponent(username)}`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const list: ReelCandidate[] = Array.isArray(data.reels) ? data.reels : [];
+        if (cancelled) return;
+        setReelCandidates(list);
+      } catch (err) {
+        console.error('[widget-editor] failed to load reels:', err);
+      } finally {
+        if (!cancelled) setReelsLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [username]);
+
+  function toggleReel(candidate: ReelCandidate) {
+    if (!candidate.video) return; // not persisted yet — cannot play, cannot be selected
+    const video = candidate.video;
+    setSelectedReels((prev) => {
+      if (prev.some((r) => r.video === video)) {
+        return prev.filter((r) => r.video !== video);
+      }
+      if (prev.length >= MAX_REELS) return prev; // cap enforced — silently ignore, button is disabled anyway
+      return [...prev, { video, poster: candidate.poster }];
+    });
+  }
 
   // The list of starter questions the customer actually typed, trimmed and
   // emptied of blank rows. An empty result must be saved as `null`, never
@@ -180,9 +258,15 @@ export default function WidgetEditorPage() {
     if (!config) return null;
     return {
       ...config,
+      // Account-level, not nested under `widget` (resolveArt reads
+      // config.reels directly — see src/lib/widget/banner.ts). `selectedReels`
+      // is seeded synchronously with `config` itself in the load effect
+      // above, so unlike the copy fields there's no separate fetch to wait
+      // on here.
+      reels: selectedReels,
       widget: { ...(config.widget || {}), banner: bannerDraft, teaser, tooltip },
     };
-  }, [config, bannerDraft, teaser, tooltip]);
+  }, [config, bannerDraft, teaser, tooltip, selectedReels]);
 
   const previewDraft = useMemo(() => {
     if (!previewConfig) return null;
@@ -219,11 +303,20 @@ export default function WidgetEditorPage() {
         body: JSON.stringify({
           username,
           widget: { banner: bannerDraft, teaser, tooltip },
+          // Always sent — `selectedReels` is seeded raw from config.reels at
+          // load (same moment as every other field on this page), not from
+          // the separate /api/influencer/reels candidate fetch, so there is
+          // no "hasn't resolved yet" state to guard against here.
+          reels: selectedReels,
         }),
       });
       if (res.ok) {
         setConfig((prev: any) => prev
-          ? { ...prev, widget: { ...(prev.widget || {}), banner: bannerDraft, teaser, tooltip } }
+          ? {
+              ...prev,
+              widget: { ...(prev.widget || {}), banner: bannerDraft, teaser, tooltip },
+              reels: selectedReels,
+            }
           : prev);
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
@@ -420,6 +513,66 @@ export default function WidgetEditorPage() {
                   + הוספת שאלה
                 </button>
               ) : null}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
+                סרטוני רילס ברקע הווידג׳ט
+              </label>
+              {!reelsLoaded ? (
+                <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>טוען סרטונים…</p>
+              ) : reelCandidates.length === 0 ? (
+                <p className="text-sm text-[#655e51]">
+                  עוד לא הופקו סרטונים לחשבון הזה. אחרי הסריקה הבאה הם יופיעו כאן.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                    {reelCandidates.map((candidate) => {
+                      const isSelected = !!candidate.video && selectedReels.some((r) => r.video === candidate.video);
+                      const isPlayable = !!candidate.video;
+                      const atCap = !isSelected && selectedReels.length >= MAX_REELS;
+                      const disabled = !isPlayable || atCap;
+                      return (
+                        <button
+                          key={candidate.shortcode}
+                          type="button"
+                          onClick={() => toggleReel(candidate)}
+                          disabled={disabled}
+                          title={!isPlayable ? 'הסרטון הזה עוד לא עובד לשידור — הוא יופיע כאן כשיהיה מוכן' : undefined}
+                          className="relative aspect-square rounded-lg overflow-hidden"
+                          style={{
+                            border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--dash-glass-border)',
+                            opacity: isPlayable ? (atCap && !isSelected ? 0.5 : 1) : 0.35,
+                            cursor: disabled ? 'not-allowed' : 'pointer',
+                            background: 'var(--dash-bar)',
+                          }}
+                        >
+                          {candidate.poster ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={candidate.poster}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : null}
+                          {isSelected ? (
+                            <span
+                              className="absolute top-1 left-1 w-5 h-5 rounded-full flex items-center justify-center"
+                              style={{ background: 'var(--color-primary)', color: '#fff' }}
+                            >
+                              <Check className="w-3 h-3" />
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-[#655e51] mt-2">
+                    נבחרו {selectedReels.length} מתוך 5. הסרטונים מתחלפים בין מבקרים.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
