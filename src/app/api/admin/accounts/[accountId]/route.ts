@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { extendDemoWindow } from '@/lib/demo/access';
 
 /**
  * PATCH /api/admin/accounts/[accountId]/config
@@ -49,6 +50,19 @@ export async function PATCH(
     // Demo flag — when set, the account is excluded from all automatic scan/AI crons
     if (typeof body.isDemo === 'boolean') {
       updatedConfig.isDemo = body.isDemo;
+    }
+
+    // Extend a demo window by a week. Sales reality: the meeting lands on day 9
+    // and the demo cannot die on day 7.
+    //
+    // Measured from whichever is later — now, or the current end — so extending
+    // a demo that still has days left adds to it rather than shortening it.
+    // Clearing `locked_at` lets the watch cron announce the new end date when it
+    // arrives; without that, an extended-then-re-expired demo would lock in
+    // silence.
+    if (body.extendDemoWeek === true && currentConfig.demo) {
+      const extended = extendDemoWindow(currentConfig.demo);
+      if (extended) updatedConfig.demo = extended;
     }
 
     const { error: updateError } = await supabase

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { extractImageData } from '@/lib/scraping/image-analyzer';
 import { verticalForArchetype } from '@/lib/catalog/verticals';
+import { buildDemoConfig } from '@/lib/demo/access';
 import type { StepContext } from '../types';
 import type { StepResult } from './index';
 
@@ -50,6 +51,19 @@ export async function finalizeStep(ctx: StepContext): Promise<StepResult> {
   // scan-mode marking — quote = bounded pre-sales demo; undefined ⇒ full.
   cfg.scan_mode = ctx.state.options?.scanMode || 'full';
   cfg.scanned_categories = ctx.state.options?.categories ?? [];
+
+  // Demo window — a demo account's public links (/chat/<slug>, /demo/<id>) stay
+  // open for 7 days and then lock behind the "talk to LDRS" screen.
+  //
+  // CREATE-ONLY, and on purpose. A re-scan must never restart or extend the
+  // clock: config-wipe/re-scan races have already resurrected settings in this
+  // codebase more than once (lenovo, studiopasha), and a demo quietly coming
+  // back to life is the same bug wearing a different hat.
+  //
+  // Accounts that are not demos never get the key at all, which is what makes
+  // `resolveDemoAccess` unable to lock a paying customer — see the two rules in
+  // src/lib/demo/access.ts.
+  if (cfg.isDemo && !cfg.demo) cfg.demo = buildDemoConfig();
 
   await supabase.from('accounts').update({ config: cfg }).eq('id', ctx.accountId);
 

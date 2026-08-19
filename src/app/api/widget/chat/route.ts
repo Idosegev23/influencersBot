@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/server';
 import { emitWebCsEvents } from '@/lib/cs/web-adapter';
 import { getWidgetCorsHeaders as getCorsHeaders, isWidgetOriginAllowed as isOriginAllowed } from '@/lib/widget/cors';
 import type { ProductRecommendation } from '@/lib/recommendations/engine';
+import { demoAccessFromConfig, demoExpiredBody } from '@/lib/demo/guard';
+import { recordBotGaveUp } from '@/lib/telemetry/bot-quality';
 
 // ============================================
 // OPTIONS — CORS Preflight
@@ -121,6 +123,16 @@ export async function POST(req: NextRequest) {
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
+    }
+
+    // Expired demo — refuse the turn. Accounts without config.demo (every
+    // paying customer, every demo predating this feature) resolve to 'open'.
+    const demoAccess = demoAccessFromConfig(cfg);
+    if (demoAccess.state === 'locked') {
+      return new Response(
+        JSON.stringify(demoExpiredBody(demoAccess)),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     // CS-engine mode (spec §5): when the visitor chose customer service AND the account has the
@@ -257,6 +269,17 @@ export async function POST(req: NextRequest) {
           );
         } catch (error: any) {
           console.error('[Widget Chat] Error:', error);
+          // Backstop for anything besides the sandwich-bot call itself (that
+          // one has its own catch inside processWidgetMessage, and returns
+          // normally instead of throwing) — e.g. a bug in the post-processing
+          // below it. Either way the visitor sees the same generic error
+          // bubble instead of an answer.
+          await recordBotGaveUp({
+            accountId,
+            sessionId: sessionId || null,
+            surface: 'widget',
+            reason: 'llm_error',
+          });
           controller.enqueue(
             encodeEvent({ type: 'error', message: loc.errorProcessing }),
           );

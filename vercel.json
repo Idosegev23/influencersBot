@@ -90,6 +90,10 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/account-health-rollup",
+      "schedule": "15 3 * * *"
+    },
+    {
       "path": "/api/cron/gsc-fetch",
       "schedule": "0 4 * * *"
     },
@@ -132,6 +136,14 @@
     {
       "path": "/api/cron/quickshop-order-sync",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/demo-watch",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/demo-digest",
+      "schedule": "0 5 * * *"
     }
   ]
 }

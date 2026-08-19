@@ -31,6 +31,74 @@
     return;
   }
 
+  var WIDGET_VERSION = '4.0';
+
+  // ---- Diagnostics reporter -------------------------------------------------
+  // widget.js swallows every error on purpose (we must never break the host
+  // page), which historically left us totally blind to failures at the customer.
+  // This reports them out-of-band. Capped and deduped so a render loop cannot
+  // flood us, and it can never itself throw.
+  var DIAG_CAP = 5;
+  var diagSent = 0;
+  var diagSeen = {};
+
+  function report(type, detail) {
+    try {
+      if (diagSent >= DIAG_CAP) return;
+      var msg = String((detail && detail.message) || detail || '').slice(0, 500);
+      if (!msg) return;
+      if (diagSeen[msg]) return;
+      diagSeen[msg] = 1;
+      diagSent++;
+      var body = JSON.stringify({
+        accountId: ACCOUNT_ID,
+        type: type,
+        message: msg,
+        // Bounded client-side too: the server only keeps the first 3 frames,
+        // but a deep stack plus a long UA can push the whole body past its
+        // 2KB cap, which is dropped silently — losing exactly the failures
+        // most worth having.
+        stack: (detail && detail.stack) ? String(detail.stack).slice(0, 1000) : null,
+        filename: (detail && detail.filename) || null,
+        line: (detail && detail.line) || null,
+        widgetVersion: WIDGET_VERSION,
+        ua: navigator.userAgent,
+        path: location.pathname
+      });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(BASE_URL + '/api/widget/diagnostics', body);
+      } else {
+        fetch(BASE_URL + '/api/widget/diagnostics', {
+          method: 'POST', body: body, keepalive: true
+        }).catch(function () { /* fire-and-forget */ });
+      }
+    } catch (e) { /* diagnostics must never break anything, including itself */ }
+  }
+
+  // Only OUR script. Without this filter we would collect the host page's own
+  // exceptions — their code, and potentially their users' data. A bare
+  // substring check on '/widget.js' is not enough: a host page can legitimately
+  // serve its own script at a path ending '/widget.js' too, so the filter must
+  // anchor to our own origin (BASE_URL), not just the filename shape.
+  try {
+    window.addEventListener('error', function (ev) {
+      try {
+        if (!ev || !ev.filename || ev.filename.indexOf(BASE_URL + '/widget.js') !== 0) return;
+        report('client_error', {
+          message: ev.message, filename: ev.filename, line: ev.lineno,
+          stack: ev.error && ev.error.stack
+        });
+      } catch (e) { /* */ }
+    });
+    window.addEventListener('unhandledrejection', function (ev) {
+      try {
+        var r = ev && ev.reason;
+        if (!r || !r.stack || r.stack.indexOf(BASE_URL) === -1) return;
+        report('client_error', { message: r.message || String(r), stack: r.stack });
+      } catch (e) { /* */ }
+    });
+  } catch (e) { /* */ }
+
   // ============================================
   // State
   // ============================================
@@ -544,7 +612,7 @@
   function widgetTrack(eventName, params) {
     params = params || {};
     var enriched = {
-      widget_version: '4.0',
+      widget_version: WIDGET_VERSION,
       attribution: WIDGET_ATTRIBUTION,
     };
     for (var k in params) enriched[k] = params[k];
@@ -1100,8 +1168,11 @@
   // Load Config
   // ============================================
 
-  fetch(BASE_URL + '/api/widget/config?accountId=' + ACCOUNT_ID)
-    .then(function (r) { return r.json(); })
+  fetch(BASE_URL + '/api/widget/config?accountId=' + ACCOUNT_ID + '&v=' + WIDGET_VERSION)
+    .then(function (r) {
+      if (!r.ok) report('config_load_failed', { message: 'config HTTP ' + r.status });
+      return r.json();
+    })
     .then(function (data) {
       // Resolve locale FIRST so default strings reflect the account's language
       // before we apply per-account overrides.
@@ -1165,7 +1236,7 @@
       }
       updateContainerPosition();
       messages = [{ role: 'assistant', content: config.welcomeMessage }];
-      widgetTrack('widget_loaded', { modules: modules });
+      widgetTrack('widget_loaded', { modules: modules, widget_version: WIDGET_VERSION });
       // Fire chip fetch in parallel — non-blocking; widget renders without chips
       // first, chips populate when ready (≈400ms on cache miss).
       fetchChips('initial');
@@ -1188,7 +1259,8 @@
       setTimeout(function () { try { showBubbleTooltip(); } catch (e) {} }, 2500);
       try { initCartWatcher(onCartAdd); } catch (e) { /* */ }
     })
-    .catch(function () {
+    .catch(function (e) {
+      report('config_load_failed', { message: (e && e.message) || 'config fetch failed' });
       messages = [{ role: 'assistant', content: config.welcomeMessage }];
       render();
     });

@@ -8,6 +8,7 @@ import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAccountByUsername } from '@/lib/supabase';
 import { prewarmSuggestionRAG } from '@/lib/suggestion-cache';
+import { demoAccessFromConfig, demoExpiredBody } from '@/lib/demo/guard';
 
 export async function GET(request: Request) {
   try {
@@ -29,6 +30,13 @@ export async function GET(request: Request) {
         { error: 'Account not found' },
         { status: 404 }
       );
+    }
+
+    // Expired demo — no session bootstrap. The page renders the lock screen
+    // instead; accounts without config.demo resolve to 'open'.
+    const demoAccess = demoAccessFromConfig((account as any)?.config);
+    if (demoAccess.state === 'locked') {
+      return NextResponse.json(demoExpiredBody(demoAccess), { status: 403 });
     }
 
     const supabase = await createClient();

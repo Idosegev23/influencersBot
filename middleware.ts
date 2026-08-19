@@ -24,6 +24,8 @@ const RATE_LIMITS = {
   auth: { windowMs: 60 * 1000, maxRequests: 50 },
   influencer: { windowMs: 60 * 1000, maxRequests: 200 }, // High limit for dashboard
   widget: { windowMs: 60 * 1000, maxRequests: 200 }, // Public widget — needs high limit
+  // Unauthenticated write path — far tighter than the general widget bucket.
+  widgetDiagnostics: { windowMs: 60 * 1000, maxRequests: 20 },
 };
 
 function getClientIP(request: NextRequest): string {
@@ -209,7 +211,14 @@ export async function middleware(request: NextRequest) {
     let prefix = 'api';
     
     // Different limits for different endpoints
-    if (pathname.startsWith('/api/widget')) {
+    if (pathname.startsWith('/api/widget/diagnostics')) {
+      // Must precede the general /api/widget branch below — otherwise it is
+      // shadowed and silently inherits the 200/min widget bucket instead of
+      // this narrower one, which is one of this route's compensating controls
+      // for being unauthenticated.
+      config = RATE_LIMITS.widgetDiagnostics;
+      prefix = 'widgetDiagnostics';
+    } else if (pathname.startsWith('/api/widget')) {
       config = RATE_LIMITS.widget;
       prefix = 'widget';
     } else if (pathname.startsWith('/api/wa/')) {

@@ -5,6 +5,9 @@ export const WIDGET_EVENT_TYPES = new Set<string>([
   'click','internal_nav','external_link_click',
   // existing funnel events also flow here now
   'widget_loaded','widget_opened','widget_closed','widget_message_sent','widget_message_received',
+  // diagnostics (migration 078 / Task 4) — these ride the same buffer → drain →
+  // partition path, so client errors inherit the 90-day retention for free.
+  'client_error','config_load_failed','csp_blocked',
 ]);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

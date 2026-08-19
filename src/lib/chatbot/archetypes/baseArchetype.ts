@@ -14,6 +14,7 @@ import OpenAI from 'openai';
 import type { ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { buildPersonalityFromDB, type PersonalityConfig } from '../personality-wrapper';
 import { compactKnowledgeContext } from '@/lib/rag/compact-knowledge-context';
+import { recordBotGaveUp } from '@/lib/telemetry/bot-quality';
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -1008,6 +1009,31 @@ ${answerLanguageLine}
 
     } catch (error) {
       console.error('[BaseArchetype] All models failed:', error);
+      // Both branches above throw a distinctly-worded Error when the model
+      // returned nothing ('Empty [streaming ]response from ... model'); any
+      // other error here is a genuine call failure (network/auth/timeout).
+      // That prefix is the only signal available at this single catch site
+      // without adding a second try/catch, so we use it to pick the reason.
+      const errMsg = error instanceof Error ? error.message : '';
+      const reason = /^Empty /.test(errMsg) ? 'empty_response' : 'llm_error';
+      // input.mode is only reliable for 'widget' (widget-chat-handler.ts) and
+      // undefined (the /chat/[username] page's two routes, which never set
+      // it). 'social' / 'dm' cover Instagram DM and Respond.io DM turns that
+      // also run through this shared method — out of this task's scope
+      // (neither the widget nor the chat page), so they're skipped rather
+      // than mislabeled.
+      if (input.mode === 'widget' || input.mode === undefined) {
+        await recordBotGaveUp({
+          accountId: input.accountContext.accountId,
+          // Not threaded into ArchetypeInput by any of the 3 live callers —
+          // adding it would mean widening SandwichBotInput, the
+          // processWithArchetype context param, and this type, which is
+          // more than "instrument an existing site" calls for.
+          sessionId: null,
+          surface: input.mode === 'widget' ? 'widget' : 'chat',
+          reason,
+        });
+      }
       const fallbackText = (input.accountContext.language || 'he').toLowerCase() === 'en'
         ? 'Oops, something went wrong. Want to try again?'
         : 'אופס, משהו השתבש... אפשר לנסות שוב?';

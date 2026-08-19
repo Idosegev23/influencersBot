@@ -20,6 +20,7 @@ import {
   type RetrievalRequest,
   type ContentMetadata 
 } from './hybrid-retrieval';
+import { recordBotGaveUp } from '@/lib/telemetry/bot-quality';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -135,6 +136,11 @@ ${metadataPrompt}
     if (!message.tool_calls || message.tool_calls.length === 0) {
       // No function call needed - direct answer
       console.log('✅ [Stage 2] AI answered directly (no content fetch needed)');
+      if (!message.content) {
+        // The model returned no content at all — this reply is not derived
+        // from anything, it's the hardcoded fallback string below.
+        await recordBotGaveUp({ accountId, sessionId: null, surface: 'chat', reason: 'empty_response' });
+      }
       return message.content || 'מצטער/ת, לא הצלחתי להבין. נסה/י שוב?';
     }
 
@@ -179,15 +185,25 @@ ${metadataPrompt}
       // GPT-5 Nano only supports temperature: 1 (default)
     });
 
-    const finalAnswer = finalResponse.choices[0].message.content || 'מצטער/ת, לא הצלחתי להשלים.';
-    
+    const rawFinalAnswer = finalResponse.choices[0].message.content;
+    if (!rawFinalAnswer) {
+      // AI had the full detailed content in context and still returned
+      // nothing — the fallback string below carries no derived knowledge.
+      await recordBotGaveUp({ accountId, sessionId: null, surface: 'chat', reason: 'empty_response' });
+    }
+    const finalAnswer = rawFinalAnswer || 'מצטער/ת, לא הצלחתי להשלים.';
+
     console.log('✅ [Hybrid Bot] Complete!');
     console.log(`📊 Stats: Metadata: ${metadata.length}, Detailed: ${detailedContent.length}`);
-    
+
     return finalAnswer;
 
   } catch (error) {
     console.error('❌ [Hybrid Bot] Error:', error);
+    // Every step from here up (retrieval, tool-call parsing, both OpenAI
+    // round-trips) is wrapped by this one catch, so we can't attribute this
+    // to a specific stage — record it as an LLM-pipeline failure.
+    await recordBotGaveUp({ accountId, sessionId: null, surface: 'chat', reason: 'llm_error' });
     return 'מצטער/ת, נתקלתי בבעיה טכנית. נסה/י שוב בעוד רגע! 🙏';
   }
 }
@@ -252,6 +268,9 @@ export async function processWithHybridAndPersona(
     const message = response.choices[0].message;
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
+      if (!message.content) {
+        await recordBotGaveUp({ accountId, sessionId: null, surface: 'chat', reason: 'empty_response' });
+      }
       return message.content || 'מצטער/ת, לא הצלחתי להבין. נסה/י שוב?';
     }
 
@@ -284,11 +303,19 @@ export async function processWithHybridAndPersona(
       // GPT-5 Nano only supports temperature: 1 (default)
     });
 
+    const personaFinalAnswer = finalResponse.choices[0].message.content;
+    if (!personaFinalAnswer) {
+      await recordBotGaveUp({ accountId, sessionId: null, surface: 'chat', reason: 'empty_response' });
+    }
     console.log('✅ [Hybrid + Persona Bot] Complete with GPT-5 Nano!');
-    return finalResponse.choices[0].message.content || 'מצטער/ת, נתקלתי בבעיה.';
+    return personaFinalAnswer || 'מצטער/ת, נתקלתי בבעיה.';
 
   } catch (error) {
     console.error('❌ [Hybrid + Persona Bot] Error:', error);
+    // Same rationale as the non-persona variant's catch: this wraps every
+    // stage, so we tag it as an LLM-pipeline failure rather than guessing
+    // which stage broke.
+    await recordBotGaveUp({ accountId, sessionId: null, surface: 'chat', reason: 'llm_error' });
     return 'מצטער/ת, נתקלתי בבעיה. נסה/י שוב! 🙏';
   }
 }

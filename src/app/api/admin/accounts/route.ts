@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { resolveDemoAccess } from '@/lib/demo/access';
 
 /**
  * GET /api/admin/accounts
@@ -91,6 +92,9 @@ export async function GET() {
         // Account info
         is_active: account.status === 'active',
         is_demo: config.isDemo === true,
+        // Demo window (null for anything that isn't a timed demo, which is
+        // every pre-feature demo and every paying account).
+        demo: resolveDemoAccess({ config }),
         plan: account.plan || 'free',
         type: account.type,
         // Real classification lives in config.archetype (brand / service_provider /
