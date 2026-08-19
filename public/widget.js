@@ -49,7 +49,11 @@
         accountId: ACCOUNT_ID,
         type: type,
         message: msg,
-        stack: (detail && detail.stack) || null,
+        // Bounded client-side too: the server only keeps the first 3 frames,
+        // but a deep stack plus a long UA can push the whole body past its
+        // 2KB cap, which is dropped silently — losing exactly the failures
+        // most worth having.
+        stack: (detail && detail.stack) ? String(detail.stack).slice(0, 1000) : null,
         filename: (detail && detail.filename) || null,
         line: (detail && detail.line) || null,
         widgetVersion: WIDGET_VERSION,
@@ -67,11 +71,14 @@
   }
 
   // Only OUR script. Without this filter we would collect the host page's own
-  // exceptions — their code, and potentially their users' data.
+  // exceptions — their code, and potentially their users' data. A bare
+  // substring check on '/widget.js' is not enough: a host page can legitimately
+  // serve its own script at a path ending '/widget.js' too, so the filter must
+  // anchor to our own origin (BASE_URL), not just the filename shape.
   try {
     window.addEventListener('error', function (ev) {
       try {
-        if (!ev || !ev.filename || ev.filename.indexOf('/widget.js') === -1) return;
+        if (!ev || !ev.filename || ev.filename.indexOf(BASE_URL + '/widget.js') !== 0) return;
         report('client_error', {
           message: ev.message, filename: ev.filename, line: ev.lineno,
           stack: ev.error && ev.error.stack
@@ -81,7 +88,7 @@
     window.addEventListener('unhandledrejection', function (ev) {
       try {
         var r = ev && ev.reason;
-        if (!r || !r.stack || r.stack.indexOf('/widget.js') === -1) return;
+        if (!r || !r.stack || r.stack.indexOf(BASE_URL) === -1) return;
         report('client_error', { message: r.message || String(r), stack: r.stack });
       } catch (e) { /* */ }
     });
