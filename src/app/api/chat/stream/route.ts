@@ -74,6 +74,7 @@ import { getCachedSuggestionRAG, cacheSuggestionRAG, prewarmSuggestionRAG, type 
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 import { getSmartThinkingMessage } from '@/lib/chatbot/thinking-messages';
 import { demoAccessFromConfig } from '@/lib/demo/guard';
+import { recordBotGaveUp } from '@/lib/telemetry/bot-quality';
 
 // ============================================
 // Stream Event Types
@@ -1375,6 +1376,17 @@ export async function POST(req: NextRequest) {
               ? 'Something went wrong on my side 😅 Please try sending again or rephrase your question.'
               : 'אופס, משהו השתבש אצלי 😅 נסה לשלוח שוב או לנסח את השאלה אחרת';
           }
+          // Rate-limit / timeout / generic are all call-failure modes — none
+          // of the 4 give-up categories distinguishes them further, so all
+          // three map to llm_error.
+          if (accountId) {
+            await recordBotGaveUp({
+              accountId,
+              sessionId: currentSessionId,
+              surface: 'chat',
+              reason: 'llm_error',
+            });
+          }
           controller.enqueue(encodeEvent({ type: 'delta', text: fullText }));
         }
 
@@ -1534,6 +1546,20 @@ export async function POST(req: NextRequest) {
             payload: { error: error.message, streaming: true },
             metadata: { source: 'chat', engineVersion: 'v2', traceId, requestId, latencyMs: Date.now() - startedAt },
           }).catch(() => {});
+        }
+
+        // This backstop wraps everything in the turn besides the sandwich-bot
+        // call itself (that one has its own catch above, a few hundred lines
+        // up) — session locking, the understanding/decision/policy engines,
+        // etc. Any of those failing produces the exact same customer-visible
+        // symptom: a generic "error processing" bubble instead of an answer.
+        if (accountId) {
+          await recordBotGaveUp({
+            accountId,
+            sessionId: sessionIdForLock,
+            surface: 'chat',
+            reason: 'llm_error',
+          });
         }
 
         controller.close();

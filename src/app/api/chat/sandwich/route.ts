@@ -19,13 +19,19 @@ import {
 import { getAccountByInfluencerUsername } from '@/engines';
 import { sanitizeChatMessage, sanitizeUsername } from '@/lib/sanitize';
 import { demoAccessFromConfig, demoExpiredBody } from '@/lib/demo/guard';
+import { recordBotGaveUp } from '@/lib/telemetry/bot-quality';
 
 export async function POST(req: NextRequest) {
+  // Hoisted so the catch below can still report which account/session hit
+  // this failure — everything else in this handler lives inside the try.
+  let accountIdForGiveUp: string | null = null;
+  let sessionIdForGiveUp: string | null = null;
   try {
     const body = await req.json();
     const message = sanitizeChatMessage(body.message || '');
     const username = sanitizeUsername(body.username || '');
     const { sessionId, responseId } = body;
+    sessionIdForGiveUp = sessionId || null;
 
     if (!message || !username) {
       return NextResponse.json(
@@ -55,6 +61,7 @@ export async function POST(req: NextRequest) {
     // ⚡ FIX: Get the correct account (handles legacy_influencer_id mapping)
     const accountInfo = await getAccountByInfluencerUsername(username);
     const accountId = accountInfo?.accountId || influencer.id;
+    accountIdForGiveUp = accountId;
 
     console.log(`[SandwichBot API] 🔍 Account mapping:`);
     console.log(`   Influencer ID: ${influencer.id}`);
@@ -67,6 +74,7 @@ export async function POST(req: NextRequest) {
       const session = await createChatSession(influencer.id); // ⚡ Use influencer.id for chat_sessions FK
       if (session) {
         currentSessionId = session.id;
+        sessionIdForGiveUp = currentSessionId;
         await trackEvent(accountId, 'chat_started', currentSessionId);
       }
     }
@@ -196,7 +204,23 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('[SandwichBot API] Error:', error);
-    
+
+    // The client (chat/[username]/page.tsx) has no `.ok` check on this
+    // fetch — it reads `data.response`, finds it missing from this error
+    // payload, and falls back to a client-side "sorry, something went
+    // wrong" chat bubble. So this 500 becomes a give-up reply exactly like
+    // a normal 200 with a fallback string would. Only recorded when we got
+    // far enough to know which account this was — a request.json() or
+    // influencer-lookup failure never resolves one.
+    if (accountIdForGiveUp) {
+      await recordBotGaveUp({
+        accountId: accountIdForGiveUp,
+        sessionId: sessionIdForGiveUp,
+        surface: 'chat',
+        reason: 'llm_error',
+      });
+    }
+
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

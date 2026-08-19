@@ -40,6 +40,7 @@ import {
   type ReturningVisitor,
   type NavigationLink,
 } from './widget-actions';
+import { recordBotGaveUp } from '@/lib/telemetry/bot-quality';
 
 // ============================================
 // Type Definitions
@@ -427,6 +428,12 @@ export async function processWidgetMessage(params: WidgetChatParams): Promise<Wi
     fullText = errLang === 'en'
       ? "Sorry, I hit a hiccup processing that. Please try again."
       : 'מצטער, נתקלתי בבעיה. נסו שוב.';
+    await recordBotGaveUp({
+      accountId,
+      sessionId: sessionId || null,
+      surface: 'widget',
+      reason: 'llm_error',
+    });
   }
 
   // Phase 2: extract <<INTENT>> envelope from the (already suggestion-stripped)

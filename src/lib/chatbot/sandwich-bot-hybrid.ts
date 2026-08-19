@@ -12,13 +12,13 @@
  */
 
 import OpenAI from 'openai';
-import {
-  searchContentByQuery,
-  fetchDetailedContent,
+import { 
+  searchContentByQuery, 
+  fetchDetailedContent, 
   formatMetadataForAI,
   formatDetailedContentForAI,
   type RetrievalRequest,
-  type ContentMetadata
+  type ContentMetadata 
 } from './hybrid-retrieval';
 import { recordBotGaveUp } from '@/lib/telemetry/bot-quality';
 
