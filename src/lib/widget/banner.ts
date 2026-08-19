@@ -223,6 +223,50 @@ function resolveStarters(raw: any): ResolvedBannerStarters | null {
   return { label, items: items && items.length ? (items as string[]) : null };
 }
 
+export interface BannerOverride {
+  id?: string;
+  /** Inclusive ISO date (YYYY-MM-DD) in Asia/Jerusalem. Absent = no lower bound. */
+  from?: string;
+  /** Inclusive ISO date. Absent = no upper bound. */
+  until?: string;
+  surface?: BannerSurface | 'both';
+  /** Invitation bubble copy, read by the widget rather than the banner. */
+  teaser?: string;
+  tooltip?: string;
+  [field: string]: unknown;
+}
+
+/**
+ * Today's date in Israel, as YYYY-MM-DD.
+ *
+ * Windows are dates, not instants: a promotion ending on the 31st ends when
+ * the 31st ends in Israel. Comparing UTC would close it three hours early in
+ * summer, and the failure is silent — the offer simply stops appearing.
+ * `en-CA` is used because it formats as YYYY-MM-DD, which string-compares
+ * correctly.
+ */
+export function todayInIsrael(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(now);
+}
+
+/** The overrides whose window is open and whose surface matches. */
+export function activeOverrides(
+  config: any,
+  surface: BannerSurface,
+  now: Date = new Date(),
+): BannerOverride[] {
+  const list = Array.isArray(config?.overrides) ? config.overrides : [];
+  const today = todayInIsrael(now);
+  return list.filter((o: BannerOverride) => {
+    if (!o || typeof o !== 'object') return false;
+    const target = o.surface || 'both';
+    if (target !== 'both' && target !== surface) return false;
+    if (typeof o.from === 'string' && o.from > today) return false;
+    if (typeof o.until === 'string' && o.until < today) return false;
+    return true;
+  });
+}
+
 /**
  * Resolve the banner for one surface, or null to keep today's behavior.
  *
@@ -236,6 +280,7 @@ export function resolveBanner(
   config: any,
   surface: BannerSurface,
   ctx: BannerContext = {},
+  now: Date = new Date(),
 ): ResolvedBanner | null {
   const widgetConfig = config?.widget || {};
   const own = surface === 'chat' ? config?.chat?.banner : widgetConfig.banner;
@@ -252,15 +297,27 @@ export function resolveBanner(
   const hasReels = !!resolveReels(config?.reels);
   const raw = (inherited === undefined || inherited === null) && hasReels ? { enabled: true } : inherited;
 
-  if (!raw || typeof raw !== 'object') return null;
-  if (raw.enabled === false) return null;
+  // Overrides merge per field over whatever the surface resolved to. Unlike
+  // the surface fallback above — which is whole-object on purpose — an
+  // override answers "what changed for now", so a promotion that only
+  // replaces the eyebrow must not blank the headline.
+  const active = activeOverrides(config, surface, now);
+  const merged = active.length
+    ? active.reduce((acc: any, o: BannerOverride) => {
+        const { id, from, until, surface: _s, teaser, tooltip, ...fields } = o;
+        return { ...acc, ...fields };
+      }, raw || {})
+    : raw;
+
+  if (!merged || typeof merged !== 'object') return null;
+  if (merged.enabled === false) return null;
 
   const brandName = copy(ctx.brandName, 60);
   const greeting = surface === 'chat' ? copy(ctx.greeting, MAX_HEADLINE) : null;
   const subtitle = surface === 'chat' ? copy(ctx.subtitle, MAX_SUBLINE) : null;
 
-  const written = copy(raw.headline, MAX_HEADLINE);
-  const generic = raw.enabled === true
+  const written = copy(merged.headline, MAX_HEADLINE);
+  const generic = merged.enabled === true
     ? `היי, אני העוזר של ${brandName || 'המותג'}. שאלו אותי כל דבר.`.slice(0, MAX_HEADLINE)
     : null;
   const headline = written || greeting || generic;
@@ -277,12 +334,12 @@ export function resolveBanner(
     : (widgetConfig.primaryColor || config?.theme?.colors?.primary || null);
 
   return {
-    eyebrow: copy(raw.eyebrow, MAX_EYEBROW),
+    eyebrow: copy(merged.eyebrow, MAX_EYEBROW),
     headline,
-    subline: copy(raw.subline, MAX_SUBLINE) || subtitle,
-    valueLine: copy(raw.valueLine, MAX_SUBLINE),
-    cta: resolveCta(raw.cta),
-    art: resolveArt(raw.art, widgetConfig, primaryColor, config?.reels),
-    starters: resolveStarters(raw.starters),
+    subline: copy(merged.subline, MAX_SUBLINE) || subtitle,
+    valueLine: copy(merged.valueLine, MAX_SUBLINE),
+    cta: resolveCta(merged.cta),
+    art: resolveArt(merged.art, widgetConfig, primaryColor, config?.reels),
+    starters: resolveStarters(merged.starters),
   };
 }

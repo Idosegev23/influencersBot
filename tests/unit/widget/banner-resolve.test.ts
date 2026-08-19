@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { glowStops, resolveBanner } from '@/lib/widget/banner';
+import { glowStops, resolveBanner, todayInIsrael, activeOverrides } from '@/lib/widget/banner';
 
 const CTX = { brandName: 'Argania', greeting: 'היי אני העוזרת של דניאל', subtitle: 'שאלו על מתכונים' };
 
@@ -410,5 +410,103 @@ describe('resolveBanner — starters', () => {
   it('is null when no starters block was written', () => {
     const config = { widget: { banner: { headline: 'שלום' } } };
     expect(resolveBanner(config, 'widget', CTX)!.starters).toBeNull();
+  });
+});
+
+describe('todayInIsrael', () => {
+  it('returns an ISO date', () => {
+    expect(todayInIsrael(new Date('2026-08-19T09:00:00Z'))).toBe('2026-08-19');
+  });
+
+  it('is still the 31st just before midnight in Israel, when UTC has moved on', () => {
+    // 2026-08-31T21:30Z is 00:30 on the 1st in UTC terms but 00:30 Israel = still Sept 1.
+    // 2026-08-31T20:30Z is 23:30 on the 31st in Israel.
+    expect(todayInIsrael(new Date('2026-08-31T20:30:00Z'))).toBe('2026-08-31');
+  });
+});
+
+describe('activeOverrides', () => {
+  const base = {
+    widget: { banner: { headline: 'רגיל' } },
+    overrides: [
+      { id: 'sale', from: '2026-08-20', until: '2026-08-31', headline: 'מבצע' },
+    ],
+  };
+  const at = (d: string) => new Date(`${d}T09:00:00Z`);
+
+  it('is empty before the window opens', () => {
+    expect(activeOverrides(base, 'widget', at('2026-08-19'))).toHaveLength(0);
+  });
+
+  it('includes the override on the first day', () => {
+    expect(activeOverrides(base, 'widget', at('2026-08-20'))).toHaveLength(1);
+  });
+
+  it('includes the override on the last day — until is inclusive', () => {
+    expect(activeOverrides(base, 'widget', at('2026-08-31'))).toHaveLength(1);
+  });
+
+  it('is empty after the window closes', () => {
+    expect(activeOverrides(base, 'widget', at('2026-09-01'))).toHaveLength(0);
+  });
+
+  it('treats a missing from as open-ended in the past, missing until as open-ended in the future', () => {
+    const cfg = { overrides: [{ headline: 'x' }] };
+    expect(activeOverrides(cfg, 'widget', at('2020-01-01'))).toHaveLength(1);
+  });
+
+  it('filters by surface', () => {
+    const cfg = { overrides: [{ surface: 'chat', headline: 'x' }] };
+    expect(activeOverrides(cfg, 'widget', at('2026-08-20'))).toHaveLength(0);
+    expect(activeOverrides(cfg, 'chat', at('2026-08-20'))).toHaveLength(1);
+  });
+
+  it('treats "both" and a missing surface as applying everywhere', () => {
+    const cfg = { overrides: [{ surface: 'both', headline: 'x' }, { headline: 'y' }] };
+    expect(activeOverrides(cfg, 'widget', at('2026-08-20'))).toHaveLength(2);
+  });
+});
+
+describe('resolveBanner — scheduled overrides', () => {
+  const at = (d: string) => new Date(`${d}T09:00:00Z`);
+  const cfg = {
+    widget: { banner: { headline: 'רגיל', subline: 'תת כותרת', eyebrow: 'רגיל' } },
+    overrides: [{ from: '2026-08-20', until: '2026-08-31', eyebrow: 'מבצע החודש' }],
+  };
+
+  it('leaves the default alone outside the window', () => {
+    const b = resolveBanner(cfg, 'widget', CTX, at('2026-08-19'))!;
+    expect(b.eyebrow).toBe('רגיל');
+  });
+
+  it('merges per field inside the window — an eyebrow override keeps the headline', () => {
+    const b = resolveBanner(cfg, 'widget', CTX, at('2026-08-25'))!;
+    expect(b.eyebrow).toBe('מבצע החודש');
+    expect(b.headline).toBe('רגיל');
+    expect(b.subline).toBe('תת כותרת');
+  });
+
+  it('applies later overrides over earlier ones so overlap is predictable', () => {
+    const two = {
+      widget: { banner: { headline: 'רגיל' } },
+      overrides: [
+        { from: '2026-08-01', until: '2026-08-31', headline: 'ראשון' },
+        { from: '2026-08-20', until: '2026-08-25', headline: 'שני' },
+      ],
+    };
+    expect(resolveBanner(two, 'widget', CTX, at('2026-08-22'))!.headline).toBe('שני');
+  });
+
+  it('an override alone can produce a banner for an account that has none', () => {
+    const only = { overrides: [{ from: '2026-08-01', until: '2026-08-31', headline: 'מבצע' }] };
+    expect(resolveBanner(only, 'widget', CTX, at('2026-08-10'))!.headline).toBe('מבצע');
+  });
+
+  it('an override cannot resurrect a banner the account switched off', () => {
+    const off = {
+      widget: { banner: { enabled: false, headline: 'רגיל' } },
+      overrides: [{ from: '2026-08-01', until: '2026-08-31', headline: 'מבצע' }],
+    };
+    expect(resolveBanner(off, 'widget', CTX, at('2026-08-10'))).toBeNull();
   });
 });
