@@ -1188,6 +1188,27 @@
       render();
     });
 
+  // ---- Draft preview channel ----
+  // The editor renders the real widget in an iframe and pushes unsaved changes
+  // in. Gated on data-preview so a customer's site can never be driven by a
+  // message from an embedding page.
+  if (SCRIPT && SCRIPT.getAttribute('data-preview') === 'true') {
+    window.addEventListener('message', function (ev) {
+      var msg = ev && ev.data;
+      if (!msg || msg.type !== 'ibot:draft' || !msg.config) return;
+      try {
+        if (msg.config.banner !== undefined) config.banner = msg.config.banner;
+        if (msg.config.invitation !== undefined) config.invitation = msg.config.invitation;
+        if (msg.config.primaryColor) config.primaryColor = msg.config.primaryColor;
+        pickBannerReel();
+        applyLocaleAssets();
+        bannerViewTracked = true;   // a draft is not a visitor impression
+        if (!isOpen) { isOpen = true; }
+        render();
+      } catch (e) { /* never break the editor */ }
+    });
+  }
+
   // ============================================
   // DOM Setup
   // ============================================
