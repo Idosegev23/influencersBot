@@ -1215,29 +1215,40 @@
         pickBannerReel();
         applyLocaleAssets();
         bannerViewTracked = true;   // a draft is not a visitor impression
-        if (msg.view === 'closed') {
-          // The only way the teaser/tooltip bubbles can be previewed at all:
-          // both early-return while the panel is open, and the panel is
-          // forced open below for every other message. Force it shut
-          // instead, clear any stale bubble from a previous draft, redraw
-          // the closed launcher, then explicitly ask both bubble renderers
-          // to run — they no longer wait for a real trigger in preview mode.
+        if (msg.view === 'teaser' || msg.view === 'tooltip') {
+          // Calling both bubble renderers at once always converges on the
+          // teaser (no empty-text bail, unconditionally clears any tooltip
+          // on its way in) — that's the widget's own mutual-exclusion
+          // design for real visitors and stays untouched here. So the
+          // tooltip field would never be independently previewable if both
+          // views shared one "closed" state. Instead each view calls only
+          // its own renderer: the other bubble's element never gets
+          // created in the first place, nothing to lose the fight to.
           isOpen = false;
           var staleTip = document.getElementById('ibot-tip');
           if (staleTip && staleTip.parentNode) staleTip.parentNode.removeChild(staleTip);
           var staleTeaser = document.getElementById('ibot-teaser');
           if (staleTeaser && staleTeaser.parentNode) staleTeaser.parentNode.removeChild(staleTeaser);
           render();
-          // Teaser first: it has no "nothing to show" bail (always falls
-          // back to locale copy) and unconditionally removes any tooltip
-          // on its way in, so calling it before the tooltip mirrors the
-          // precedence the widget already enforces for real visitors.
-          showProactiveTeaser('preview');
-          showBubbleTooltip();
+          if (msg.view === 'teaser') {
+            showProactiveTeaser('preview');
+          } else {
+            showBubbleTooltip();
+          }
         } else {
-          // Every other message (including one with no `view`, e.g. an
-          // older cached draft) keeps today's behaviour: force the panel
-          // open, which is the only way to preview the banner.
+          // Every other message (including one with no `view`, an
+          // unrecognised value, or an older cached draft) keeps today's
+          // behaviour: force the panel open, which is the only way to
+          // preview the banner. The tip/teaser nodes live on
+          // document.body, outside the container render() rewrites, so a
+          // bubble left over from switching out of 'teaser'/'tooltip'
+          // view would otherwise float on top of the open panel forever —
+          // clearing it here is what makes "unchanged from before" true
+          // when toggling back, not a change to the force-open path itself.
+          var leftoverTip = document.getElementById('ibot-tip');
+          if (leftoverTip && leftoverTip.parentNode) leftoverTip.parentNode.removeChild(leftoverTip);
+          var leftoverTeaser = document.getElementById('ibot-teaser');
+          if (leftoverTeaser && leftoverTeaser.parentNode) leftoverTeaser.parentNode.removeChild(leftoverTeaser);
           if (!isOpen) { isOpen = true; }
           render();
         }

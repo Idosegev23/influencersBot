@@ -22,9 +22,12 @@ import { useEffect, useRef } from 'react';
  * `view` picks what the iframe shows: `'open'` (default) force-opens the
  * chat panel, which is the only way to see the banner — but it also means
  * the invitation bubbles (teaser/tooltip) can never render, since both
- * early-return while the panel is open. `'closed'` renders the launcher
- * instead and makes widget.js explicitly surface those bubbles so they're
- * previewable at all (see public/widget.js's `ibot:draft` handler).
+ * early-return while the panel is open. `'teaser'` and `'tooltip'` instead
+ * render the closed launcher and make widget.js explicitly invoke ONE
+ * bubble renderer each — not both — so each field is independently
+ * previewable despite the widget's own mutual-exclusion logic (teaser
+ * always wins when both are invoked; see public/widget.js's `ibot:draft`
+ * handler).
  */
 export function WidgetDraftPreview({
   accountId,
@@ -33,7 +36,7 @@ export function WidgetDraftPreview({
 }: {
   accountId: string;
   draft: unknown;
-  view?: 'open' | 'closed';
+  view?: 'open' | 'teaser' | 'tooltip';
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const ready = useRef(false);

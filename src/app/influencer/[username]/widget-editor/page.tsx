@@ -74,11 +74,13 @@ export default function WidgetEditorPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 'open' (default, unchanged banner preview) shows the chat panel, the
-  // only way to see banner copy. 'closed' shows the launcher instead — the
-  // only way to see the teaser/tooltip bubbles, since widget.js force-opens
-  // the panel on every draft message otherwise, and both bubbles bail out
-  // while the panel is open.
-  const [previewView, setPreviewView] = useState<'open' | 'closed'>('open');
+  // only way to see banner copy. 'teaser'/'tooltip' show the launcher
+  // instead and ask widget.js to render exactly one bubble — the widget's
+  // own mutual-exclusion logic means the teaser always wins if both were
+  // asked to render at once (it has no empty-text bail and unconditionally
+  // clears the tooltip), so each field gets its own view rather than
+  // sharing a single "closed" state.
+  const [previewView, setPreviewView] = useState<'open' | 'teaser' | 'tooltip'>('open');
 
   useEffect(() => {
     if (!username) return;
@@ -145,6 +147,15 @@ export default function WidgetEditorPage() {
   const bannerDraft = useMemo(
     () => ({
       ...(currentBanner || {}),
+      // Accounts with reels but no stored banner get one automatically —
+      // resolveBanner's fallback fires only while `widget.banner` is
+      // undefined/null. The moment this editor writes ANY object there
+      // (which it always does, even with every field left blank), that
+      // fallback stops applying unless `enabled` says so explicitly. Default
+      // true so a reel-only account's banner keeps resolving after its first
+      // save here; preserve an existing explicit `false` so a banner someone
+      // deliberately turned off does not get silently resurrected.
+      enabled: currentBanner?.enabled !== false,
       eyebrow,
       headline,
       subline,
@@ -443,7 +454,7 @@ export default function WidgetEditorPage() {
                   style={inputStyle}
                 />
                 <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                  {tooltip.length}/{MAX_INVITATION} תווים.
+                  {tooltip.length}/{MAX_INVITATION} תווים. שדה ריק יציג טקסט ברירת מחדל כללי.
                 </p>
               </div>
             </div>
@@ -484,19 +495,31 @@ export default function WidgetEditorPage() {
                   border: '1px solid var(--dash-glass-border)',
                 }}
               >
-                תצוגת שיחה פתוחה
+                צ׳אט פתוח
               </button>
               <button
                 type="button"
-                onClick={() => setPreviewView('closed')}
+                onClick={() => setPreviewView('teaser')}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium"
                 style={{
-                  background: previewView === 'closed' ? 'var(--color-primary)' : 'var(--dash-bar)',
-                  color: previewView === 'closed' ? '#fff' : 'var(--dash-text)',
+                  background: previewView === 'teaser' ? 'var(--color-primary)' : 'var(--dash-bar)',
+                  color: previewView === 'teaser' ? '#fff' : 'var(--dash-text)',
                   border: '1px solid var(--dash-glass-border)',
                 }}
               >
-                תצוגת כפתור סגור
+                בועת הזמנה
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewView('tooltip')}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                style={{
+                  background: previewView === 'tooltip' ? 'var(--color-primary)' : 'var(--dash-bar)',
+                  color: previewView === 'tooltip' ? '#fff' : 'var(--dash-text)',
+                  border: '1px solid var(--dash-glass-border)',
+                }}
+              >
+                טולטיפ
               </button>
             </div>
             {accountId && previewDraft ? (
