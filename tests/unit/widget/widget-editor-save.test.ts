@@ -159,4 +159,49 @@ describe('buildBannerDraft', () => {
     const config = { widget: { banner: draft }, reels: [{ video: 'https://cdn.example.com/a.mp4', poster: null }] };
     expect(resolveBanner(config, 'widget', { brandName: 'מותג לדוגמה' })).toBeNull();
   });
+
+  it('empty starterItems must be saved as null, never []', () => {
+    // The JSDoc on BannerDraftFields.starterItems requires the "present but
+    // empty" case to become null, not an empty array — resolveBanner (and
+    // anything downstream) must be able to tell "no starters configured"
+    // apart from "the customer emptied out a previously-filled list" only by
+    // this key being absent-equivalent (null), never by inspecting length.
+    const draft = buildBannerDraft(null, true, false, { ...blankFields, starterItems: [] });
+    const starters = draft.starters as Record<string, unknown>;
+    expect(starters.items).toBeNull();
+  });
+
+  it('a blank (or whitespace-only) startersLabel must be saved as null, never an empty string', () => {
+    const draft = buildBannerDraft(null, true, false, { ...blankFields, startersLabel: '   ' });
+    const starters = draft.starters as Record<string, unknown>;
+    expect(starters.label).toBeNull();
+  });
+
+  it('maps eyebrow/subline/ctaLabel/ctaValue to their own keys, not a swapped neighbour', () => {
+    // Every field gets a distinct, greppable value so a field-mapping swap
+    // (e.g. subline reading from fields.eyebrow) shows up as a wrong value
+    // rather than two fields coincidentally matching.
+    const fields: BannerDraftFields = {
+      eyebrow: 'EYEBROW_VALUE',
+      headline: 'HEADLINE_VALUE',
+      subline: 'SUBLINE_VALUE',
+      ctaLabel: 'CTA_LABEL_VALUE',
+      ctaValue: 'CTA_VALUE_VALUE',
+      startersLabel: 'STARTERS_LABEL_VALUE',
+      starterItems: ['item-1'],
+    };
+    const draft = buildBannerDraft(null, true, false, fields);
+
+    expect(draft.eyebrow).toBe('EYEBROW_VALUE');
+    expect(draft.headline).toBe('HEADLINE_VALUE');
+    expect(draft.subline).toBe('SUBLINE_VALUE');
+
+    const cta = draft.cta as { label?: string; value?: string };
+    expect(cta.label).toBe('CTA_LABEL_VALUE');
+    expect(cta.value).toBe('CTA_VALUE_VALUE');
+
+    const starters = draft.starters as { label?: string; items?: unknown };
+    expect(starters.label).toBe('STARTERS_LABEL_VALUE');
+    expect(starters.items).toEqual(['item-1']);
+  });
 });

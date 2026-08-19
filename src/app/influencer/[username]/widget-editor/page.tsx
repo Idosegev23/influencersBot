@@ -285,6 +285,12 @@ export default function WidgetEditorPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set only when the save itself succeeded but the follow-up reconciliation
+  // read failed — see handleSave's fallback branch. Deliberately separate
+  // from `error`: that state means "the save failed," and re-using it here
+  // would tell the customer their promotion/rotation changes were lost when
+  // they were not.
+  const [refetchWarning, setRefetchWarning] = useState<string | null>(null);
   // 'open' (default, unchanged banner preview) shows the chat panel, the
   // only way to see banner copy. 'teaser'/'tooltip' show the launcher
   // instead and ask widget.js to render exactly one bubble — the widget's
@@ -627,6 +633,7 @@ export default function WidgetEditorPage() {
     setSaving(true);
     setSaved(false);
     setError(null);
+    setRefetchWarning(null);
     try {
       const res = await fetch('/api/influencer/settings', {
         method: 'POST',
@@ -660,10 +667,35 @@ export default function WidgetEditorPage() {
         } else {
           try {
             const influencer = await fetchInfluencerByUsername(username);
-            const rawConfig = (influencer as any)?._rawConfig || {};
-            applyRawConfig(rawConfig, brandName);
+            // fetchInfluencerByUsername never throws — a bad response, a bad
+            // fetch, or a missing account all collapse to `null` inside it
+            // (see its own comment). Treating that `null` as "config is
+            // empty" and calling applyRawConfig({}, ...) is exactly the bug
+            // this whole flow exists to avoid: it would blank every field on
+            // this form — even though the save that just ran DID succeed —
+            // and the next Save click would then post `reels: []` /
+            // `overrides: []` over the rotation/promotions the server is
+            // still holding. So a failed refetch leaves every draft field
+            // untouched (it still matches what was just posted, just not
+            // reconciled against server-side sanitisation) and only surfaces
+            // a message telling the customer to reload — never implying the
+            // save itself failed.
+            if (!influencer) {
+              setRefetchWarning(
+                'השמירה הצליחה, אך לא הצלחנו לרענן את התצוגה. מומלץ לרענן את הדף כדי לוודא שהיא תואמת למה שנשמר בפועל.',
+              );
+            } else {
+              const rawConfig = (influencer as any)._rawConfig || {};
+              applyRawConfig(rawConfig, brandName);
+            }
           } catch (refetchErr) {
+            // Defense in depth, mirroring fetchInfluencerByUsername's own
+            // never-throws contract — should be unreachable, but if it ever
+            // is, this must not fall through to applyRawConfig(undefined).
             console.error('[widget-editor] post-save refetch failed:', refetchErr);
+            setRefetchWarning(
+              'השמירה הצליחה, אך לא הצלחנו לרענן את התצוגה. מומלץ לרענן את הדף כדי לוודא שהיא תואמת למה שנשמר בפועל.',
+            );
           }
         }
         setSaved(true);
@@ -1358,6 +1390,10 @@ export default function WidgetEditorPage() {
 
             {error ? (
               <p className="text-xs" style={{ color: '#dc2626' }}>{error}</p>
+            ) : null}
+
+            {refetchWarning ? (
+              <p className="text-xs" style={{ color: '#b45309' }}>{refetchWarning}</p>
             ) : null}
 
             <div className="flex justify-end">
