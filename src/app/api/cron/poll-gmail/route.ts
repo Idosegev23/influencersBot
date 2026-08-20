@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { getGoogleServiceAccount, sendEmail } from '@/lib/email';
 import { ingestQuote, type IngestAttachment } from '@/lib/crm/quote-ingest';
+import { routeInboundCustomerEmail } from '@/lib/support/inbound-email';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -130,7 +131,21 @@ export async function GET(req: NextRequest) {
             html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.6">${res.ackText.replace(/\n/g, '<br/>')}</div>`,
           }).catch(() => {});
         }
-        results.push({ id: m.id, from, matched: res.matched, hasQuote: !!res.quote, needsClient: !!res.needsClient, reason: res.reason });
+
+        // Not from a registered agent → it is not a quote. The other thing that lands in this
+        // mailbox is a CUSTOMER replying to a Bestie email, and until now nobody read those.
+        // Forward it to the business the reply belongs to.
+        let routed: any = null;
+        if (!res.matched) {
+          routed = await routeInboundCustomerEmail({
+            providerMessageId: m.id,
+            from,
+            subject,
+            body: collected.text || full.data.snippet || '',
+          }).catch((e: any) => ({ outcome: 'error', note: String(e?.message || e) }));
+        }
+
+        results.push({ id: m.id, from, matched: res.matched, hasQuote: !!res.quote, needsClient: !!res.needsClient, reason: res.reason, ...(routed ? { routed: routed.outcome } : {}) });
       } catch (e: any) {
         results.push({ id: m.id, error: String(e?.message || e) });
       }
