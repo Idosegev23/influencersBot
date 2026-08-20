@@ -68,7 +68,7 @@ export async function GET(
     .from('support_requests')
     .select(
       `
-      id, account_id, customer_name, customer_phone, message, brand,
+      id, account_id, customer_name, customer_phone, customer_email, message, brand,
       order_number, product_id, status, created_at, updated_at,
       source, escalation_reason,
       ref_source, internal_notes, assigned_to, assigned_agent_id,
@@ -118,7 +118,7 @@ export async function GET(
     const safe = q.replace(/^#+/, '').replace(/[,()]/g, ' ').slice(0, 80);
     if (safe.length > 0) {
       query = query.or(
-        `customer_name.ilike.%${safe}%,customer_phone.ilike.%${safe}%,order_number.ilike.%${safe}%,message.ilike.%${safe}%`,
+        `customer_name.ilike.%${safe}%,customer_phone.ilike.%${safe}%,customer_email.ilike.%${safe}%,order_number.ilike.%${safe}%,message.ilike.%${safe}%`,
       );
     }
   }

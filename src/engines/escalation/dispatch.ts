@@ -4,7 +4,7 @@ import { detectEscalation, detectHandoff } from './detect';
 import { resolveRecipients } from './recipients';
 import { buildEscalationEmail } from './email-template';
 import { summarizeHandoff } from './summarize';
-import { realPhoneOrNull } from '@/lib/support/contact';
+import { realPhoneOrNull, realEmailOrNull } from '@/lib/support/contact';
 import type { EscalationConfig } from './types';
 
 export interface EscalationInput {
@@ -177,6 +177,9 @@ export interface CsHandoffInput {
   // elsewhere). On the widget / chat page `waId` is a synthetic visitor id, so it must never
   // stand in for this — see @/lib/support/contact.
   contactPhone?: string | null;
+  // The email half. A web shopper who gave only an address is still reachable — the ticket must
+  // carry it, or the brand sees "no contact" for someone they could have emailed.
+  contactEmail?: string | null;
   userMessage: string;
   customerName?: string | null; // learned shopper name — enriches the ticket + email (else the waId)
   imageUrl?: string | null;     // durable URL of a photo the shopper sent → attached to the ticket + email
@@ -231,6 +234,7 @@ export async function runCsHandoffCheck(
   // answer — the ticket has no contact route and the inbox must say so rather than offer a send
   // button that dies at Meta with (#131009).
   const contactPhone = realPhoneOrNull(input.contactPhone) ?? realPhoneOrNull(input.waId);
+  const contactEmail = realEmailOrNull(input.contactEmail);
 
   // Prior messages from the bound thread: user-only feeds frustration detection; the FULL transcript
   // (both roles) enriches the escalation ticket + email so the human sees the whole conversation —
@@ -336,7 +340,7 @@ export async function runCsHandoffCheck(
   // auto_escalation surface (pre-bind / widget / chat). Either way it powers dedup + the support inbox.
   // Name fallback order: the learned name → the dialable phone → a placeholder. NEVER the waId,
   // which on web is an opaque `aw_…` id that told the agent nothing.
-  const customerName = (input.customerName && input.customerName.trim()) || contactPhone || 'לקוח/ה';
+  const customerName = (input.customerName && input.customerName.trim()) || contactPhone || contactEmail || 'לקוח/ה';
   const escalation = {
     severity: detection.severity,
     reason: detection.reason,
@@ -344,6 +348,7 @@ export async function runCsHandoffCheck(
     triggers: detection.triggers,
     customer_name: customerName,
     customer_phone: contactPhone,
+    customer_email: contactEmail,
     channel_user_id: input.waId, // traceability when there is no phone — links the ticket to the session
     image_url: input.imageUrl || null, // the shopper's photo (durable URL) for the support inbox
     transcript: transcript.slice(-8), // the whole recent conversation for the human
@@ -369,12 +374,14 @@ export async function runCsHandoffCheck(
     // A phone learned mid-conversation (web shopper finally typed one) is the difference between a
     // ticket a human can close and one they can only read — write it through to the ticket.
     if (contactPhone) patch.customer_phone = contactPhone;
+    if (contactEmail) patch.customer_email = contactEmail;
     await supabase.from('support_requests').update(patch).eq('id', input.ticketId);
   } else {
     await supabase.from('support_requests').insert({
       account_id: input.accountId,
       customer_name: customerName, // learned name → phone → placeholder (NOT NULL)
       customer_phone: contactPhone,  // null when unreachable — never the synthetic waId
+      customer_email: contactEmail,
       message: input.userMessage,
       session_id: input.chatSessionId,
       status: 'new',

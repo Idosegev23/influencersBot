@@ -29,6 +29,12 @@ export interface CsToolCtx {
   ticketId: string | null;
   customerName: string | null;
   identity: CsIdentity;          // WHO is asking + how much we trust it (spec §1). Replaces senderPhone.
+  // The email half of the contact route (identity carries the phone half). Learned via
+  // remember_contact or the details form, persisted on the session.
+  contactEmail?: string | null;
+  // Has this shopper already been asked for contact details? Set from the session so the
+  // escalation gate can block exactly once and never trap someone with the bot.
+  contactAsked?: boolean;
   lastImageUrl?: string | null;  // durable URL of an image the shopper sent THIS turn → attached to escalation
   // search_products writes the candidates it returned to the model; show_products reads them back to
   // resolve the refs it was given. Lives on the per-TURN ctx, so a ref can never address a product
@@ -45,6 +51,10 @@ export interface CsToolResult {
   // carry one. The loop persists it as the session's claimedPhone so later turns (and any
   // escalation) can reach them.
   learnedPhone?: string;
+  learnedEmail?: string;                           // same, for the email half
+  // escalate_to_human refused to hand off until contact details were requested → the loop records
+  // that the ask happened, so the gate opens on the next attempt whatever the shopper answers.
+  contactAsked?: boolean;
   escalated?: boolean;                             // escalate_to_human → loop returns { kind:'none' }
   cards?: CsProductCard[];                         // show_products → loop appends to CsTurnResult.cards
   // NOTE: no `interactive` signal — Bestie CS is purely conversational (no button/list MENU tools),

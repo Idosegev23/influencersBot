@@ -1,7 +1,7 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
 import { identityPhone, ticketSourceFor, CS_TICKET_SOURCES } from '@/lib/cs/identity';
-import { realPhoneOrNull } from '@/lib/support/contact';
+import { realPhoneOrNull, realEmailOrNull, hasContactRoute } from '@/lib/support/contact';
 import type { CsProductCard, CsTool, CsToolCtx, CsToolResult, OpenAIFunctionDef } from './types';
 
 const TERMINAL_TICKET = new Set(['resolved', 'closed', 'cancelled']);
@@ -150,24 +150,41 @@ const openOrAttachTicketTool: CsTool = {
 const rememberContactTool: CsTool = {
   def: { type: 'function', function: {
     name: 'remember_contact',
-    description: "Save the shopper's phone number the moment they give it, so a human can call back. Call this BEFORE escalate_to_human on this channel — a hand-off without a phone reaches nobody. Ask for it plainly (\"לאיזה מספר שנחזור אלייך?\") once you know a human is needed.",
-    parameters: { type: 'object', properties: { phone: { type: 'string', description: 'the phone number exactly as the shopper gave it' } }, required: ['phone'] },
+    description: "Save how a human can get back to this shopper — a phone number, an email address, or both — the moment they give it. Required BEFORE escalate_to_human on this channel: a hand-off with no contact details reaches nobody. Ask plainly (\"לאיזה מספר או מייל שנחזור אלייך?\") once you know a human is needed.",
+    parameters: {
+      type: 'object',
+      properties: {
+        phone: { type: 'string', description: 'phone number exactly as the shopper gave it' },
+        email: { type: 'string', description: 'email address exactly as the shopper gave it' },
+      },
+    },
   } },
   async handler(args, ctx): Promise<CsToolResult> {
     const phone = realPhoneOrNull(args?.phone);
-    // Reject rather than store a fragment — the agent would see a number that cannot be dialled
-    // and only find out from Meta. The model is told to ask again.
-    if (!phone) return { ok: false, data: { reason: 'invalid_phone', hint: 'ask for a full phone number' } };
+    const email = realEmailOrNull(args?.email);
+    // Reject rather than store something undialable/unmailable — the agent would see contact
+    // details that don't work and only find out when the reply bounces.
+    if (!phone && !email) {
+      return { ok: false, data: { reason: 'invalid_contact', hint: 'ask for a full phone number or a valid email address' } };
+    }
     // Write straight through to the open ticket so the support inbox becomes actionable NOW,
     // not only if the conversation later escalates.
     if (ctx.ticketId && ctx.accountId) {
+      const patch: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (phone) patch.customer_phone = phone;
+      if (email) patch.customer_email = email;
       await supabaseAdmin
         .from('support_requests')
-        .update({ customer_phone: phone, updated_at: new Date().toISOString() })
+        .update(patch)
         .eq('id', ctx.ticketId)
         .eq('account_id', ctx.accountId);
     }
-    return { ok: true, learnedPhone: phone, data: { saved: true, phone } };
+    return {
+      ok: true,
+      ...(phone ? { learnedPhone: phone } : {}),
+      ...(email ? { learnedEmail: email } : {}),
+      data: { saved: true, phone, email },
+    };
   },
 };
 
@@ -175,16 +192,48 @@ const escalateTool: CsTool = {
   def: { type: 'function', function: {
     name: 'escalate_to_human',
     description: 'Hand the conversation to a human when you cannot help (refund/return, defective product, legal, real frustration, or an explicit request for a person). Pauses the bot and notifies the brand.',
-    parameters: { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'] },
+    parameters: {
+      type: 'object',
+      properties: {
+        reason: { type: 'string' },
+        contact_refused: {
+          type: 'boolean',
+          description: 'Set true ONLY after you asked for a phone or email and the shopper declined or ignored the request. Never set it without having asked.',
+        },
+      },
+      required: ['reason'],
+    },
   } },
   async handler(args, ctx): Promise<CsToolResult> {
     if (!ctx.chatSessionId || !ctx.accountId) return { ok: false, data: { reason: 'not_bound' } };
     const reason = String(args?.reason || '').slice(0, 200);
+
+    // THE GATE. On a channel that carries no contact details, handing off without any means a
+    // ticket the brand cannot answer and a shopper promised a callback nobody can make — the
+    // exact failure Adi hit. A prompt line asking nicely is not enough, so this is mechanical.
+    //
+    // It blocks ONCE. If the shopper was already asked (previous turn) and still gave nothing, or
+    // the model reports they refused, the escalation goes through anyway: leaving an angry person
+    // trapped with a bot is worse than a ticket with no phone, as long as the brand can SEE that
+    // there is no way to reply.
+    const channelCarriesContact = ctx.identity.channel === 'whatsapp';
+    const known = hasContactRoute({ phone: identityPhone(ctx.identity), email: ctx.contactEmail });
+    const refused = args?.contact_refused === true;
+    if (!channelCarriesContact && !known && !refused && !ctx.contactAsked) {
+      return {
+        ok: false,
+        contactAsked: true, // remembered on the session, so this can never block twice
+        data: {
+          reason: 'contact_required',
+          hint: 'Ask the shopper for a phone number or email so a human can get back to them, then call remember_contact. If they refuse or ignore it, call escalate_to_human again with contact_refused: true.',
+        },
+      };
+    }
     // Notify FIRST (force=true → skip re-detection, brain already decided), THEN decide whether to pause.
     let outcome: any = null;
     try {
       const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch'); // Phase D (D4)
-      outcome = await runCsHandoffCheck({ accountId: ctx.accountId, chatSessionId: ctx.chatSessionId, ticketId: ctx.ticketId, waId: ctx.waId, contactPhone: identityPhone(ctx.identity), userMessage: reason, customerName: ctx.customerName, imageUrl: ctx.lastImageUrl, force: true });
+      outcome = await runCsHandoffCheck({ accountId: ctx.accountId, chatSessionId: ctx.chatSessionId, ticketId: ctx.ticketId, waId: ctx.waId, contactPhone: identityPhone(ctx.identity), contactEmail: ctx.contactEmail, userMessage: reason, customerName: ctx.customerName, imageUrl: ctx.lastImageUrl, force: true });
     } catch (e) { console.warn('[cs-tools] escalation notify failed', e); }
     // Pause UNLESS escalation is switched off for this brand. If it's off (skipped disabled/flag_off) no
     // human is coming, so pausing would drop the shopper into silence — keep the bot answering instead.

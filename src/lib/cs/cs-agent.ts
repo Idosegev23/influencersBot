@@ -214,7 +214,9 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   const storedClaimedPhone = typeof (session.context as any)?.claimedPhone === 'string' ? (session.context as any).claimedPhone : undefined;
   const identity = withClaimedPhone(input.identity, input.claimedPhone ?? storedClaimedPhone);
 
-  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, preBoundAccountId: input.boundAccountId ?? null, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity, lastImageUrl: img?.url ?? null };
+  const storedContactEmail = typeof (session.context as any)?.contactEmail === 'string' ? (session.context as any).contactEmail : null;
+  const storedContactAsked = (session.context as any)?.contactAsked === true;
+  const ctx: CsToolCtx = { waId, accountId: session.active_account_id, preBoundAccountId: input.boundAccountId ?? null, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity, contactEmail: storedContactEmail, contactAsked: storedContactAsked, lastImageUrl: img?.url ?? null };
 
   // Web channels (spec §5): the account IS the brand — bind up-front so the very first CS turn
   // already speaks with the brand persona and every tool scopes correctly. The whatsapp_cs.enabled
@@ -294,6 +296,8 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   let finalText: string | null = null;
   let handedOff = false; // escalate_to_human fired this turn → pause FUTURE turns, but still ack THIS one
   let learnedPhone: string | null = null; // remember_contact → persisted as the session's claimedPhone
+  let learnedEmail: string | null = null; // remember_contact → persisted as the session's contactEmail
+  let contactAsked = storedContactAsked;  // escalation gate fired → never blocks this shopper twice
   let cards: CsProductCard[] = [];
   const payloads = new Map<string, CsUiPayload>(); // deduped by kind, last wins
 
@@ -315,6 +319,11 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
         learnedPhone = result.learnedPhone;
         ctx.identity = withClaimedPhone(ctx.identity, learnedPhone);
       }
+      if (result.learnedEmail) {
+        learnedEmail = result.learnedEmail;
+        ctx.contactEmail = learnedEmail;
+      }
+      if (result.contactAsked) { contactAsked = true; ctx.contactAsked = true; }
       if (result.escalated) handedOff = true;
       if (result.cards?.length) cards = result.cards;   // last show_products call wins (never accumulates past the cap)
       const payload = derivePayload(tc.name, result);
@@ -341,6 +350,8 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   const contextPatch: any = { ...(session.context || {}), recentTurns: recentTurns.slice(-8) };
   if (input.claimedPhone?.trim()) contextPatch.claimedPhone = input.claimedPhone.trim(); // asked once, kept forever (spec §7)
   if (learnedPhone) contextPatch.claimedPhone = learnedPhone; // typed in conversation — same rule, later wins
+  if (learnedEmail) contextPatch.contactEmail = learnedEmail;
+  if (contactAsked) contextPatch.contactAsked = true;
   await saveCsSession(session, { context: contextPatch, last_activity_at: new Date().toISOString() });
   if (session.active_chat_session_id) await persistTurn(session.active_chat_session_id, userMessage, replyBody, cards);
   return { reply: { kind: 'text', body: replyBody }, phase: session.phase, ...(cards.length ? { cards } : {}), ...(payloads.size ? { payloads: [...payloads.values()] } : {}), ...(suggestions.length ? { suggestions } : {}) };

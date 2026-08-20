@@ -37,3 +37,22 @@ export function realPhoneOrNull(value: unknown): string | null {
 export function isRealPhone(value: unknown): boolean {
   return realPhoneOrNull(value) !== null;
 }
+
+// Deliberately loose — the job is to reject "לא רוצה" and "0545989978", not to police TLDs.
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[a-zA-Z]{2,}$/;
+
+/** The value if it is a usable email address, else null. */
+export function realEmailOrNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 254) return null;
+  return EMAIL_RE.test(trimmed) ? trimmed.toLowerCase() : null;
+}
+
+/**
+ * Can a human get back to this customer at all? The single question the support inbox — and the
+ * escalation gate — actually cares about. Either channel counts.
+ */
+export function hasContactRoute(contact: { phone?: unknown; email?: unknown }): boolean {
+  return realPhoneOrNull(contact.phone) !== null || realEmailOrNull(contact.email) !== null;
+}

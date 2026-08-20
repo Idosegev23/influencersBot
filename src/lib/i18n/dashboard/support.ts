@@ -111,6 +111,16 @@ export const support = {
 
     // Customer block
     orderLabel: 'הזמנה:',
+    // Contact block — the ticket's answer to "how do I reach this person?"
+    contactTitle: 'פרטי התקשרות',
+    contactPhone: 'טלפון',
+    contactEmail: 'מייל',
+    contactNameLabel: 'שם',
+    contactNone: 'אין שום דרך ליצור קשר עם הלקוח/ה — לא נמסרו טלפון ולא מייל.',
+    contactNoneHint: 'הפנייה הגיעה מצ\'אט באתר, שם הלקוח/ה אנונימי/ת. אפשר להשיב רק אם היא תחזור לשיחה.',
+    contactPhoneUnusable: 'המספר שנשמר אינו תקין ואי אפשר לשלוח אליו',
+    contactCopy: 'העתק',
+    contactSession: 'מזהה שיחה',
     brandLabel: 'מותג:',
     arrivedVia: '↗ הגיעה דרך:',
 
@@ -380,6 +390,15 @@ export const support = {
 
     // Customer block
     orderLabel: 'Order:',
+    contactTitle: 'Contact details',
+    contactPhone: 'Phone',
+    contactEmail: 'Email',
+    contactNameLabel: 'Name',
+    contactNone: 'No way to reach this customer — neither a phone nor an email was given.',
+    contactNoneHint: 'The ticket came from the site chat, where the visitor is anonymous. You can only reply if they come back to the conversation.',
+    contactPhoneUnusable: 'The stored number is not valid and cannot be messaged',
+    contactCopy: 'Copy',
+    contactSession: 'Session id',
     brandLabel: 'Brand:',
     arrivedVia: '↗ Came in via:',
 

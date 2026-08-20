@@ -9,6 +9,7 @@ import {
   XCircle,
   Loader2,
   User,
+  Mail,
   Phone,
   Package,
   RefreshCw,
@@ -35,7 +36,7 @@ import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 import type { Influencer } from '@/types';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { getDashboardStrings } from '@/lib/i18n/dashboard';
-import { isRealPhone } from '@/lib/support/contact';
+import { isRealPhone, realEmailOrNull } from '@/lib/support/contact';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -54,6 +55,7 @@ interface Ticket {
   id: string;
   customer_name: string;
   customer_phone: string | null;
+  customer_email: string | null;
   message: string;
   brand: string | null;
   order_number: string | null;
@@ -78,6 +80,8 @@ interface Ticket {
   source?: string | null;
   escalation_reason?: string | null;
   metadata?: {
+    // The channel the shopper actually came from, when there is no phone to show instead.
+    channel_user_id?: string | null;
     escalation?: {
       severity?: string | null;
       reason?: string | null;
@@ -85,6 +89,7 @@ interface Ticket {
       transcript?: { role: string; content: string }[] | null;
       image_url?: string | null;
       triggers?: string[] | null;
+      channel_user_id?: string | null;
     } | null;
   } | null;
 }
@@ -1198,6 +1203,14 @@ function TicketDetail({
   // or chat page used to store the anonymous visitor id here, and every send died at Meta with
   // (#131009). Gate the buttons on what can actually be dialled.
   const canWhatsApp = isRealPhone(ticket.customer_phone);
+  const customerEmail = realEmailOrNull(ticket.customer_email);
+  // "Can a human get back to this person at all?" — the question the agent is really asking when
+  // they open a ticket. Either channel counts; neither means say so out loud.
+  const reachable = canWhatsApp || !!customerEmail;
+  // A stored-but-unusable number is worth showing: it tells the agent the value exists and is junk,
+  // instead of looking identical to "no number was ever given".
+  const unusablePhone = !canWhatsApp && !!ticket.customer_phone?.trim();
+  const sessionId = (ticket.metadata as any)?.channel_user_id || (ticket.metadata as any)?.escalation?.channel_user_id || null;
 
   return (
     <div
@@ -1390,18 +1403,79 @@ function TicketDetail({
 
       {/* Customer block */}
       <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
+        <div className="text-[11px] font-semibold mb-1" style={{ color: 'var(--dash-text-2, #9ca3af)' }}>
+          {t.contactTitle}
+        </div>
+
+        {ticket.customer_name && (
+          <div className="flex items-center gap-2 text-sm">
+            <User className="w-4 h-4" style={{ color: 'var(--dash-text-2, #9ca3af)' }} />
+            <span style={{ color: 'var(--dash-text-2, #9ca3af)' }}>{t.contactNameLabel}</span>
+            <span>{ticket.customer_name}</span>
+          </div>
+        )}
+
         {canWhatsApp && (
-          <a
-            href={`https://wa.me/${ticket.customer_phone!.replace(/\D/g, '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm"
-            style={{ color: '#22c55e' }}
-          >
+          <div className="flex items-center gap-2 text-sm">
+            <a
+              href={`https://wa.me/${ticket.customer_phone!.replace(/\D/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2"
+              style={{ color: '#22c55e' }}
+            >
+              <Phone className="w-4 h-4" />
+              <span dir="ltr">{ticket.customer_phone}</span>
+              <span className="text-xs opacity-70">(WhatsApp)</span>
+            </a>
+            <button
+              onClick={() => navigator.clipboard.writeText(ticket.customer_phone || '')}
+              title={t.contactCopy}
+              className="text-xs opacity-70 hover:opacity-100"
+            >
+              <Copy className="w-3 h-3 inline" />
+            </button>
+          </div>
+        )}
+
+        {unusablePhone && (
+          <div className="flex items-center gap-2 text-sm" style={{ color: '#fbbf24' }}>
             <Phone className="w-4 h-4" />
-            <span dir="ltr">{ticket.customer_phone}</span>
-            <span className="text-xs opacity-70">(WhatsApp)</span>
-          </a>
+            <span dir="ltr" className="line-through opacity-70">{ticket.customer_phone}</span>
+            <span className="text-[11px]">{t.contactPhoneUnusable}</span>
+          </div>
+        )}
+
+        {customerEmail && (
+          <div className="flex items-center gap-2 text-sm">
+            <a
+              href={`mailto:${customerEmail}`}
+              className="flex items-center gap-2"
+              style={{ color: '#60a5fa' }}
+            >
+              <Mail className="w-4 h-4" />
+              <span dir="ltr">{customerEmail}</span>
+            </a>
+            <button
+              onClick={() => navigator.clipboard.writeText(customerEmail)}
+              title={t.contactCopy}
+              className="text-xs opacity-70 hover:opacity-100"
+            >
+              <Copy className="w-3 h-3 inline" />
+            </button>
+          </div>
+        )}
+
+        {!reachable && (
+          <div className="rounded-lg p-2.5 text-sm" style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)' }}>
+            <div style={{ color: '#fbbf24' }}>{t.contactNone}</div>
+            {sessionId && (
+              <div className="text-[11px] mt-1.5 opacity-70">
+                {t.contactNoneHint}
+                <span className="block mt-1" dir="ltr">{t.contactSession}: <code>{sessionId}</code></span>
+              </div>
+            )}
+          </div>
         )}
         {ticket.order_number && (
           <div className="flex items-center gap-2 text-sm">

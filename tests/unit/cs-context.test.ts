@@ -151,11 +151,12 @@ describe('cs-context', () => {
 
   // The hand-off promise has to be keepable. On a channel with no phone the prompt must send the
   // brain to collect one first — otherwise the ticket reaches the brand with no contact route.
-  it('demands a callback number before escalating when the channel carries no contact', async () => {
+  it('demands a phone or email before escalating when the channel carries no contact', async () => {
     const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
     const p = await buildCsSystemPrompt({ accountId: 'acc-1', userMessage: 'אני רוצה נציג', digest: digest({ boundBrand: 'Argania', hasContactRoute: false }) });
     expect(p).toContain('remember_contact');
-    expect(p).toContain('אין לנו את מספר הטלפון');
+    expect(p).toContain('אין לנו שום דרך ליצור קשר');
+    expect(p).toContain('contact_refused');
   });
 
   it('says nothing about collecting a phone when the channel already has one', async () => {

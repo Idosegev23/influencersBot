@@ -4,6 +4,7 @@ import { searchContentByQuery, formatMetadataForAI } from '@/lib/chatbot/hybrid-
 import { isWarm, type CsSessionRow } from '@/lib/cs/cs-session';
 import { listCsEnabledBrands, MAX_INLINE } from '@/lib/cs/brand-resolver';
 import { identityPhone, type CsIdentity } from '@/lib/cs/identity';
+import { hasContactRoute as contactRoute } from '@/lib/support/contact';
 
 // The brain always appends <<SUGGESTIONS>>…; a WhatsApp channel MUST strip it before sending.
 export function stripSuggestions(text: string): string {
@@ -62,7 +63,9 @@ export async function buildContextDigest(
   const recentTurns = Array.isArray((session.context as any)?.recentTurns) ? (session.context as any).recentTurns : [];
   // Absent identity → assume a contact route exists, so an unknown caller can never make the prompt
   // start demanding phone numbers on WhatsApp.
-  const hasContactRoute = identity ? identityPhone(identity) !== null : true;
+  const hasContactRoute = identity
+    ? contactRoute({ phone: identityPhone(identity), email: (session.context as any)?.contactEmail })
+    : true;
   return { knownName: session.customer_name, boundBrand, warm: isWarm(session), mode, language, openThreads, recentTurns, policy, hasContactRoute };
 }
 
@@ -84,7 +87,7 @@ export async function buildCsSystemPrompt(input: {
   if (!digest.hasContactRoute) {
     // Without this the hand-off is a promise nobody can keep: the ticket reaches the brand with no
     // phone on it, and the shopper waits for a call that cannot be made.
-    lines.push('חשוב — בערוץ הזה אין לנו את מספר הטלפון של הלקוח/ה. לפני שמסלימים לאדם: בקש/י מספר טלפון לחזרה במשפט אחד ופשוט ("לאיזה מספר שנחזור אלייך?"), ומרגע שקיבלת אותו הפעל/י remember_contact ורק אז escalate_to_human. אם הלקוח/ה מסרב/ת או לא עונ/ה — הסלם/י בכל זאת, ואמר/י במפורש שאפשר לחזור לכאן לעדכון. אל תבטיח/י שנציג/ה יתקשר/ו אם אין לך מספר.');
+    lines.push('חשוב — בערוץ הזה אין לנו שום דרך ליצור קשר עם הלקוח/ה. לפני שמסלימים לאדם: בקש/י במשפט אחד ופשוט טלפון או מייל לחזרה ("לאיזה מספר או מייל שנחזור אלייך?"), ומרגע שקיבלת הפעל/י remember_contact (אפשר טלפון, מייל, או שניהם) ורק אז escalate_to_human. אם הלקוח/ה מסרב/ת או מתעלמ/ת מהבקשה — הפעל/י escalate_to_human עם contact_refused: true, ואמר/י במפורש שאפשר לחזור לכאן לעדכון. אל תבטיח/י שנציג/ה יחזרו אם אין לך שום פרט קשר.');
   }
   lines.push('טון לפי מצב: בתלונה, מוצר פגום, נזק במשלוח או כעס — הורד/י את הטון העליז ואת האימוג׳ים המחייכים, הגב/י ברצינות, אמפתיה והתנצלות אמיתית. אימוג׳י עליז (🙂✨) מתאים רק לשיחה נעימה, לא לתלונה.');
   lines.push('על ברכה פשוטה ("היי") — פתח/י בחום ושאל/י איך אפשר לעזור (או המשך/י בפרוזה נושא פתוח קודם). אל תוביל/י ברכה בהצעה "להעביר לנציג" — הצע/י אדם רק כשבאמת נתקעת או כשהלקוח/ה מבקש/ת.');

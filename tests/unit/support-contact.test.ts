@@ -43,3 +43,33 @@ describe('realPhoneOrNull', () => {
     expect(isRealPhone('aw_wxjdyhrzmt18914r')).toBe(false);
   });
 });
+
+describe('realEmailOrNull', () => {
+  it('accepts and normalises a real address', async () => {
+    const { realEmailOrNull } = await import('@/lib/support/contact');
+    expect(realEmailOrNull(' Sigalit@Gmail.com ')).toBe('sigalit@gmail.com');
+    expect(realEmailOrNull('csr@labeaute.co.il')).toBe('csr@labeaute.co.il');
+  });
+
+  it('rejects prose, phones and malformed addresses', async () => {
+    const { realEmailOrNull } = await import('@/lib/support/contact');
+    for (const v of ['לא רוצה', '0545989978', 'a@b', 'a b@c.com', '@gmail.com', '', null, 5]) {
+      expect(realEmailOrNull(v)).toBeNull();
+    }
+  });
+});
+
+describe('hasContactRoute', () => {
+  it('is true when either channel is usable', async () => {
+    const { hasContactRoute } = await import('@/lib/support/contact');
+    expect(hasContactRoute({ phone: '0545989978' })).toBe(true);
+    expect(hasContactRoute({ email: 'a@b.com' })).toBe(true);
+    expect(hasContactRoute({ phone: 'aw_x1', email: 'a@b.com' })).toBe(true);
+  });
+
+  it('is false when neither is', async () => {
+    const { hasContactRoute } = await import('@/lib/support/contact');
+    expect(hasContactRoute({})).toBe(false);
+    expect(hasContactRoute({ phone: 'aw_x1', email: 'לא רוצה' })).toBe(false);
+  });
+});
