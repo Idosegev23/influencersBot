@@ -41,6 +41,10 @@ export interface CsToolResult {
   data?: unknown;                                  // structured payload fed back to the model
   bind?: { accountId: string; ticketId?: string | null }; // bind_brand / open_or_attach_ticket
   learnedName?: string;                            // brain-learned name → loop persists + ctx
+  // remember_contact → the shopper's phone, learned mid-conversation on a channel that doesn't
+  // carry one. The loop persists it as the session's claimedPhone so later turns (and any
+  // escalation) can reach them.
+  learnedPhone?: string;
   escalated?: boolean;                             // escalate_to_human → loop returns { kind:'none' }
   cards?: CsProductCard[];                         // show_products → loop appends to CsTurnResult.cards
   // NOTE: no `interactive` signal — Bestie CS is purely conversational (no button/list MENU tools),

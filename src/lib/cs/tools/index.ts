@@ -1,6 +1,7 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
 import { identityPhone, ticketSourceFor, CS_TICKET_SOURCES } from '@/lib/cs/identity';
+import { realPhoneOrNull } from '@/lib/support/contact';
 import type { CsProductCard, CsTool, CsToolCtx, CsToolResult, OpenAIFunctionDef } from './types';
 
 const TERMINAL_TICKET = new Set(['resolved', 'closed', 'cancelled']);
@@ -123,7 +124,7 @@ const bindBrandTool: CsTool = {
     if (cfg?.whatsapp_cs?.enabled !== true) return { ok: false, data: { reason: 'brand_not_cs_enabled' } };
     const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket'); // Phase D (D1)
     let ticketId: string | null = ctx.ticketId;
-    try { ticketId = (await openOrAttachCsTicket({ accountId, waId: ctx.waId, customerPhone: identityPhone(ctx.identity) ?? ctx.waId, customerName: ctx.customerName, source: ticketSourceFor(ctx.identity) })).ticketId; }
+    try { ticketId = (await openOrAttachCsTicket({ accountId, waId: ctx.waId, customerPhone: identityPhone(ctx.identity), customerName: ctx.customerName, source: ticketSourceFor(ctx.identity) })).ticketId; }
     catch (e) { console.warn('[cs-tools] openOrAttachCsTicket failed', e); }
     return { ok: true, bind: { accountId, ticketId }, data: { brand: cfg.display_name || cfg.username || accountId, ticketId } };
   },
@@ -138,8 +139,35 @@ const openOrAttachTicketTool: CsTool = {
   async handler(args, ctx): Promise<CsToolResult> {
     if (!ctx.accountId) return { ok: false, data: { reason: 'no_brand_bound' } };
     const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket'); // Phase D (D1)
-    const t = await openOrAttachCsTicket({ accountId: ctx.accountId, waId: ctx.waId, customerPhone: identityPhone(ctx.identity) ?? ctx.waId, customerName: ctx.customerName, topic: args?.topic, source: ticketSourceFor(ctx.identity) });
+    const t = await openOrAttachCsTicket({ accountId: ctx.accountId, waId: ctx.waId, customerPhone: identityPhone(ctx.identity), customerName: ctx.customerName, topic: args?.topic, source: ticketSourceFor(ctx.identity) });
     return { ok: true, bind: { accountId: ctx.accountId, ticketId: t.ticketId }, data: { ticketId: t.ticketId } };
+  },
+};
+
+// A shopper on the widget / chat page arrives anonymous: the channel carries no phone, so an
+// escalation used to produce a ticket the brand literally could not answer (the visitor id was
+// stored in customer_phone and every send died at Meta). This is how the number gets in.
+const rememberContactTool: CsTool = {
+  def: { type: 'function', function: {
+    name: 'remember_contact',
+    description: "Save the shopper's phone number the moment they give it, so a human can call back. Call this BEFORE escalate_to_human on this channel — a hand-off without a phone reaches nobody. Ask for it plainly (\"לאיזה מספר שנחזור אלייך?\") once you know a human is needed.",
+    parameters: { type: 'object', properties: { phone: { type: 'string', description: 'the phone number exactly as the shopper gave it' } }, required: ['phone'] },
+  } },
+  async handler(args, ctx): Promise<CsToolResult> {
+    const phone = realPhoneOrNull(args?.phone);
+    // Reject rather than store a fragment — the agent would see a number that cannot be dialled
+    // and only find out from Meta. The model is told to ask again.
+    if (!phone) return { ok: false, data: { reason: 'invalid_phone', hint: 'ask for a full phone number' } };
+    // Write straight through to the open ticket so the support inbox becomes actionable NOW,
+    // not only if the conversation later escalates.
+    if (ctx.ticketId && ctx.accountId) {
+      await supabaseAdmin
+        .from('support_requests')
+        .update({ customer_phone: phone, updated_at: new Date().toISOString() })
+        .eq('id', ctx.ticketId)
+        .eq('account_id', ctx.accountId);
+    }
+    return { ok: true, learnedPhone: phone, data: { saved: true, phone } };
   },
 };
 
@@ -156,7 +184,7 @@ const escalateTool: CsTool = {
     let outcome: any = null;
     try {
       const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch'); // Phase D (D4)
-      outcome = await runCsHandoffCheck({ accountId: ctx.accountId, chatSessionId: ctx.chatSessionId, ticketId: ctx.ticketId, waId: ctx.waId, userMessage: reason, customerName: ctx.customerName, imageUrl: ctx.lastImageUrl, force: true });
+      outcome = await runCsHandoffCheck({ accountId: ctx.accountId, chatSessionId: ctx.chatSessionId, ticketId: ctx.ticketId, waId: ctx.waId, contactPhone: identityPhone(ctx.identity), userMessage: reason, customerName: ctx.customerName, imageUrl: ctx.lastImageUrl, force: true });
     } catch (e) { console.warn('[cs-tools] escalation notify failed', e); }
     // Pause UNLESS escalation is switched off for this brand. If it's off (skipped disabled/flag_off) no
     // human is coming, so pausing would drop the shopper into silence — keep the bot answering instead.
@@ -298,7 +326,7 @@ const showProductsTool: CsTool = {
 // (resolve_brand → confirm/clarify in plain text), never via show_buttons/show_list.
 const TOOLS: CsTool[] = [
   resolveBrandTool, bindBrandTool, rememberNameTool, lookupOrderTool, lookupOrdersByPhoneTool,
-  listOpenThreadsTool, openOrAttachTicketTool, escalateTool,
+  listOpenThreadsTool, openOrAttachTicketTool, rememberContactTool, escalateTool,
   searchProductsTool, showProductsTool,
 ];
 export function getCsTools(): CsTool[] { return TOOLS; }

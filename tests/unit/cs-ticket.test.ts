@@ -77,6 +77,62 @@ describe('cs-ticket', () => {
     expect(row.metadata.channel).toBe('widget_cs');
   });
 
+  // Regression: an anonymous widget shopper has no phone. Writing the visitor id into
+  // customer_phone made the inbox offer a WhatsApp send that Meta rejected with (#131009).
+  it('stores no phone for an anonymous web shopper, and keeps the channel id for traceability', async () => {
+    const sb = makeSupabase({ existing: [] });
+    vi.doMock('@/lib/supabase', () => ({ supabase: sb }));
+    const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket');
+    await openOrAttachCsTicket({
+      accountId: 'acc-1', waId: 'aw_wxjdyhrzmt18914r', customerPhone: null,
+      customerName: 'סיגלית', source: 'widget_cs',
+    });
+    const row = sb.inserts[0].row;
+    expect(row.customer_phone).toBeNull();
+    expect(row.metadata.channel_user_id).toBe('aw_wxjdyhrzmt18914r');
+    expect(row.customer_name).toBe('סיגלית');
+  });
+
+  it('never stores a visitor id even if one is passed as the phone', async () => {
+    const sb = makeSupabase({ existing: [] });
+    vi.doMock('@/lib/supabase', () => ({ supabase: sb }));
+    const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket');
+    await openOrAttachCsTicket({
+      accountId: 'acc-1', waId: 'aw_x1', customerPhone: 'aw_x1',
+      customerName: null, source: 'widget_cs',
+    });
+    expect(sb.inserts[0].row.customer_phone).toBeNull();
+  });
+
+  // Without a phone to match on, the shopper must still land back on their own thread —
+  // otherwise every turn spawns a ticket.
+  it('re-attaches a phoneless shopper by channel_user_id', async () => {
+    const sb = makeSupabase({
+      existing: [{ id: 't-web', status: 'new', customer_phone: null, metadata: { channel_user_id: 'aw_x1' } }],
+    });
+    vi.doMock('@/lib/supabase', () => ({ supabase: sb }));
+    const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket');
+    const r = await openOrAttachCsTicket({
+      accountId: 'acc-1', waId: 'aw_x1', customerPhone: null,
+      customerName: null, source: 'widget_cs',
+    });
+    expect(r.ticketId).toBe('t-web');
+    expect(sb.inserts.length).toBe(0);
+  });
+
+  it('does not cross-attach two different anonymous visitors', async () => {
+    const sb = makeSupabase({
+      existing: [{ id: 't-web', status: 'new', customer_phone: null, metadata: { channel_user_id: 'aw_someone_else' } }],
+    });
+    vi.doMock('@/lib/supabase', () => ({ supabase: sb }));
+    const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket');
+    const r = await openOrAttachCsTicket({
+      accountId: 'acc-1', waId: 'aw_x1', customerPhone: null,
+      customerName: null, source: 'widget_cs',
+    });
+    expect(r.ticketId).toBe('ticket-new-1');
+  });
+
   it('appendCsTicketHistory inserts one history row', async () => {
     const sb = makeSupabase({});
     vi.doMock('@/lib/supabase', () => ({ supabase: sb }));

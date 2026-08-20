@@ -45,11 +45,18 @@ describe('buildCsToolset (archetype-aware registry, spec §4)', () => {
     expect(n).toContain('search_products');
   });
 
-  it('government_ministry = escalation + name only; service_provider = tickets + escalation, no orders/products', () => {
+  // remember_contact rides along on every non-WhatsApp archetype: a hand-off from an anonymous
+  // web shopper is worthless without a callback number, ministry or not.
+  it('government_ministry = escalation + name/contact only; service_provider = tickets + escalation, no orders/products', () => {
     expect(names(buildCsToolset({ channel: 'widget', account: { archetype: 'government_ministry', config: {} } })))
-      .toEqual(['escalate_to_human', 'remember_name']);
+      .toEqual(['escalate_to_human', 'remember_contact', 'remember_name']);
     expect(names(buildCsToolset({ channel: 'widget', account: { archetype: 'service_provider', config: QUICKSHOP } })))
-      .toEqual(['escalate_to_human', 'list_open_threads', 'open_or_attach_ticket', 'remember_name']);
+      .toEqual(['escalate_to_human', 'list_open_threads', 'open_or_attach_ticket', 'remember_contact', 'remember_name']);
+  });
+
+  it('remember_contact is absent on WhatsApp, where the sender number IS the contact', () => {
+    expect(names(buildCsToolset({ channel: 'whatsapp', account: { archetype: 'government_ministry', config: {} } })))
+      .not.toContain('remember_contact');
   });
 
   it('tools and defs stay in lockstep (the loop dispatches only what the model was offered)', () => {

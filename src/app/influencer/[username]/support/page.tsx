@@ -35,6 +35,7 @@ import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 import type { Influencer } from '@/types';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { getDashboardStrings } from '@/lib/i18n/dashboard';
+import { isRealPhone } from '@/lib/support/contact';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -1193,6 +1194,10 @@ function TicketDetail({
 
   const c = STATUS_COLOR[ticket.status];
   const Icon = STATUS_ICON[ticket.status];
+  // A non-empty customer_phone is not the same as a reachable one: tickets opened from the widget
+  // or chat page used to store the anonymous visitor id here, and every send died at Meta with
+  // (#131009). Gate the buttons on what can actually be dialled.
+  const canWhatsApp = isRealPhone(ticket.customer_phone);
 
   return (
     <div
@@ -1385,9 +1390,9 @@ function TicketDetail({
 
       {/* Customer block */}
       <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
-        {ticket.customer_phone && (
+        {canWhatsApp && (
           <a
-            href={`https://wa.me/${ticket.customer_phone.replace(/\D/g, '')}`}
+            href={`https://wa.me/${ticket.customer_phone!.replace(/\D/g, '')}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-sm"
@@ -1464,12 +1469,12 @@ function TicketDetail({
         style={{ background: 'rgba(136,63,226,0.1)', border: '1px solid rgba(136,63,226,0.25)' }}>
         <div className="text-xs mb-2 font-semibold" style={{ color: '#c084fc' }}>{t.waSectionTitle}</div>
         <div className="flex flex-wrap gap-2">
-          <NotifyButton label={t.waNotifyInProgress} onClick={() => setShowSendDialog('in_progress')} disabled={!ticket.customer_phone} />
-          <NotifyButton label={t.waNotifyAwaiting} onClick={() => setShowSendDialog('awaiting_customer')} disabled={!ticket.customer_phone} />
-          <NotifyButton label={t.waNotifyShipped} onClick={() => setShowSendDialog('shipped')} disabled={!ticket.customer_phone} />
-          <NotifyButton label={t.waNotifyResolved} onClick={() => setShowSendDialog('resolved')} disabled={!ticket.customer_phone} />
+          <NotifyButton label={t.waNotifyInProgress} onClick={() => setShowSendDialog('in_progress')} disabled={!canWhatsApp} />
+          <NotifyButton label={t.waNotifyAwaiting} onClick={() => setShowSendDialog('awaiting_customer')} disabled={!canWhatsApp} />
+          <NotifyButton label={t.waNotifyShipped} onClick={() => setShowSendDialog('shipped')} disabled={!canWhatsApp} />
+          <NotifyButton label={t.waNotifyResolved} onClick={() => setShowSendDialog('resolved')} disabled={!canWhatsApp} />
         </div>
-        {!ticket.customer_phone && (
+        {!canWhatsApp && (
           <p className="text-[11px] mt-2 opacity-70">{t.waNoPhone}</p>
         )}
         {ticket.last_customer_notified_at && (
@@ -1482,7 +1487,7 @@ function TicketDetail({
       {/* Direct message — free-form text + image, only inside the 24h window.
           Also gated on lang !== 'en' since the freeform-message flow uses the
           same Hebrew WhatsApp template path. */}
-      {lang !== 'en' && ticket.customer_phone && (
+      {lang !== 'en' && canWhatsApp && (
         <div className="rounded-xl p-3"
           style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">

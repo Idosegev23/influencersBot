@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
+import { realPhoneOrNull } from '@/lib/support/contact';
 
 const TERMINAL = new Set(['resolved', 'closed', 'cancelled']);
 
@@ -9,26 +10,34 @@ const TERMINAL = new Set(['resolved', 'closed', 'cancelled']);
  */
 export async function openOrAttachCsTicket(input: {
   accountId: string;
-  waId: string;
-  customerPhone: string;
+  waId: string;                    // channel_user_id — a real phone ONLY on WhatsApp
+  customerPhone: string | null;    // the dialable phone when known; null on an anonymous web shopper
   customerName: string | null;
   topic?: string;
   source?: string; // channel ticket source (spec §8): whatsapp_cs (default) | widget_cs | web_cs | instagram_cs
 }): Promise<{ ticketId: string }> {
   const source = input.source || 'whatsapp_cs';
-  const wa = toWaId(input.customerPhone || input.waId);
+  // Store only what can be dialled. On the widget / chat page `waId` is a synthetic visitor id
+  // (`aw_…`), and writing it here is what made the inbox offer a WhatsApp send that Meta rejected
+  // with (#131009) — see @/lib/support/contact.
+  const phone = realPhoneOrNull(input.customerPhone);
+  const wa = phone ? toWaId(phone) : null;
 
   const { data: rows } = await supabase
     .from('support_requests')
-    .select('id, status, customer_phone')
+    .select('id, status, customer_phone, metadata')
     .eq('account_id', input.accountId)
     .eq('source', source)
     .order('updated_at', { ascending: false })
     .limit(20);
 
-  const match = (rows || []).find(
-    (t: any) => t.customer_phone && toWaId(t.customer_phone) === wa && !TERMINAL.has(t.status),
-  );
+  // Re-attach by phone when there is one, else by the channel user id — an anonymous web shopper
+  // must still land back on their own open thread instead of spawning one per turn.
+  const match = (rows || []).find((t: any) => {
+    if (TERMINAL.has(t.status)) return false;
+    if (wa) return t.customer_phone && toWaId(t.customer_phone) === wa;
+    return (t.metadata as any)?.channel_user_id === input.waId;
+  });
   if (match) return { ticketId: match.id };
 
   const { data: inserted, error } = await supabase
@@ -36,11 +45,11 @@ export async function openOrAttachCsTicket(input: {
     .insert({
       account_id: input.accountId,
       customer_name: input.customerName || 'לקוח/ה',      // NOT NULL
-      customer_phone: input.customerPhone,
+      customer_phone: phone,
       message: input.topic || 'פנייה בוואטסאפ',            // NOT NULL
       status: 'new',
       source,
-      metadata: { channel: source, topic: input.topic || null },
+      metadata: { channel: source, topic: input.topic || null, channel_user_id: input.waId },
     })
     .select('id')
     .single();

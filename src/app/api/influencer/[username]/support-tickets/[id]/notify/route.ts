@@ -34,6 +34,18 @@ import {
   sendSupportFreeformMessage,
 } from '@/lib/whatsapp-notify';
 import { ensureReplyToken } from '@/lib/support/reply-token';
+import { isRealPhone } from '@/lib/support/contact';
+
+/**
+ * Meta buries the useful half of a rejection in `error_data.details` — a 131009 reads
+ * "(#131009) Parameter value is not valid" at the top level and "מספר הטלפון שגוי" one
+ * level down. The agent needs the second one.
+ */
+function sendErrorMessage(error: { message?: string; details?: unknown } | undefined): string {
+  const base = error?.message || 'send failed';
+  const detail = (error?.details as any)?.details;
+  return typeof detail === 'string' && detail.trim() ? `${base} — ${detail.trim()}` : base;
+}
 
 // Meta template BODY hard cap is 1024; the resolved template wraps the
 // summary with ~120 chars of fixed text + variables, so we leave the
@@ -95,8 +107,16 @@ export async function POST(
     .maybeSingle();
 
   if (!ticket) return NextResponse.json({ error: 'ticket not found' }, { status: 404 });
-  if (!ticket.customer_phone) {
-    return NextResponse.json({ error: 'ticket has no customer phone' }, { status: 400 });
+  // Reject up front rather than let Meta reject it. Tickets opened from the widget / chat page
+  // used to carry the visitor id here, which looks like a phone to a null-check and isn't one.
+  if (!isRealPhone(ticket.customer_phone)) {
+    return NextResponse.json(
+      {
+        error: 'ticket_has_no_phone',
+        message: 'אין מספר טלפון תקין בפנייה — אי אפשר לשלוח הודעת WhatsApp.',
+      },
+      { status: 400 },
+    );
   }
 
   const fname = firstName(ticket.customer_name);
@@ -284,7 +304,7 @@ export async function POST(
     body_text: bodyText,
     note: result.success
       ? null
-      : `Send failed: ${result.error?.message || 'unknown'}`,
+      : `Send failed: ${sendErrorMessage(result.error)}`,
   });
 
   if (result.success) {
@@ -327,7 +347,7 @@ export async function POST(
   return NextResponse.json({
     ok: result.success,
     template: tpl,
-    error: result.success ? null : result.error?.message || 'send failed',
+    error: result.success ? null : sendErrorMessage(result.error),
     wa_message_id: result.wa_message_id || null,
   });
 }

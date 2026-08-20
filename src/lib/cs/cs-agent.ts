@@ -271,7 +271,7 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
 
   // 4) Build the brand-grounded system prompt (persona + RAG + re-entry digest — NO scripted menu).
   const openThreads = await loadOpenThreads(waId);
-  const digest = await buildContextDigest(session, openThreads, input.mode ?? 'cs', input.language ?? 'he');
+  const digest = await buildContextDigest(session, openThreads, input.mode ?? 'cs', input.language ?? 'he', ctx.identity);
   const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest });
 
   // 5) Tool-calling loop.
@@ -293,6 +293,7 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   const messages: CsChatMessage[] = [...history, { role: 'user', content: userContent }];
   let finalText: string | null = null;
   let handedOff = false; // escalate_to_human fired this turn → pause FUTURE turns, but still ack THIS one
+  let learnedPhone: string | null = null; // remember_contact → persisted as the session's claimedPhone
   let cards: CsProductCard[] = [];
   const payloads = new Map<string, CsUiPayload>(); // deduped by kind, last wins
 
@@ -307,6 +308,13 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
       if (tool) { try { result = await tool.handler(tc.args, ctx); } catch (e) { result = { ok: false, data: { reason: 'tool_error' } }; console.warn('[cs-agent] tool threw', tc.name, e); } }
       if (result.bind) session = await applyBind(session, ctx, result.bind);
       if (result.learnedName) session = await applyLearnedName(session, ctx, result.learnedName);
+      // A phone learned this turn must apply IMMEDIATELY: later tools in the same loop (order
+      // lookup, escalate_to_human) read ctx.identity, and an escalation that fires one iteration
+      // after the shopper typed their number would otherwise still hand off with no contact route.
+      if (result.learnedPhone) {
+        learnedPhone = result.learnedPhone;
+        ctx.identity = withClaimedPhone(ctx.identity, learnedPhone);
+      }
       if (result.escalated) handedOff = true;
       if (result.cards?.length) cards = result.cards;   // last show_products call wins (never accumulates past the cap)
       const payload = derivePayload(tc.name, result);
@@ -332,6 +340,7 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   if (handedOff) cards = [];
   const contextPatch: any = { ...(session.context || {}), recentTurns: recentTurns.slice(-8) };
   if (input.claimedPhone?.trim()) contextPatch.claimedPhone = input.claimedPhone.trim(); // asked once, kept forever (spec §7)
+  if (learnedPhone) contextPatch.claimedPhone = learnedPhone; // typed in conversation — same rule, later wins
   await saveCsSession(session, { context: contextPatch, last_activity_at: new Date().toISOString() });
   if (session.active_chat_session_id) await persistTurn(session.active_chat_session_id, userMessage, replyBody, cards);
   return { reply: { kind: 'text', body: replyBody }, phase: session.phase, ...(cards.length ? { cards } : {}), ...(payloads.size ? { payloads: [...payloads.values()] } : {}), ...(suggestions.length ? { suggestions } : {}) };

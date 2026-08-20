@@ -18,10 +18,13 @@ export interface CsToolsetOpts {
 }
 
 const WHATSAPP_ONLY = new Set(['resolve_brand', 'bind_brand']); // shared-number problem; elsewhere the account IS the brand
+// On WhatsApp the sender's number IS the contact — asking for one would be absurd. Everywhere else
+// the shopper is anonymous, and this is the only way a hand-off gets a callback number.
+const NON_WHATSAPP_ONLY = new Set(['remember_contact']);
 const ORDER_TOOLS = new Set(['lookup_order', 'lookup_orders_by_phone']);
 const PRODUCT_TOOLS = new Set(['search_products', 'show_products']);
-const GOV_ALLOWED = new Set(['remember_name', 'escalate_to_human']); // RAG answers come from the system prompt, not a tool
-const NON_BRAND_ALLOWED = new Set(['remember_name', 'list_open_threads', 'open_or_attach_ticket', 'escalate_to_human']);
+const GOV_ALLOWED = new Set(['remember_name', 'remember_contact', 'escalate_to_human']); // RAG answers come from the system prompt, not a tool
+const NON_BRAND_ALLOWED = new Set(['remember_name', 'remember_contact', 'list_open_threads', 'open_or_attach_ticket', 'escalate_to_human']);
 
 function hasOrdersProvider(config: any): boolean {
   const i = config?.integrations || {};
@@ -36,6 +39,7 @@ export function buildCsToolset(opts: CsToolsetOpts): { tools: CsTool[]; defs: Op
     // already names the tenant, offering them would let the conversation be rebound to another
     // account — the leak is closed by never offering the tool, not by validating its arguments.
     if (WHATSAPP_ONLY.has(name) && (opts.channel !== 'whatsapp' || opts.preBoundAccountId)) return false;
+    if (NON_WHATSAPP_ONLY.has(name) && opts.channel === 'whatsapp') return false;
     if (!opts.account) return true;
     const archetype = opts.account.archetype || 'brand';
     if (archetype === 'government_ministry') return GOV_ALLOWED.has(name);

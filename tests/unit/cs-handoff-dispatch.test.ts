@@ -136,6 +136,72 @@ describe('runCsHandoffCheck', () => {
     expect(Array.isArray(audit.row.metadata.escalation.transcript)).toBe(true);
   });
 
+  // Regression (#131009): on the widget / chat page `waId` is a synthetic visitor id. It was
+  // written into customer_phone, so the inbox showed a reachable ticket and every WhatsApp send
+  // died at Meta with "מספר הטלפון שגוי". A ticket with no contact route must SAY it has none.
+  it('writes no phone when the channel id is a web visitor id', async () => {
+    const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
+    const sb = makeSupabase({ config: { escalation: { enabled: true, recipients: [{ email: 'r@b.co' }] } } });
+    await runCsHandoffCheck(
+      { accountId: 'a1', chatSessionId: 'cs1', ticketId: null, waId: 'aw_wxjdyhrzmt18914r', userMessage: 'אני רוצה נציג', customerName: 'סיגלית', force: true },
+      { supabase: sb as any, sendEmail: vi.fn().mockResolvedValue({ success: true }) as any, pauseBot: vi.fn() as any, now: () => 0 },
+    );
+    const audit = sb.inserts.find((i: any) => i.table === 'support_requests');
+    expect(audit.row.customer_phone).toBeNull();
+    expect(audit.row.metadata.escalation.customer_phone).toBeNull();
+    // ...but the session is still traceable from the ticket.
+    expect(audit.row.metadata.escalation.channel_user_id).toBe('aw_wxjdyhrzmt18914r');
+  });
+
+  it('never falls back to the visitor id for the ticket name', async () => {
+    const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
+    const sb = makeSupabase({ config: { escalation: { enabled: true, recipients: [{ email: 'r@b.co' }] } } });
+    await runCsHandoffCheck(
+      { accountId: 'a1', chatSessionId: 'cs1', ticketId: null, waId: 'aw_x1', userMessage: 'אני רוצה נציג', force: true },
+      { supabase: sb as any, sendEmail: vi.fn().mockResolvedValue({ success: true }) as any, pauseBot: vi.fn() as any, now: () => 0 },
+    );
+    const audit = sb.inserts.find((i: any) => i.table === 'support_requests');
+    expect(audit.row.customer_name).toBe('לקוח/ה');
+  });
+
+  // The phone a web shopper typed mid-conversation (remember_contact) is the whole point of the
+  // fix — it must reach the ticket, not just the session.
+  it('stores a contactPhone learned on a web channel', async () => {
+    const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
+    const sb = makeSupabase({ config: { escalation: { enabled: true, recipients: [{ email: 'r@b.co' }] } } });
+    await runCsHandoffCheck(
+      { accountId: 'a1', chatSessionId: 'cs1', ticketId: null, waId: 'aw_x1', contactPhone: '0545989978', userMessage: 'אני רוצה נציג', customerName: 'סיגלית', force: true },
+      { supabase: sb as any, sendEmail: vi.fn().mockResolvedValue({ success: true }) as any, pauseBot: vi.fn() as any, now: () => 0 },
+    );
+    const audit = sb.inserts.find((i: any) => i.table === 'support_requests');
+    expect(audit.row.customer_phone).toBe('0545989978');
+  });
+
+  it('writes a learned phone through to an already-bound ticket', async () => {
+    const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
+    const sb = makeSupabase({
+      config: { escalation: { enabled: true, recipients: [{ email: 'r@b.co' }] } },
+      ticket: { metadata: {}, customer_name: 'לקוח/ה' },
+    });
+    await runCsHandoffCheck(
+      { accountId: 'a1', chatSessionId: 'cs1', ticketId: 't1', waId: 'aw_x1', contactPhone: '0545989978', userMessage: 'אני רוצה נציג', force: true },
+      { supabase: sb as any, sendEmail: vi.fn().mockResolvedValue({ success: true }) as any, pauseBot: vi.fn() as any, now: () => 0 },
+    );
+    const upd = sb.updates.find((u: any) => u.table === 'support_requests');
+    expect(upd.row.customer_phone).toBe('0545989978');
+  });
+
+  it('still carries the WhatsApp sender number as the phone (unchanged behaviour)', async () => {
+    const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
+    const sb = makeSupabase({ config: { escalation: { enabled: true, recipients: [{ email: 'r@b.co' }] } } });
+    await runCsHandoffCheck(
+      { accountId: 'a1', chatSessionId: 'cs1', ticketId: null, waId: '972501234567', userMessage: 'אני רוצה נציג', force: true },
+      { supabase: sb as any, sendEmail: vi.fn().mockResolvedValue({ success: true }) as any, pauseBot: vi.fn() as any, now: () => 0 },
+    );
+    const audit = sb.inserts.find((i: any) => i.table === 'support_requests');
+    expect(audit.row.customer_phone).toBe('972501234567');
+  });
+
   it('dedups a second alert inside the window (keys off the ticket last_handoff_at)', async () => {
     const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
     const sb = makeSupabase({ config: { escalation: { enabled: true } }, ticket: { metadata: { last_handoff_at: new Date(0).toISOString() } } });

@@ -30,7 +30,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-const digest = (over: any = {}) => ({ knownName: null, boundBrand: null, warm: false, openThreads: [], recentTurns: [], policy: null, ...over });
+const digest = (over: any = {}) => ({ knownName: null, boundBrand: null, warm: false, openThreads: [], recentTurns: [], policy: null, hasContactRoute: true, ...over });
 
 describe('cs-context', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -147,5 +147,20 @@ describe('cs-context', () => {
     expect(p).toContain('משלוח');
     expect(p).not.toMatch(/show_buttons/);
     expect(p).toMatch(/בפרוזה/);
+  });
+
+  // The hand-off promise has to be keepable. On a channel with no phone the prompt must send the
+  // brain to collect one first — otherwise the ticket reaches the brand with no contact route.
+  it('demands a callback number before escalating when the channel carries no contact', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: 'acc-1', userMessage: 'אני רוצה נציג', digest: digest({ boundBrand: 'Argania', hasContactRoute: false }) });
+    expect(p).toContain('remember_contact');
+    expect(p).toContain('אין לנו את מספר הטלפון');
+  });
+
+  it('says nothing about collecting a phone when the channel already has one', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: 'acc-1', userMessage: 'אני רוצה נציג', digest: digest({ boundBrand: 'Argania', hasContactRoute: true }) });
+    expect(p).not.toContain('remember_contact');
   });
 });

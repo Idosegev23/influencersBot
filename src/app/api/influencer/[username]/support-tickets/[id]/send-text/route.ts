@@ -14,6 +14,7 @@ import { getAgentSession } from '@/lib/auth/agent-auth';
 import { sendText } from '@/lib/whatsapp-cloud/client';
 import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
 import { getServiceWindow } from '@/lib/support/service-window';
+import { isRealPhone } from '@/lib/support/contact';
 
 export const runtime = 'nodejs';
 
@@ -56,8 +57,8 @@ export async function POST(
     .maybeSingle();
 
   if (!ticket) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  if (!ticket.customer_phone) {
-    return NextResponse.json({ error: 'no_phone', message: 'אין טלפון לפנייה הזו' }, { status: 400 });
+  if (!isRealPhone(ticket.customer_phone)) {
+    return NextResponse.json({ error: 'no_phone', message: 'אין מספר טלפון תקין בפנייה הזו' }, { status: 400 });
   }
 
   const window = await getServiceWindow(influencer.id, ticket.customer_phone);

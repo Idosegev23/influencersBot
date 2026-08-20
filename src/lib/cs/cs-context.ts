@@ -3,6 +3,7 @@ import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
 import { searchContentByQuery, formatMetadataForAI } from '@/lib/chatbot/hybrid-retrieval';
 import { isWarm, type CsSessionRow } from '@/lib/cs/cs-session';
 import { listCsEnabledBrands, MAX_INLINE } from '@/lib/cs/brand-resolver';
+import { identityPhone, type CsIdentity } from '@/lib/cs/identity';
 
 // The brain always appends <<SUGGESTIONS>>…; a WhatsApp channel MUST strip it before sending.
 export function stripSuggestions(text: string): string {
@@ -36,6 +37,10 @@ export interface CsContextDigest {
   // must follow it. This is the v1 "policy engine": a per-brand rulebook injected into the prompt.
   // A future brand-management screen will populate it (upload a file or type it); null when unset.
   policy: string | null;
+  // Does this channel already carry a way to call the shopper back? True on WhatsApp (the sender's
+  // number) and once a web shopper has given a phone; false for an anonymous widget / chat visitor,
+  // where a hand-off without asking first reaches nobody.
+  hasContactRoute: boolean;
 }
 
 export async function buildContextDigest(
@@ -43,6 +48,7 @@ export async function buildContextDigest(
   openThreads: Array<{ ticketId: string; brand: string; topic: string }>,
   mode: 'cs' | 'content' = 'cs',
   language: 'he' | 'en' = 'he',
+  identity?: CsIdentity,
 ): Promise<CsContextDigest> {
   let boundBrand: string | null = null;
   let policy: string | null = null;
@@ -54,7 +60,10 @@ export async function buildContextDigest(
     policy = typeof p === 'string' && p.trim() ? p : null;
   }
   const recentTurns = Array.isArray((session.context as any)?.recentTurns) ? (session.context as any).recentTurns : [];
-  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), mode, language, openThreads, recentTurns, policy };
+  // Absent identity → assume a contact route exists, so an unknown caller can never make the prompt
+  // start demanding phone numbers on WhatsApp.
+  const hasContactRoute = identity ? identityPhone(identity) !== null : true;
+  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), mode, language, openThreads, recentTurns, policy, hasContactRoute };
 }
 
 /**
@@ -72,6 +81,11 @@ export async function buildCsSystemPrompt(input: {
   lines.push('את/ה Bestie — שירות הלקוחות של המותגים בוואטסאפ. דבר/י בעברית, בגובה העיניים, קצר וברור, בקול המותג.');
   lines.push('כללי ליבה: אל תמציא/י פרטי הזמנה או מדיניות — השתמש/י בכלים (tools). אל תחשוף/י פרטי הזמנה לפני אימות טלפון (הכלי lookup_order עושה זאת). אם אינך יכול/ה לעזור או שהלקוח/ה מבקש/ת אדם — הפעל/י escalate_to_human.');
   lines.push('כשמסלימים לאדם (escalate_to_human): מיד באותו תור כתב/י הודעת סיום קצרה, חמה ואמפתית — הכר/י בבעיה, התנצל/י אם זו תלונה/נזק, והבטח/י שנציג/ה אנושי/ת יחזרו בהקדם. לעולם אל תשאיר/י את הלקוח/ה בשתיקה אחרי הסלמה.');
+  if (!digest.hasContactRoute) {
+    // Without this the hand-off is a promise nobody can keep: the ticket reaches the brand with no
+    // phone on it, and the shopper waits for a call that cannot be made.
+    lines.push('חשוב — בערוץ הזה אין לנו את מספר הטלפון של הלקוח/ה. לפני שמסלימים לאדם: בקש/י מספר טלפון לחזרה במשפט אחד ופשוט ("לאיזה מספר שנחזור אלייך?"), ומרגע שקיבלת אותו הפעל/י remember_contact ורק אז escalate_to_human. אם הלקוח/ה מסרב/ת או לא עונ/ה — הסלם/י בכל זאת, ואמר/י במפורש שאפשר לחזור לכאן לעדכון. אל תבטיח/י שנציג/ה יתקשר/ו אם אין לך מספר.');
+  }
   lines.push('טון לפי מצב: בתלונה, מוצר פגום, נזק במשלוח או כעס — הורד/י את הטון העליז ואת האימוג׳ים המחייכים, הגב/י ברצינות, אמפתיה והתנצלות אמיתית. אימוג׳י עליז (🙂✨) מתאים רק לשיחה נעימה, לא לתלונה.');
   lines.push('על ברכה פשוטה ("היי") — פתח/י בחום ושאל/י איך אפשר לעזור (או המשך/י בפרוזה נושא פתוח קודם). אל תוביל/י ברכה בהצעה "להעביר לנציג" — הצע/י אדם רק כשבאמת נתקעת או כשהלקוח/ה מבקש/ת.');
   lines.push('תמונות: כשהלקוח/ה שולח/ת תמונה — את/ה רואה אותה ממש. התבונן/י בה, תאר/י בקצרה מה את/ה רואה (מוצר, נזק, תווית, טקסט), אשר/י מול המדיניות (למשל אם המוצר אכן נראה פגום/פתוח), ופעל/י בהתאם. אם התמונה לא ברורה או לא רלוונטית — בקש/י בעדינות תמונה טובה יותר.');
