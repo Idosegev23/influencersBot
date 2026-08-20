@@ -40,6 +40,23 @@ export type InboundOutcome =
   | 'not_a_customer_reply'
   | 'error';
 
+/** One message this run could not hand to a business — collected and reported as a single digest. */
+export interface UnroutableEmail {
+  from: string;
+  subject: string;
+  reason: 'unmatched' | 'no_brand_address';
+  brandName?: string;
+  excerpt: string;
+}
+
+export interface RouteOptions {
+  /**
+   * Collect alerts here instead of emailing one per message. A per-message alert is how a
+   * classification mistake turns into an inbox flood — see reportUnroutableEmails.
+   */
+  deferAlerts?: UnroutableEmail[];
+}
+
 export interface InboundResult {
   outcome: InboundOutcome;
   accountId?: string;
@@ -52,6 +69,18 @@ export interface InboundResult {
 // UUID's first group (8 hex). Status templates use a 6-hex prefix of the same id. Accept 6–8 so
 // both surfaces resolve, and read it out of the quoted history the client attached.
 const TICKET_CODE_RE = /(?:מספר\s*פנייה|Reference|Ticket\s*ID)\s*[:：]?\s*#?\s*([0-9a-fA-F]{6,8})/;
+
+/**
+ * Mail WE sent. The poller reads the mailbox Bestie sends from, so without this every outbound
+ * email — customer confirmations, and the unmatched-alert itself — comes back as an inbound
+ * "customer reply". The alert loop that produced 349 alerts in two hours started exactly here.
+ */
+function isSelfSent(from: string): boolean {
+  const ours = [process.env.GMAIL_SEND_FROM, process.env.CRM_INBOX_EMAIL]
+    .map((v) => v?.trim().toLowerCase())
+    .filter(Boolean) as string[];
+  return ours.includes(from.trim().toLowerCase());
+}
 
 /** A bounce or an auto-reply must never be forwarded to a brand as if a customer wrote it. */
 function isAutomated(email: InboundEmail): boolean {
@@ -111,11 +140,42 @@ function buildForwardHtml(email: InboundEmail, brandName: string, ticketId: stri
 </body></html>`;
 }
 
+/** Defer when the caller is batching (the cron), else send immediately (a one-off call). */
+async function raiseAlert(options: RouteOptions, item: UnroutableEmail): Promise<void> {
+  if (options.deferAlerts) { options.deferAlerts.push(item); return; }
+  await reportUnroutableEmails([item]);
+}
+
+/**
+ * One alert for everything a run could not route. Silent when there is nothing to say — a cron
+ * that emails every 10 minutes to report "nothing happened" gets filtered, and then the one that
+ * mattered gets filtered with it.
+ */
+export async function reportUnroutableEmails(items: UnroutableEmail[]): Promise<void> {
+  if (!items.length) return;
+  const lines = items.map((i) => {
+    const why = i.reason === 'no_brand_address'
+      ? `שויך ל-${i.brandName || 'מותג'} אבל לחשבון אין כתובת מייל`
+      : 'לא הצלחנו לשייך לאף חשבון';
+    return `• ${i.from} — "${i.subject || '(ללא נושא)'}"\n  ${why}\n  ${i.excerpt.replace(/\s+/g, ' ').slice(0, 200)}`;
+  });
+  await sendAdminAlert({
+    level: 'warning',
+    subject: `${items.length} תשובות מייל לא נותבו לאף עסק`,
+    message: `הגיעו ${items.length} הודעות לתיבה של Bestie שלא הועברו לאף עסק. הן ממתינות בתיבה.`,
+    details: lines.join('\n\n'),
+    adminEmails: CTO_ALERT_RECIPIENTS,
+  }).catch(() => {});
+}
+
 /**
  * Forward one inbound message to its brand. Idempotent: the Gmail poller re-reads a 2-day
  * window every 10 minutes, so a message already handled returns 'duplicate' untouched.
  */
-export async function routeInboundCustomerEmail(email: InboundEmail): Promise<InboundResult> {
+export async function routeInboundCustomerEmail(
+  email: InboundEmail,
+  options: RouteOptions = {},
+): Promise<InboundResult> {
   const { data: seen } = await supabaseAdmin
     .from('inbound_email_routing')
     .select('id')
@@ -132,6 +192,11 @@ export async function routeInboundCustomerEmail(email: InboundEmail): Promise<In
     });
   };
 
+  if (isSelfSent(email.from)) {
+    await log({ outcome: 'not_a_customer_reply', note: 'sent by us — not an inbound reply' });
+    return { outcome: 'not_a_customer_reply' };
+  }
+
   if (isAutomated(email)) {
     await log({ outcome: 'not_a_customer_reply', note: 'automated sender or auto-reply subject' });
     return { outcome: 'not_a_customer_reply' };
@@ -144,13 +209,9 @@ export async function routeInboundCustomerEmail(email: InboundEmail): Promise<In
 
   if (!match) {
     await log({ outcome: 'unmatched' });
-    await sendAdminAlert({
-      level: 'warning',
-      subject: 'תשובת מייל ללא שיוך — אף עסק לא קיבל אותה',
-      message: `הגיעה תשובה לתיבה של Bestie מ-${email.from} ולא הצלחנו לשייך אותה לחשבון. היא לא הועברה לאף עסק וממתינה בתיבה.`,
-      details: `נושא: ${email.subject}\n\n${email.body.slice(0, 2000)}`,
-      adminEmails: CTO_ALERT_RECIPIENTS,
-    }).catch(() => {});
+    await raiseAlert(options, {
+      from: email.from, subject: email.subject, reason: 'unmatched', excerpt: email.body.slice(0, 400),
+    });
     return { outcome: 'unmatched' };
   }
 
@@ -168,13 +229,10 @@ export async function routeInboundCustomerEmail(email: InboundEmail): Promise<In
       account_id: match.accountId, ticket_id: match.ticketId, matched_by: matchedBy,
       outcome: 'no_brand_address',
     });
-    await sendAdminAlert({
-      level: 'warning',
-      subject: `תשובת לקוח ל-${brandName} — אין כתובת מייל לעסק`,
-      message: `שייכנו את התשובה של ${email.from} ל-${brandName}, אבל לחשבון אין כתובת מייל מוגדרת, אז אי אפשר להעביר אותה.`,
-      details: `נושא: ${email.subject}\n\n${email.body.slice(0, 2000)}`,
-      adminEmails: CTO_ALERT_RECIPIENTS,
-    }).catch(() => {});
+    await raiseAlert(options, {
+      from: email.from, subject: email.subject, reason: 'no_brand_address', brandName,
+      excerpt: email.body.slice(0, 400),
+    });
     return { outcome: 'no_brand_address', accountId: match.accountId, ticketId: match.ticketId };
   }
 

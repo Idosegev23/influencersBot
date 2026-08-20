@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { getGoogleServiceAccount, sendEmail } from '@/lib/email';
 import { ingestQuote, type IngestAttachment } from '@/lib/crm/quote-ingest';
-import { routeInboundCustomerEmail } from '@/lib/support/inbound-email';
+import { routeInboundCustomerEmail, reportUnroutableEmails, type UnroutableEmail } from '@/lib/support/inbound-email';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -80,10 +80,17 @@ export async function GET(req: NextRequest) {
   const gmail = google.gmail({ version: 'v1', auth });
 
   const results: any[] = [];
+  // Anything that could not be routed this run — reported as ONE digest below rather than one
+  // alert per message. A per-message alert is how a classification mistake becomes an inbox flood.
+  const unroutable: UnroutableEmail[] = [];
   try {
+    // `in:inbox` is load-bearing, not tidiness: without it Gmail returns the mailbox's SENT
+    // messages too. Every Bestie email is sent FROM this address, so the poller read its own
+    // outbound mail back as if a customer had written it — including the "unmatched" alerts it
+    // had just sent, which then produced another alert. 349 alerts in two hours.
     const list = await gmail.users.messages.list({
       userId: 'me',
-      q: 'newer_than:2d -in:chats',
+      q: 'in:inbox newer_than:2d -in:chats -from:me',
       maxResults: 25,
     });
     const messages = list.data.messages || [];
@@ -142,7 +149,7 @@ export async function GET(req: NextRequest) {
             from,
             subject,
             body: collected.text || full.data.snippet || '',
-          }).catch((e: any) => ({ outcome: 'error', note: String(e?.message || e) }));
+          }, { deferAlerts: unroutable }).catch((e: any) => ({ outcome: 'error', note: String(e?.message || e) }));
         }
 
         results.push({ id: m.id, from, matched: res.matched, hasQuote: !!res.quote, needsClient: !!res.needsClient, reason: res.reason, ...(routed ? { routed: routed.outcome } : {}) });
@@ -154,5 +161,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 
-  return NextResponse.json({ configured: true, processed: results.length, results });
+  await reportUnroutableEmails(unroutable);
+
+  return NextResponse.json({ configured: true, processed: results.length, unroutable: unroutable.length, results });
 }

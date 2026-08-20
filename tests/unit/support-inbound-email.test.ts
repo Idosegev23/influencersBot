@@ -66,7 +66,11 @@ const mail = (over: any = {}) => ({
 });
 
 describe('routeInboundCustomerEmail', () => {
-  beforeEach(() => vi.resetModules());
+  beforeEach(() => {
+    vi.resetModules();
+    process.env.GMAIL_SEND_FROM = 'bestie@ldrsgroup.com';
+    delete process.env.CRM_INBOX_EMAIL;
+  });
 
   it('matches on the ticket code quoted back and forwards to the brand', async () => {
     const sb = makeSupabase({ byCode: [{ id: '88e0f355-fbc6-4587-8c44-7af36e35b32f', account_id: 'acc-1' }], account: BRAND });
@@ -109,6 +113,50 @@ describe('routeInboundCustomerEmail', () => {
     expect(sb.inserts[0].row.outcome).toBe('unmatched');
   });
 
+  // THE loop that flooded the inbox: the poller reads the mailbox Bestie SENDS from, so every
+  // outbound email — including the unmatched-alert itself — came back as an inbound "reply",
+  // failed to match, and produced another alert. 349 alerts in two hours.
+  it('never treats our own outbound mail as a customer reply', async () => {
+    process.env.GMAIL_SEND_FROM = 'bestie@ldrsgroup.com';
+    const sb = makeSupabase({ byCode: [], bySender: [] });
+    const route = await load(sb);
+    const r = await route(mail({ from: 'bestie@ldrsgroup.com', subject: 'קיבלנו את הפנייה שלך' }));
+    expect(r.outcome).toBe('not_a_customer_reply');
+    expect(alerts.length).toBe(0); // no alert → no message to read back → no loop
+    expect(sent.length).toBe(0);
+  });
+
+  it('is case- and whitespace-insensitive about our own address', async () => {
+    process.env.GMAIL_SEND_FROM = 'bestie@ldrsgroup.com';
+    const sb = makeSupabase({ byCode: [], bySender: [] });
+    const route = await load(sb);
+    const r = await route(mail({ from: '  Bestie@LDRSgroup.com ' }));
+    expect(r.outcome).toBe('not_a_customer_reply');
+  });
+
+  // One alert per message is how a classification mistake becomes a flood. Batch callers collect.
+  it('defers alerts to the caller\'s batch instead of emailing per message', async () => {
+    const sb = makeSupabase({ byCode: [], bySender: [] });
+    const route = await load(sb);
+    const batch: any[] = [];
+    await route(mail({ providerMessageId: 'g1', from: 'a@x.com' }), { deferAlerts: batch });
+    await route(mail({ providerMessageId: 'g2', from: 'b@x.com' }), { deferAlerts: batch });
+    expect(alerts.length).toBe(0);
+    expect(batch.length).toBe(2);
+
+    const { reportUnroutableEmails } = await import('@/lib/support/inbound-email');
+    await reportUnroutableEmails(batch);
+    expect(alerts.length).toBe(1); // ONE digest, not one per message
+    expect(alerts[0].subject).toContain('2');
+  });
+
+  it('says nothing when a run had nothing to report', async () => {
+    await load(makeSupabase());
+    const { reportUnroutableEmails } = await import('@/lib/support/inbound-email');
+    await reportUnroutableEmails([]);
+    expect(alerts.length).toBe(0);
+  });
+
   it('alerts the CTO when the brand has no address to forward to', async () => {
     const sb = makeSupabase({
       byCode: [{ id: 't-1', account_id: 'acc-1' }],
@@ -118,6 +166,7 @@ describe('routeInboundCustomerEmail', () => {
     const r = await route(mail());
     expect(r.outcome).toBe('no_brand_address');
     expect(alerts[0].adminEmails).toEqual(['cto@ldrsgroup.com']);
+    expect(alerts[0].details).toContain('LA BEAUTE');
     expect(sent.length).toBe(0);
   });
 
