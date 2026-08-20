@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email';
+import { resolveBrandReplyTo } from '@/lib/support/reply-address';
 
 function cors(origin: string): Record<string, string> {
   return {
@@ -91,7 +92,9 @@ export async function POST(req: NextRequest) {
   <div style="max-width:560px;margin:12px auto 0;font-size:11px;color:#9ca3af;text-align:center">${escapeHtml(footer)}</div>
 </body></html>`;
 
-    const res = await sendEmail({ to: email, subject, html });
+    // A reply to a transcript belongs to the brand, not to the shared Bestie mailbox.
+    const replyTo = await resolveBrandReplyTo(supabase, { id: accountId, config: cfg });
+    const res = await sendEmail({ to: email, subject, html, ...(replyTo ? { replyTo } : {}) });
     if (!res.success) {
       console.warn('[Widget Transcript] email send failed:', res.error);
       return NextResponse.json({ error: res.error || 'send failed' }, { status: 500, headers });

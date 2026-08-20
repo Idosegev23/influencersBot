@@ -10,6 +10,7 @@ import { emitServerConversion } from '@/lib/analytics/server-track';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
 import { autoAssignNewTicket } from '@/lib/support/auto-assign';
 import { sendEmail, sendEmailWithAttachments } from '@/lib/email';
+import { resolveBrandReplyTo } from '@/lib/support/reply-address';
 
 // ============================================
 // CORS — opens this route for cross-origin POSTs from embedded widgets.
@@ -392,7 +393,14 @@ export async function POST(req: NextRequest) {
   <div style="max-width:560px;margin:12px auto 0;font-size:11px;color:#9ca3af;text-align:center">${htmlEscapeC(footer)}</div>
 </body></html>`;
 
-      sendEmail({ to: sanitizedEmail, subject: subjectCust, html: htmlCust })
+      // THE fix for "customers reply to Bestie's address and nobody answers": their reply must
+      // reach the brand's own inbox. Left off entirely when the brand gave us no address —
+      // better a reply to a watched-by-nobody mailbox than to the wrong business.
+      const customerReplyTo = await resolveBrandReplyTo(supabase, {
+        id: influencer.id,
+        config: (influencer as any)._rawConfig || {},
+      });
+      sendEmail({ to: sanitizedEmail, subject: subjectCust, html: htmlCust, ...(customerReplyTo ? { replyTo: customerReplyTo } : {}) })
         .then((r) => {
           if (!r.success) console.warn('[Support] Customer confirmation email failed:', r.error);
         })

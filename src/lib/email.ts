@@ -65,6 +65,7 @@ export function buildRawEmail(options: {
   subject: string;
   html: string;
   from?: string;
+  replyTo?: string;
 }): string {
   const to = Array.isArray(options.to) ? options.to.join(', ') : options.to;
   const cc = Array.isArray(options.cc) ? options.cc.join(', ') : options.cc;
@@ -73,6 +74,7 @@ export function buildRawEmail(options: {
   const messageParts = [
     `From: ${from}`,
     `To: ${to}`,
+    ...(options.replyTo ? [`Reply-To: ${options.replyTo}`] : []),
     ...(cc ? [`Cc: ${cc}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(options.subject).toString('base64')}?=`,
     'MIME-Version: 1.0',
@@ -95,6 +97,7 @@ function buildRawEmailWithAttachments(options: {
   subject: string;
   html: string;
   from?: string;
+  replyTo?: string;
   attachments: { filename: string; content: Buffer; mimeType: string }[];
 }): string {
   const to = Array.isArray(options.to) ? options.to.join(', ') : options.to;
@@ -105,6 +108,7 @@ function buildRawEmailWithAttachments(options: {
   const parts: string[] = [
     `From: ${from}`,
     `To: ${to}`,
+    ...(options.replyTo ? [`Reply-To: ${options.replyTo}`] : []),
     ...(cc ? [`Cc: ${cc}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(options.subject).toString('base64')}?=`,
     'MIME-Version: 1.0',
@@ -147,6 +151,12 @@ export interface SendEmailOptions {
   cc?: string | string[];
   subject: string;
   html: string;
+  /**
+   * Where a REPLY should land. Bestie sends from one shared mailbox, so without this every
+   * customer who hits "reply" writes to bestie@ — an inbox no brand watches. Any mail addressed
+   * to an end customer must carry the brand's own address here (see @/lib/support/reply-address).
+   */
+  replyTo?: string;
 }
 
 export interface SendEmailWithAttachmentsOptions extends SendEmailOptions {
