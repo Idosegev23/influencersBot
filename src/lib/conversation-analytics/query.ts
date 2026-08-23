@@ -154,3 +154,26 @@ export async function fetchInsights(opts: {
   if (error) throw new Error(error.message);
   return (data || []) as any[];
 }
+
+/**
+ * Sessions that exist in the range — the denominator for the coverage bar.
+ *
+ * Counted from chat_sessions, not from conversation_classifications, precisely
+ * so an incomplete classification run shows up as low coverage instead of
+ * reading as a complete report of a smaller period.
+ */
+export async function countSessionsInRange(opts: {
+  accountId: string;
+  fromIso: string;
+  toIso: string;
+}): Promise<number> {
+  const { count, error } = await supabase
+    .from('chat_sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('account_id', opts.accountId)
+    .gte('created_at', opts.fromIso)
+    .lt('created_at', opts.toIso);
+
+  if (error) throw new Error(error.message);
+  return count || 0;
+}

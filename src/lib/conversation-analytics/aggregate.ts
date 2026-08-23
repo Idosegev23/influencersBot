@@ -70,8 +70,17 @@ export function buildReport(opts: {
   current: ClassificationLite[];
   previous: ClassificationLite[];
   connectedChannels: string[];
+  /**
+   * Sessions that exist in the range, classified or not. Coverage is measured
+   * against this, NOT against the rows we happen to have: a pipeline that has
+   * only reached 3% of an account must not display 100% classified. Omit only
+   * when the universe is genuinely unknown, and accept that the percentage then
+   * describes the fetched rows alone.
+   */
+  sessionsInRange?: number;
 }): ConversationReport {
   const { current, previous, connectedChannels } = opts;
+  const universe = opts.sessionsInRange ?? current.length;
 
   const usable = current.filter((r) => r.status === 'ok');
   const complaints = current.filter((r) => r.is_complaint);
@@ -146,9 +155,9 @@ export function buildReport(opts: {
 
   return {
     coverage: {
-      total: current.length,
+      total: universe,
       classified: usable.length,
-      classifiedPct: pct(usable.length, current.length),
+      classifiedPct: pct(usable.length, universe),
       complaints: complaints.length,
       complaintsWithProduct: complaintsWithProduct.length,
       complaintsWithProductPct: pct(complaintsWithProduct.length, complaints.length),

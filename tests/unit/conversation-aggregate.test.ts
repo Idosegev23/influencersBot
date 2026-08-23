@@ -47,6 +47,28 @@ describe('coverage', () => {
     expect(r.coverage.complaintsWithProductPct).toBe(50);
   });
 
+  // The bug this guards: coverage used to divide by the number of
+  // classification rows present, so a run that had only reached 3% of the
+  // account's sessions still displayed 100% classified. Coverage must be
+  // measured against the sessions that exist, not against what was fetched.
+  it('measures coverage against every session in the range, not just classified rows', () => {
+    const r = buildReport({
+      current: [row({}), row({})],
+      previous: [],
+      connectedChannels: ['web'],
+      sessionsInRange: 100,
+    });
+    expect(r.coverage.total).toBe(100);
+    expect(r.coverage.classified).toBe(2);
+    expect(r.coverage.classifiedPct).toBe(2);
+  });
+
+  it('falls back to the rows it has when the session count is unknown', () => {
+    const r = buildReport({ current: [row({}), row({})], previous: [], connectedChannels: ['web'] });
+    expect(r.coverage.total).toBe(2);
+    expect(r.coverage.classifiedPct).toBe(100);
+  });
+
   it('reports zero percent rather than NaN for an empty range', () => {
     const r = buildReport({ current: [], previous: [], connectedChannels: ['web'] });
     expect(r.coverage.classifiedPct).toBe(0);

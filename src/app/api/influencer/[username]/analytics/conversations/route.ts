@@ -14,6 +14,7 @@ import {
   fetchClassificationRows,
   fetchConnectedChannels,
   fetchInsights,
+  countSessionsInRange,
   filtersFromParams,
 } from '@/lib/conversation-analytics/query';
 
@@ -35,17 +36,25 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ username: s
     const range = parseRange(sp, new Date());
     const filters = filtersFromParams(sp);
 
-    const [current, previous, channels, insights] = await Promise.all([
+    const [current, previous, channels, insights, sessionsInRange] = await Promise.all([
       fetchClassificationRows({ accountId: influencer.id, fromIso: range.fromIso, toIso: range.toIso, filters }),
       fetchClassificationRows({ accountId: influencer.id, fromIso: range.prevFromIso, toIso: range.prevToIso, filters }),
       fetchConnectedChannels(influencer.id),
       // Insights are never filtered — they describe the period, not a slice of it.
       fetchInsights({ accountId: influencer.id, fromIso: range.fromIso, toIso: range.toIso }),
+      countSessionsInRange({ accountId: influencer.id, fromIso: range.fromIso, toIso: range.toIso }),
     ]);
 
     return NextResponse.json({
       range,
-      report: buildReport({ current, previous, connectedChannels: channels }),
+      // Coverage is only honest when a filter is not narrowing the numerator:
+      // a filtered view counts its own rows, an unfiltered one counts sessions.
+      report: buildReport({
+        current,
+        previous,
+        connectedChannels: channels,
+        sessionsInRange: Object.values(filters).some(Boolean) ? undefined : sessionsInRange,
+      }),
       insights,
     });
   } catch (e: any) {
