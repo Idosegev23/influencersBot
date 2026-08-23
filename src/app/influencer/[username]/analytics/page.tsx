@@ -105,7 +105,9 @@ export default function AnalyticsPage({
   ];
   const router = useRouter();
 
+
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
+  const [conversationAnalyticsVisible, setConversationAnalyticsVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('30d');
   const [summary, setSummary] = useState<AccurateAnalytics | null>(null);
@@ -117,6 +119,18 @@ export default function AnalyticsPage({
   // refFilter null = "all", otherwise an influencer slug.
   const [refFilter, setRefFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+
+  // Conversation-analysis link is opt-in per account (see the comment at its
+  // render site). A failed probe leaves it hidden, which is the safe default.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/influencer/${encodeURIComponent(username)}/analytics/conversations/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled && j?.visible) setConversationAnalyticsVisible(true); })
+      .catch(() => { /* hidden is the safe default */ });
+    return () => { cancelled = true; };
+  }, [username]);
+
 
   // Calculate date ranges
   const { startDate, endDate, prevStartDate, prevEndDate } = useMemo(() => {
@@ -323,17 +337,24 @@ export default function AnalyticsPage({
 
           {/* Date Range Selector */}
           <div className="flex items-center gap-2">
-            <a
-              href={`/influencer/${username}/analytics/conversations`}
-              className="rounded-xl px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap"
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid var(--dash-glass-border)',
-                color: 'var(--dash-text-2)',
-              }}
-            >
-              {t.conversationAnalytics.linkFromAnalytics}
-            </a>
+            {/* Link to the conversation-analysis page. Deliberately gated on
+                config.conversation_analytics.visible rather than .enabled:
+                .enabled starts the classification pipeline, .visible reveals
+                the result. They are separate so an account can be classified
+                and hand-checked before anyone is shown a number. */}
+            {conversationAnalyticsVisible && (
+              <a
+                href={`/influencer/${username}/analytics/conversations`}
+                className="rounded-xl px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--dash-glass-border)',
+                  color: 'var(--dash-text-2)',
+                }}
+              >
+                {t.conversationAnalytics.linkFromAnalytics}
+              </a>
+            )}
             <Calendar className="w-4 h-4" style={{ color: 'var(--dash-text-3)' }} />
             <select
               value={dateRange}
