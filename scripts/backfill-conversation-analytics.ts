@@ -17,8 +17,13 @@
 const HOST = process.env.BACKFILL_HOST || 'http://localhost:3000';
 const SECRET = process.env.CRON_SECRET;
 
-const MAX_ROUNDS = 40;
-const PER_ROUND_LIMIT = 200;
+const MAX_ROUNDS = 80;
+/**
+ * Sessions per round. The cron route caps at maxDuration 300s and classification
+ * is sequential at roughly 1–3s per session, so a round much larger than this
+ * risks being killed mid-run. Overridable with --limit.
+ */
+const DEFAULT_PER_ROUND_LIMIT = 100;
 
 function arg(name: string, fallback = ''): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -43,6 +48,7 @@ async function main() {
   const account = arg('account');
   const since = arg('since', '2026-01-01');
   const budget = arg('budget', '3');
+  const perRound = arg('limit', String(DEFAULT_PER_ROUND_LIMIT));
   if (!account) throw new Error('--account is required');
 
   console.log(`Backfilling ${account} since ${since} against ${HOST}`);
@@ -54,7 +60,7 @@ async function main() {
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     const json = await call(
       `/api/cron/classify-conversations?account_id=${account}&since=${since}` +
-      `&limit=${PER_ROUND_LIMIT}&budget=${budget}`
+      `&limit=${perRound}&budget=${budget}`
     );
 
     const r = json.results?.[0];
