@@ -7,7 +7,7 @@ import { routeToArchetype } from './archetypes/intentRouter';
 import { recordTurnCost } from '@/lib/costs/recorder';
 import type { TokenUsage } from './archetypes/types';
 import { processWithArchetype } from './archetypes';
-import { getInsightsForPersona } from './conversation-learner';
+import { getInsightsForPersona } from './persona-insights';
 import {
   retrieveKnowledge as retrieveKnowledgeFromSources,
   formatKnowledgeForPrompt,
