@@ -19,6 +19,22 @@ import { google } from 'googleapis';
 // Gmail API impersonation field (it does a strict string compare).
 const SEND_FROM = process.env.GMAIL_SEND_FROM?.trim();
 
+/**
+ * Where an operational alert goes when the caller doesn't name a recipient.
+ *
+ * This used to default to SEND_FROM — i.e. Bestie's own outbound mailbox, which nobody reads.
+ * That made the never-silent fallbacks silent: `runCsHandoffCheck` alerts "Handoff ללא נמען"
+ * exactly when an escalation reached no brand recipient, and that alert went to the void too.
+ * An alert nobody receives is worse than no alert, because it reads as covered.
+ */
+export const ADMIN_ALERT_RECIPIENTS: string[] = (process.env.ADMIN_ALERT_EMAILS || 'cto@ldrsgroup.com')
+  .split(',').map((e) => e.trim()).filter(Boolean);
+
+/** The recipient list for an admin alert: what the caller asked for, else the fallback above. */
+export function adminAlertRecipients(explicit?: string[] | null): string[] {
+  return explicit && explicit.length > 0 ? explicit : ADMIN_ALERT_RECIPIENTS;
+}
+
 function getServiceAccountCredentials(): { client_email: string; private_key: string } | null {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
   if (!raw) return null;
@@ -239,7 +255,7 @@ export async function sendAdminAlert(options: {
   details?: string;
   adminEmails?: string[];
 }): Promise<void> {
-  const to = options.adminEmails || [SEND_FROM!];
+  const to = adminAlertRecipients(options.adminEmails);
   const levelColors = {
     info: '#3b82f6',
     warning: '#f59e0b',

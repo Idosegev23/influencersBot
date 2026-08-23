@@ -48,6 +48,7 @@ async function load(sb: any) {
   vi.doMock('@/lib/email', () => ({
     sendEmail: vi.fn(async (o: any) => { sent.push(o); return { success: true, messageId: 'm1' }; }),
     sendAdminAlert: vi.fn(async (o: any) => { alerts.push(o); }),
+    ADMIN_ALERT_RECIPIENTS: ['cto@ldrsgroup.com'],
   }));
   vi.doMock('@/lib/support/reply-address', () => ({
     resolveBrandReplyTo: vi.fn(async (_sb: any, acct: any) => acct?.config?.support_email ?? null),
@@ -202,6 +203,7 @@ describe('routeInboundCustomerEmail', () => {
     vi.doMock('@/lib/email', () => ({
       sendEmail: vi.fn(async () => ({ success: false, error: 'quota' })),
       sendAdminAlert: vi.fn(async (o: any) => { alerts.push(o); }),
+      ADMIN_ALERT_RECIPIENTS: ['cto@ldrsgroup.com'],
     }));
     vi.doMock('@/lib/support/reply-address', () => ({ resolveBrandReplyTo: vi.fn(async () => 'csr@labeaute.com') }));
     const { routeInboundCustomerEmail } = await import('@/lib/support/inbound-email');

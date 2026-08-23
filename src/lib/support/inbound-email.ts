@@ -18,12 +18,12 @@
  */
 
 import { supabase as supabaseAdmin } from '@/lib/supabase';
-import { sendEmail, sendAdminAlert } from '@/lib/email';
+import { sendEmail, sendAdminAlert, ADMIN_ALERT_RECIPIENTS } from '@/lib/email';
 import { resolveBrandReplyTo } from '@/lib/support/reply-address';
 
 // sendAdminAlert defaults to GMAIL_SEND_FROM — the unwatched shared mailbox this whole feature
 // exists to drain. Every alert here must name a human inbox explicitly.
-const CTO_ALERT_RECIPIENTS = ['cto@ldrsgroup.com'];
+
 
 export interface InboundEmail {
   providerMessageId: string;
@@ -164,7 +164,7 @@ export async function reportUnroutableEmails(items: UnroutableEmail[]): Promise<
     subject: `${items.length} תשובות מייל לא נותבו לאף עסק`,
     message: `הגיעו ${items.length} הודעות לתיבה של Bestie שלא הועברו לאף עסק. הן ממתינות בתיבה.`,
     details: lines.join('\n\n'),
-    adminEmails: CTO_ALERT_RECIPIENTS,
+    adminEmails: ADMIN_ALERT_RECIPIENTS,
   }).catch(() => {});
 }
 

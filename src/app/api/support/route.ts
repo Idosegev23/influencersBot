@@ -11,6 +11,7 @@ import { requireAdminAuth } from '@/lib/auth/admin-auth';
 import { autoAssignNewTicket } from '@/lib/support/auto-assign';
 import { sendEmail, sendEmailWithAttachments } from '@/lib/email';
 import { resolveBrandReplyTo } from '@/lib/support/reply-address';
+import { realPhoneOrNull } from '@/lib/support/contact';
 
 // ============================================
 // CORS — opens this route for cross-origin POSTs from embedded widgets.
@@ -70,6 +71,11 @@ export async function POST(req: NextRequest) {
     const sanitizedName = sanitizeHtml(customerName);
     const sanitizedMessage = sanitizeHtml(messageText);
     const sanitizedPhone = customerPhone ? customerPhone.replace(/[^\d+]/g, '') : null;
+    // The form accepts what the shopper typed, and the ticket STORES it verbatim on purpose — the
+    // inbox renders an unusable number struck through, because "junk value" and "never gave one"
+    // must not look the same. But a truncated number ("05456906" — three of these on real tickets)
+    // is a guaranteed Meta failure, so nothing is ever SENT to one.
+    const dialablePhone = realPhoneOrNull(sanitizedPhone);
     const sanitizedEmail = (typeof customerEmail === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim()))
       ? customerEmail.trim().toLowerCase()
       : null;
@@ -490,11 +496,11 @@ export async function POST(req: NextRequest) {
     // Send confirmation to CUSTOMER via Meta Cloud API
     // (follower_support_confirmation template, gated by per-template flag).
     let confirmationSent = false;
-    if (sanitizedPhone) {
-      console.log('[Support] Sending follower_support_confirmation to:', sanitizedPhone);
+    if (dialablePhone) {
+      console.log('[Support] Sending follower_support_confirmation to:', dialablePhone);
       try {
         const result = await sendFollowerSupportConfirmation({
-          to: sanitizedPhone,
+          to: dialablePhone,
           followerFirstName: sanitizedName.split(' ')[0] || sanitizedName,
           brand: sanitizedBrand || influencer.display_name,
           orderNumber: sanitizedOrderNumber || '—',
