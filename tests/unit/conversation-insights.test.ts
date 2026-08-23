@@ -63,7 +63,7 @@ describe('generateInsights', () => {
   });
 
   it('sends aggregates, never raw conversation text', async () => {
-    const callModel = vi.fn(async () => ({ insights: [] }));
+    const callModel = vi.fn(async (_summary: any) => ({ insights: [] }));
     await generateInsights(report, { callModel });
     const payload = JSON.stringify(callModel.mock.calls[0][0]);
     expect(payload).not.toContain('s1');       // no session ids

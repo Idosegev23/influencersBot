@@ -22,7 +22,7 @@ const session = (id: string) => ({
   messages: [{ role: 'user', content: 'שאלה' }], intentHints: [],
 });
 
-function fakeDeps(sessions: any[], opts: { costPerRow?: number } = {}) {
+function fakeDeps(sessions: any[], opts: { costPerRow?: number; classify?: any } = {}) {
   const inserted: any[] = [];
   const deps = {
     fetchPendingSessions: vi.fn(async () => sessions),
@@ -39,6 +39,7 @@ function fakeDeps(sessions: any[], opts: { costPerRow?: number } = {}) {
     })),
     saveRows: vi.fn(async (rows: any[]) => { inserted.push(...rows); return rows.length; }),
   };
+  if (opts.classify) deps.classify = opts.classify;
   return { inserted, deps };
 }
 
@@ -74,8 +75,7 @@ describe('runClassification', () => {
   });
 
   it('counts failed rows separately but still saves them for retry', async () => {
-    const { deps, inserted } = fakeDeps([session('s1'), session('s2')]);
-    deps.classify = vi.fn(async (s: any) => ({
+    const failing = vi.fn(async (s: any) => ({
       account_id: 'a1', session_id: s.id, channel: 'web',
       started_at: s.startedAt, user_message_count: 1,
       inquiry_type: null, topic_raw: null, is_complaint: false,
@@ -85,6 +85,7 @@ describe('runClassification', () => {
       status: 'failed' as const, error_message: 'boom',
       model: null, tokens_in: null, tokens_out: null, cost_usd: null,
     }));
+    const { deps, inserted } = fakeDeps([session('s1'), session('s2')], { classify: failing });
 
     const res = await runClassification({ accountId: 'a1', deps });
     expect(res.failed).toBe(2);

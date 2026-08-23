@@ -44,7 +44,7 @@ describe('clusterTopics', () => {
   });
 
   it('sends only unseen phrasings to the model and records the merge as an alias', async () => {
-    const callModel = vi.fn(async () => ({
+    const callModel = vi.fn(async (_args: { existingLabels: string[]; rawTopics: string[] }) => ({
       assignments: [{ raw: 'התקרחות', label: 'נשירת שיער' }],
     }));
     const upsertTopic = vi.fn(async () => 't1');
