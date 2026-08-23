@@ -36,7 +36,7 @@ import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 import type { Influencer } from '@/types';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { getDashboardStrings } from '@/lib/i18n/dashboard';
-import { isRealPhone, realEmailOrNull } from '@/lib/support/contact';
+import { isRealPhone, realEmailOrNull, waMeNumber } from '@/lib/support/contact';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -1418,7 +1418,7 @@ function TicketDetail({
         {canWhatsApp && (
           <div className="flex items-center gap-2 text-sm">
             <a
-              href={`https://wa.me/${ticket.customer_phone!.replace(/\D/g, '')}`}
+              href={`https://wa.me/${waMeNumber(ticket.customer_phone)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2"

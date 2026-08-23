@@ -105,3 +105,26 @@ describe('harvestContact', () => {
     expect(harvestContact(null).phone).toBeNull();
   });
 });
+
+describe('waMeNumber', () => {
+  it('converts a local Israeli number to the international form wa.me needs', async () => {
+    const { waMeNumber } = await import('@/lib/support/contact');
+    expect(waMeNumber('0507106050')).toBe('972507106050');
+    expect(waMeNumber('050-710-6050')).toBe('972507106050');
+    expect(waMeNumber('00972507106050')).toBe('972507106050');
+    expect(waMeNumber('507106050')).toBe('972507106050');
+  });
+
+  it('leaves an already-international number alone', async () => {
+    const { waMeNumber } = await import('@/lib/support/contact');
+    expect(waMeNumber('+972507106050')).toBe('972507106050');
+    expect(waMeNumber('972507106050')).toBe('972507106050');
+  });
+
+  it('is null for anything undialable — no link is better than a dead one', async () => {
+    const { waMeNumber } = await import('@/lib/support/contact');
+    expect(waMeNumber('aw_7l1bkwnamt5ov1fq')).toBeNull();
+    expect(waMeNumber('3064')).toBeNull();
+    expect(waMeNumber(null)).toBeNull();
+  });
+});

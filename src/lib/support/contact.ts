@@ -109,3 +109,22 @@ export function harvestContact(text: unknown): { phone: string | null; email: st
 
   return { phone, email };
 }
+
+/**
+ * The number a wa.me link needs: digits only, in international form. `wa.me/0507106050`
+ * simply does not resolve — every Israeli 0-prefixed number stored by the details form or
+ * recovered from a conversation needs the 972 swap first, or the agent clicks "WhatsApp"
+ * and lands nowhere. Null when the value isn't dialable at all.
+ *
+ * Mirrors toWaId in @/lib/whatsapp-cloud/client, kept here so the ticket UI and the
+ * escalation email can build a link without importing the send path.
+ */
+export function waMeNumber(value: unknown): string | null {
+  const phone = realPhoneOrNull(value);
+  if (!phone) return null;
+  let digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('0')) digits = '972' + digits.slice(1);
+  if (digits.length === 9) digits = '972' + digits; // no country code → assume IL
+  return digits;
+}

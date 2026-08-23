@@ -4,7 +4,7 @@ import { detectEscalation, detectHandoff } from './detect';
 import { resolveRecipients } from './recipients';
 import { buildEscalationEmail } from './email-template';
 import { summarizeHandoff } from './summarize';
-import { realPhoneOrNull, realEmailOrNull } from '@/lib/support/contact';
+import { realPhoneOrNull, realEmailOrNull, harvestContact } from '@/lib/support/contact';
 import type { EscalationConfig } from './types';
 
 export interface EscalationInput {
@@ -28,13 +28,7 @@ export interface EscalationOutcome {
   skipped?: string;
 }
 
-const PHONE_RE = /0\d{1,2}-?\d{7}|\+972\d{8,9}/;
 
-function extractPhone(text: string): string | null {
-  const m = (text || '').match(PHONE_RE);
-  // Guarded so this path can only ever yield something dialable, matching the CS path.
-  return m ? realPhoneOrNull(m[0]) : null;
-}
 
 export async function runEscalationCheck(
   input: EscalationInput,
@@ -89,7 +83,9 @@ export async function runEscalationCheck(
   // 5) recipients
   const recipients = await resolveRecipients(supabase, input.accountId, escalationConfig);
   const brandName = config.brandName || config.username || 'Account';
-  const phone = extractPhone(input.userMessage);
+  // One extraction rule across both escalation paths (@/lib/support/contact): finds a number
+  // written as "050 7106050" too, and picks up an email address the old phone-only regex dropped.
+  const { phone, email: harvestedEmail } = harvestContact(input.userMessage);
   const lastMessages = prior.slice(-3);
   // Executive summary (סיכום מנהלים) of the conversation for the human — best-effort.
   const summary = await summarizeHandoff({ transcript: prior, reason: verdict.reason, brandName, customerName: phone });
@@ -104,6 +100,7 @@ export async function runEscalationCheck(
       reason: verdict.reason,
       severity: verdict.severity ?? 'high',
       customerPhone: phone,
+      customerEmail: harvestedEmail,
       userMessage: input.userMessage,
       summary,
       lastMessages,
@@ -131,6 +128,7 @@ export async function runEscalationCheck(
     account_id: input.accountId,
     customer_name: phone || 'לקוח/ה', // NOT NULL — mirrors cs-ticket.ts's `input.customerName || 'לקוח/ה'`
     customer_phone: phone,
+    customer_email: harvestedEmail,
     message: input.userMessage,
     session_id: input.sessionId,
     status: 'new',
@@ -143,6 +141,7 @@ export async function runEscalationCheck(
         summary, // AI executive summary (סיכום מנהלים) for the support inbox
         triggers: verdict.triggers,
         customer_phone: phone,
+        customer_email: harvestedEmail,
         transcript: prior.slice(-8), // whole recent conversation for the human, not just the trigger line
         detected_at: new Date(deps.now()).toISOString(),
         recipients_notified: notified,
@@ -314,6 +313,7 @@ export async function runCsHandoffCheck(
       severity: detection.severity === 'high' ? 'critical' : 'high',
       customerName: input.customerName || null,
       customerPhone: contactPhone,
+      customerEmail: contactEmail,
       userMessage: input.userMessage,
       summary,
       lastMessages: transcript.slice(-6),
