@@ -68,6 +68,77 @@ describe('clusterTopics', () => {
     expect(upsertTopic).toHaveBeenCalledWith('a1', 'נשירת שיער', 'התקרחות');
   });
 
+  // Regression: one call for every topic overflowed max_output_tokens on the
+  // first real run and came back as truncated JSON, losing the whole pass.
+  it('splits a large topic set across several model calls', async () => {
+    const many = Array.from({ length: 95 }, (_, i) => `נושא ${i}`);
+    const callModel = vi.fn(async (a: { existingLabels: string[]; rawTopics: string[] }) => ({
+      assignments: a.rawTopics.map((raw) => ({ raw, label: raw })),
+    }));
+
+    const res = await clusterTopics({
+      accountId: 'a1',
+      deps: {
+        fetchTopics: async () => [],
+        fetchUnassignedRaw: async () => many,
+        callModel,
+        upsertTopic: vi.fn(async () => 't1'),
+        assignTopicToRaw: vi.fn(async () => {}),
+      },
+    });
+
+    expect(callModel.mock.calls.length).toBeGreaterThan(1);
+    for (const [args] of callModel.mock.calls) {
+      expect(args.rawTopics.length).toBeLessThanOrEqual(40);
+    }
+    expect(res.clustered).toBe(95);
+  });
+
+  it('keeps the batches that worked when one batch fails', async () => {
+    const many = Array.from({ length: 95 }, (_, i) => `נושא ${i}`);
+    let call = 0;
+    const callModel = vi.fn(async (a: { existingLabels: string[]; rawTopics: string[] }) => {
+      call++;
+      if (call === 2) throw new Error('Unterminated string in JSON');
+      return { assignments: a.rawTopics.map((raw) => ({ raw, label: raw })) };
+    });
+
+    const res = await clusterTopics({
+      accountId: 'a1',
+      deps: {
+        fetchTopics: async () => [],
+        fetchUnassignedRaw: async () => many,
+        callModel,
+        upsertTopic: vi.fn(async () => 't1'),
+        assignTopicToRaw: vi.fn(async () => {}),
+      },
+    });
+
+    expect(res.clustered).toBeGreaterThan(0);
+    expect(res.clustered).toBeLessThan(95);
+  });
+
+  it('offers earlier batches\' labels to later ones so clusters converge', async () => {
+    const many = Array.from({ length: 60 }, (_, i) => `נושא ${i}`);
+    const callModel = vi.fn(async (a: { existingLabels: string[]; rawTopics: string[] }) => ({
+      assignments: a.rawTopics.map((raw) => ({ raw, label: 'מאוחד' })),
+    }));
+
+    await clusterTopics({
+      accountId: 'a1',
+      deps: {
+        fetchTopics: async () => [],
+        fetchUnassignedRaw: async () => many,
+        callModel,
+        upsertTopic: vi.fn(async () => 't1'),
+        assignTopicToRaw: vi.fn(async () => {}),
+      },
+    });
+
+    expect(callModel.mock.calls[0][0].existingLabels).not.toContain('מאוחד');
+    expect(callModel.mock.calls[1][0].existingLabels).toContain('מאוחד');
+  });
+
   it('does nothing when there is nothing unassigned', async () => {
     const callModel = vi.fn();
     const res = await clusterTopics({

@@ -76,51 +76,46 @@ export async function runClassification(opts: {
 function defaultDeps(): RunDeps {
   return {
     async fetchPendingSessions(accountId, sinceIso, limit) {
-      const settledBefore = new Date(Date.now() - SETTLE_MINUTES * 60_000).toISOString();
-
-      let q = supabase
-        .from('chat_sessions')
-        .select('id, anon_id, created_at, last_turn_at, chat_messages(role, content, intent, created_at)')
-        .eq('account_id', accountId)
-        .lt('last_turn_at', settledBefore)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      if (sinceIso) q = q.gte('created_at', sinceIso);
-
-      const { data, error } = await q;
+      // The anti-join lives in SQL (migration 081). Filtering already-classified
+      // sessions in JS after LIMIT is what stalled the first backfill at 100 of
+      // 3,605 rows: every round re-fetched the same newest page, found it fully
+      // classified, and reported nothing left to do.
+      const { data: pending, error } = await supabase.rpc('pending_classification_sessions', {
+        p_account_id: accountId,
+        p_since: sinceIso ?? null,
+        p_limit: limit,
+        p_settle_minutes: SETTLE_MINUTES,
+        p_max_attempts: MAX_ATTEMPTS,
+      });
       if (error) throw new Error(`fetchPendingSessions: ${error.message}`);
+      if (!pending || pending.length === 0) return [];
 
-      const ids = (data || []).map((s: any) => s.id);
-      if (!ids.length) return [];
+      const ids = pending.map((s: any) => s.id);
+      const { data: msgs, error: msgErr } = await supabase
+        .from('chat_messages')
+        .select('session_id, role, content, intent, created_at')
+        .in('session_id', ids)
+        .order('created_at', { ascending: true });
+      if (msgErr) throw new Error(`fetchPendingSessions messages: ${msgErr.message}`);
 
-      // Exclude anything already classified, or failed past the attempt cap.
-      const { data: done } = await supabase
-        .from('conversation_classifications')
-        .select('session_id, status, attempts')
-        .in('session_id', ids);
+      const bySession = new Map<string, any[]>();
+      for (const m of msgs || []) {
+        const arr = bySession.get(m.session_id) || [];
+        arr.push(m);
+        bySession.set(m.session_id, arr);
+      }
 
-      const blocked = new Set(
-        (done || [])
-          .filter((d: any) => d.status !== 'failed' || d.attempts >= MAX_ATTEMPTS)
-          .map((d: any) => d.session_id)
-      );
-
-      return (data || [])
-        .filter((s: any) => !blocked.has(s.id))
-        .map((s: any) => {
-          const msgs = (s.chat_messages || [])
-            .slice()
-            .sort((a: any, b: any) => String(a.created_at).localeCompare(String(b.created_at)));
-          return {
-            id: s.id,
-            accountId,
-            channel: channelOf(s.anon_id),
-            startedAt: s.created_at,
-            messages: msgs.map((m: any) => ({ role: m.role, content: m.content || '' })),
-            intentHints: msgs.map((m: any) => m.intent).filter(Boolean),
-          } as SessionForClassification;
-        })
-        .filter((s: SessionForClassification) => s.messages.some((m) => m.role === 'user'));
+      return pending.map((s: any) => {
+        const rows = bySession.get(s.id) || [];
+        return {
+          id: s.id,
+          accountId,
+          channel: channelOf(s.anon_id),
+          startedAt: s.created_at,
+          messages: rows.map((m: any) => ({ role: m.role, content: m.content || '' })),
+          intentHints: rows.map((m: any) => m.intent).filter(Boolean),
+        } as SessionForClassification;
+      });
     },
 
     async fetchCatalog(accountId) {

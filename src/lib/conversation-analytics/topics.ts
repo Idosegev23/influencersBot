@@ -10,6 +10,14 @@ import OpenAI from 'openai';
 
 const CLUSTER_MODEL = 'gpt-5.6-luna';
 
+/**
+ * Raw topics per model call. One call for everything overflowed
+ * max_output_tokens and came back as truncated JSON ("Unterminated string in
+ * JSON at position 5277") on the very first real run — 95 topics was already
+ * too many, and a full backfill has thousands.
+ */
+const CLUSTER_BATCH = 40;
+
 export interface TopicRow { id: string; label: string; aliases: string[] }
 
 const norm = (s: string) => s.trim().replace(/[\s ]+/g, ' ');
@@ -62,19 +70,33 @@ export async function clusterTopics(opts: {
 
   if (!unseen.length) return { matchedByAlias, clustered: 0, newTopics: 0 };
 
-  const { assignments } = await deps.callModel({
-    existingLabels: topics.map((t) => t.label),
-    rawTopics: unseen,
-  });
-
   let clustered = 0;
   let newTopics = 0;
-  for (const a of assignments || []) {
-    if (!a?.raw || !a?.label) continue;
-    if (!known.has(a.label)) { known.add(a.label); newTopics++; }
-    const topicId = await deps.upsertTopic(accountId, a.label, a.raw === a.label ? null : a.raw);
-    await deps.assignTopicToRaw(accountId, a.raw, topicId);
-    clustered++;
+
+  for (let i = 0; i < unseen.length; i += CLUSTER_BATCH) {
+    const batch = unseen.slice(i, i + CLUSTER_BATCH);
+
+    let assignments: Array<{ raw: string; label: string }> = [];
+    try {
+      // Labels accumulate across batches, so a topic named in batch 1 is
+      // offered to batch 2 and the clusters converge instead of fragmenting.
+      ({ assignments } = await deps.callModel({
+        existingLabels: [...known],
+        rawTopics: batch,
+      }));
+    } catch (e: any) {
+      // One bad batch must not discard the batches that already succeeded.
+      console.error(`[topics] batch ${i / CLUSTER_BATCH} failed:`, e?.message || e);
+      continue;
+    }
+
+    for (const a of assignments || []) {
+      if (!a?.raw || !a?.label) continue;
+      if (!known.has(a.label)) { known.add(a.label); newTopics++; }
+      const topicId = await deps.upsertTopic(accountId, a.label, a.raw === a.label ? null : a.raw);
+      await deps.assignTopicToRaw(accountId, a.raw, topicId);
+      clustered++;
+    }
   }
 
   return { matchedByAlias, clustered, newTopics };
@@ -114,7 +136,7 @@ function defaultDeps(): ClusterDeps {
 תוויות קיימות:
 ${existingLabels.map((l) => `- ${l}`).join('\n') || '(אין)'}`,
         input: JSON.stringify({ rawTopics }),
-        max_output_tokens: 2000,
+        max_output_tokens: 4000,
         reasoning: { effort: 'low' },
         text: {
           format: {
