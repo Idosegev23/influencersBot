@@ -323,6 +323,17 @@ export default function AnalyticsPage({
 
           {/* Date Range Selector */}
           <div className="flex items-center gap-2">
+            <a
+              href={`/influencer/${username}/analytics/conversations`}
+              className="rounded-xl px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid var(--dash-glass-border)',
+                color: 'var(--dash-text-2)',
+              }}
+            >
+              {t.conversationAnalytics.linkFromAnalytics}
+            </a>
             <Calendar className="w-4 h-4" style={{ color: 'var(--dash-text-3)' }} />
             <select
               value={dateRange}

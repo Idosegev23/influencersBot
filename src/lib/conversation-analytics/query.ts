@@ -128,3 +128,29 @@ export async function fetchConnectedChannels(accountId: string): Promise<string[
   if ((count || 0) > 0) out.push('instagram');
   return out;
 }
+
+/**
+ * Insights written by the weekly job, for the cards at the top of the page.
+ * Scoped to the viewed range so an old week's insight does not float above a
+ * report it has nothing to do with.
+ */
+export async function fetchInsights(opts: {
+  accountId: string;
+  fromIso: string;
+  toIso: string;
+  limit?: number;
+}): Promise<Array<{ id: string; insight_type: string; title: string; content: string; occurrence_count: number; examples: any[] }>> {
+  const { data, error } = await supabase
+    .from('conversation_insights')
+    .select('id, insight_type, title, content, occurrence_count, examples, created_at')
+    .eq('account_id', opts.accountId)
+    .eq('is_active', true)
+    .gte('created_at', opts.fromIso)
+    .lte('created_at', opts.toIso)
+    .order('created_at', { ascending: false })
+    .order('occurrence_count', { ascending: false })
+    .limit(opts.limit ?? 6);
+
+  if (error) throw new Error(error.message);
+  return (data || []) as any[];
+}
