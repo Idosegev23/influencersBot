@@ -22,6 +22,15 @@ const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC
 const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || '';
 const GRAPH_API_VERSION = 'v22.0';
 const FB_GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+// Pin the Instagram Graph host too. An unversioned graph.instagram.com call
+// resolves to the app's *default* API version, which Meta rolls forward on its
+// own schedule — so the OAuth flow can break with no deploy on our side. That
+// is exactly what happened: the callback was untouched since 2026-08-08 and
+// connected fine on 08-09, then started failing on 08-23 with
+// `Unsupported request - method type: get` (code 100 — the token authenticated,
+// the *path* did not exist in whatever version the call landed on).
+// Every other graph.instagram.com call site in the repo already pins v22.0.
+const IG_GRAPH_BASE = `https://graph.instagram.com/${GRAPH_API_VERSION}`;
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
@@ -241,7 +250,7 @@ async function exchangeLongLivedToken(shortLivedToken: string): Promise<LongLive
     access_token: shortLivedToken,
   });
 
-  const response = await fetch(`https://graph.instagram.com/access_token?${params.toString()}`);
+  const response = await fetch(`${IG_GRAPH_BASE}/access_token?${params.toString()}`);
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
@@ -267,7 +276,7 @@ async function getIGBusinessAccount(accessToken: string): Promise<{
   // so we store them all (known_ig_ids) to route inbound DMs reliably.
   const fields = 'id,username,name,profile_picture_url,followers_count,media_count,user_id';
   const response = await fetch(
-    `https://graph.instagram.com/me?fields=${fields}&access_token=${accessToken}`,
+    `${IG_GRAPH_BASE}/me?fields=${fields}&access_token=${accessToken}`,
   );
 
   if (!response.ok) {

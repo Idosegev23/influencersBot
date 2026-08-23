@@ -6,7 +6,12 @@
 
 import { createClient } from '@/lib/supabase/server';
 
-const IG_GRAPH_BASE = 'https://graph.instagram.com';
+// Pinned, for the same reason as the OAuth callback: an unversioned
+// graph.instagram.com call resolves to the app's default API version, which
+// Meta can roll forward without us deploying anything. Unpinned, this cron
+// would silently stop renewing tokens and every IG DM connection would die at
+// its 60-day expiry with nobody noticing.
+const IG_GRAPH_BASE = 'https://graph.instagram.com/v22.0';
 
 /**
  * Refresh all tokens that expire within the next 7 days
