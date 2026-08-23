@@ -56,3 +56,56 @@ export function realEmailOrNull(value: unknown): string | null {
 export function hasContactRoute(contact: { phone?: unknown; email?: unknown }): boolean {
   return realPhoneOrNull(contact.phone) !== null || realEmailOrNull(contact.email) !== null;
 }
+
+// ---------------------------------------------------------------------------
+// Harvesting a contact route out of ordinary chat text.
+//
+// The details form and remember_contact were the ONLY two ways a phone ever
+// reached the session — so a shopper who simply TYPED her number ("דנה כחלון
+// 0507106050") was treated as having given nothing: order verification kept
+// failing, and the escalation filed a ticket the brand could not answer. This
+// closes that gap mechanically, without asking the model to notice.
+//
+// Token-based on purpose. A loose /\d{9,}/ sweep over "40073 40072 40160"
+// happily produces an eleven-digit "phone" that no one can dial — exactly the
+// undialable-value class realPhoneOrNull exists to prevent.
+// ---------------------------------------------------------------------------
+
+/** An Israeli/E.164 phone as people actually type one: 05x…, 0x-xxx-xxxx, +972…, 972…. */
+const PHONE_SHAPE = /^(?:\+?972|0)[\d.-]{7,13}$/;
+const EMAIL_IN_TEXT = /[^\s@,;:<>()"'\][]+@[^\s@,;:<>()"'\][]+\.[A-Za-z]{2,}/g;
+
+/** Trim the punctuation a sentence leaves around a number ("(טלפון: 0507106050)"). */
+function stripEdges(token: string): string {
+  return token.replace(/^[^\d+]+/, '').replace(/[^\d]+$/, '');
+}
+
+/**
+ * A phone number and/or email address stated anywhere in a free-text message, or nulls.
+ * Both are validated by the same guards that gate what gets stored on a ticket, so a
+ * harvested value is dialable/mailable by construction.
+ */
+export function harvestContact(text: unknown): { phone: string | null; email: string | null } {
+  if (typeof text !== 'string' || !text.trim()) return { phone: null, email: null };
+
+  // Adjacent tokens are also tried joined, so "050 7106050" is found — while "40073 40072"
+  // still isn't, because the join must itself start with 0 / 972 to be considered at all.
+  const tokens = text.split(/[\s,;:()"'<>[\]]+/).filter(Boolean);
+  let phone: string | null = null;
+  for (let i = 0; i < tokens.length && !phone; i++) {
+    for (const candidate of [tokens[i], i + 1 < tokens.length ? tokens[i] + tokens[i + 1] : '']) {
+      const cleaned = stripEdges(candidate);
+      if (!cleaned || !PHONE_SHAPE.test(cleaned)) continue;
+      const valid = realPhoneOrNull(cleaned);
+      if (valid) { phone = valid; break; }
+    }
+  }
+
+  let email: string | null = null;
+  for (const m of text.matchAll(EMAIL_IN_TEXT)) {
+    const valid = realEmailOrNull(m[0]);
+    if (valid) { email = valid; break; }
+  }
+
+  return { phone, email };
+}

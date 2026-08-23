@@ -352,4 +352,70 @@ describe('runCsTurn (brain-led loop)', () => {
     await runCsTurnCore(widgetInput(), { callModel });
     expect(seenIdentities[1]).toMatchObject({ channel: 'widget', phone: '0501234567', trust: 'phone_claimed' });
   });
+
+  // --- The Studio Pasha hand-off gap (2026-08-23) ---------------------------
+  // The code backstop returns BEFORE the tool loop, so escalate_to_human's contact gate never
+  // ran on the most common escalation of all ("אני רוצה נציג") and the dispatch was called with
+  // no contact fields at all. Result: a ticket stamped "no way to reach this customer" while the
+  // shopper's phone sat on the very session that filed it.
+
+  const boundWidget = (context: any = {}) => ({
+    wa_id: 'v-77', contact_id: null, phase: 'serving', active_account_id: 'acc-1',
+    active_ticket_id: null, active_chat_session_id: 'cs-9', customer_name: 'דנה',
+    context, last_activity_at: new Date().toISOString(), version: 2,
+  });
+
+  it('backstop hand-off carries the contact route the session already knows', async () => {
+    store['v-77'] = boundWidget({ claimedPhone: '0507106050' });
+    detectHandoff.mockReturnValue({ triggered: true, triggers: ['human_demand'], severity: 'high', reason: 'human' });
+    const { runCsTurnCore } = await import('@/lib/cs/cs-agent');
+    await runCsTurnCore(widgetInput({ text: 'אני מבקשת בפעם הרביעית לדבר עם נציג אנושי' }), { callModel });
+    expect(runCsHandoffCheck).toHaveBeenCalledWith(expect.objectContaining({ contactPhone: '0507106050', force: true }));
+  });
+
+  it('backstop hand-off harvests a phone typed in the escalating message itself', async () => {
+    store['v-77'] = boundWidget();
+    detectHandoff.mockReturnValue({ triggered: true, triggers: ['human_demand'], severity: 'high', reason: 'human' });
+    const { runCsTurnCore } = await import('@/lib/cs/cs-agent');
+    await runCsTurnCore(widgetInput({ text: 'דנה כחלון 0507106050 - אני רוצה נציג' }), { callModel });
+    expect(runCsHandoffCheck).toHaveBeenCalledWith(expect.objectContaining({ contactPhone: '0507106050' }));
+    expect(store['v-77'].context.claimedPhone).toBe('0507106050');
+  });
+
+  it('backstop gate: no contact route on a web channel → asks once instead of filing an unanswerable ticket', async () => {
+    store['v-77'] = boundWidget();
+    detectHandoff.mockReturnValue({ triggered: true, triggers: ['human_demand'], severity: 'high', reason: 'רוצה נציג' });
+    const { runCsTurnCore } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurnCore(widgetInput({ text: 'אני רוצה לדבר עם נציג' }), { callModel });
+    expect(runCsHandoffCheck).not.toHaveBeenCalled();
+    expect(callModel).not.toHaveBeenCalled();
+    if (res.reply.kind === 'text') expect(res.reply.body).toMatch(/טלפון|מייל/);
+    expect(store['v-77'].context.contactAsked).toBe(true);
+    expect(store['v-77'].context.pendingHandoff).toMatchObject({ reason: 'אני רוצה לדבר עם נציג' });
+  });
+
+  it('...and the hand-off fires by itself the moment the number arrives — the shopper is never dropped', async () => {
+    store['v-77'] = boundWidget({ contactAsked: true, pendingHandoff: { reason: 'רוצה נציג' } });
+    detectHandoff.mockReturnValue({ triggered: false, triggers: [], severity: 'low', reason: '' });
+    const { runCsTurnCore } = await import('@/lib/cs/cs-agent');
+    await runCsTurnCore(widgetInput({ text: '0507106050' }), { callModel });
+    expect(runCsHandoffCheck).toHaveBeenCalledWith(expect.objectContaining({ contactPhone: '0507106050', userMessage: 'רוצה נציג', force: true }));
+    expect(store['v-77'].context.pendingHandoff).toBeFalsy();
+  });
+
+  it('the gate blocks exactly once — a shopper who gives nothing is still handed off', async () => {
+    store['v-77'] = boundWidget({ contactAsked: true });
+    detectHandoff.mockReturnValue({ triggered: true, triggers: ['human_demand'], severity: 'high', reason: 'רוצה נציג' });
+    const { runCsTurnCore } = await import('@/lib/cs/cs-agent');
+    await runCsTurnCore(widgetInput({ text: 'אני רוצה נציג עכשיו' }), { callModel });
+    expect(runCsHandoffCheck).toHaveBeenCalledWith(expect.objectContaining({ contactPhone: null }));
+  });
+
+  it('WhatsApp is never gated — the number IS the channel', async () => {
+    store['972501112222'] = bound();
+    detectHandoff.mockReturnValue({ triggered: true, triggers: ['human_demand'], severity: 'high', reason: 'human' });
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    await runCsTurn(job('אני רוצה נציג'), { callModel });
+    expect(runCsHandoffCheck).toHaveBeenCalledWith(expect.objectContaining({ contactPhone: '972501112222' }));
+  });
 });

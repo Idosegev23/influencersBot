@@ -18,7 +18,8 @@ import type { CsProductCard, CsToolCtx, CsToolResult, OpenAIFunctionDef } from '
 import { buildCsSystemPrompt, buildContextDigest, stripSuggestions, parseSuggestions, type CsRecentTurn } from '@/lib/cs/cs-context';
 import { laneModel } from '@/lib/llm/config';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
-import { whatsappIdentity, identityKey, withClaimedPhone, CS_TICKET_SOURCES, type CsIdentity } from '@/lib/cs/identity';
+import { whatsappIdentity, identityKey, withClaimedPhone, identityPhone, CS_TICKET_SOURCES, type CsIdentity } from '@/lib/cs/identity';
+import { hasContactRoute, harvestContact } from '@/lib/support/contact';
 import type { CsJob } from '@/lib/cs/wa-cs-queue';
 
 export interface CsTurnResult {
@@ -218,6 +219,16 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   const storedContactAsked = (session.context as any)?.contactAsked === true;
   const ctx: CsToolCtx = { waId, accountId: session.active_account_id, preBoundAccountId: input.boundAccountId ?? null, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, customerName: session.customer_name, identity, contactEmail: storedContactEmail, contactAsked: storedContactAsked, lastImageUrl: img?.url ?? null };
 
+  // A phone or email the shopper simply TYPED ("דנה כחלון 0507106050") is a contact route just as
+  // much as one from the details form — but nothing read it, so order verification kept answering
+  // "האימות לא הושלם" and the hand-off filed a ticket the brand could not answer (Studio Pasha,
+  // 2026-08-23). Harvested MECHANICALLY, because this must not depend on the brain calling
+  // remember_contact. Same trust level as the form (a claim, matched against the order), and the
+  // same later-wins rule.
+  const harvested = harvestContact(userMessage);
+  if (harvested.phone) ctx.identity = withClaimedPhone(ctx.identity, harvested.phone);
+  if (harvested.email) ctx.contactEmail = harvested.email;
+
   // Web channels (spec §5): the account IS the brand — bind up-front so the very first CS turn
   // already speaks with the brand persona and every tool scopes correctly. The whatsapp_cs.enabled
   // roster gate does not apply here: that gate curates the shared-number brand roster, while a web
@@ -260,15 +271,48 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   } catch (e) {
     console.warn('[cs-agent] detectHandoff failed — treating as unknown, proceeding to the model', e);
   }
-  if (handoff?.triggered && session.active_account_id && session.active_chat_session_id) {
+  // A hand-off deferred to collect a contact route resumes the moment one arrives — the shopper who
+  // answered "לאיזה מספר?" must never have to ask for a human a second time.
+  const pendingHandoff = (session.context as any)?.pendingHandoff as { reason?: string } | null | undefined;
+  const contactKnown = hasContactRoute({ phone: identityPhone(ctx.identity), email: ctx.contactEmail });
+  if ((handoff?.triggered || (!!pendingHandoff && contactKnown)) && session.active_account_id && session.active_chat_session_id) {
+    const handoffMessage = handoff?.triggered ? userMessage : (pendingHandoff?.reason || userMessage);
+    const contextPatch: any = { ...(session.context || {}) };
+    if (harvested.phone) contextPatch.claimedPhone = harvested.phone;
+    if (harvested.email) contextPatch.contactEmail = harvested.email;
+    if (input.claimedPhone?.trim()) contextPatch.claimedPhone = input.claimedPhone.trim();
+
+    // THE GATE, mirrored from escalate_to_human. This backstop returns BEFORE the tool loop, so the
+    // tool's gate never ran here — and "אני רוצה נציג" is the most common escalation there is, which
+    // is how tickets stamped "אין שום דרך ליצור קשר" kept being filed for shoppers we could have
+    // reached. Blocks ONCE (contactAsked is shared with the tool, so a shopper is never asked twice),
+    // and never on WhatsApp, where the number IS the channel.
+    if (ctx.identity.channel !== 'whatsapp' && !contactKnown && !ctx.contactAsked) {
+      const ask = (input.language === 'en')
+        ? 'Of course — what phone number or email should we get back to you on?'
+        : 'בשמחה אעביר אותך לנציג/ה — לאיזה מספר טלפון או מייל שנחזור אלייך?';
+      recentTurns.push({ role: 'assistant', text: ask });
+      try { await persistTurn(session.active_chat_session_id, userMessage, ask); } catch (e) { console.warn('[cs-agent] persist of the contact ask failed', e); }
+      // pendingHandoff is the guarantee: the escalation is not dropped, only deferred by one turn.
+      try {
+        await saveCsSession(session, { context: { ...contextPatch, recentTurns: recentTurns.slice(-8), contactAsked: true, pendingHandoff: { reason: handoffMessage } }, last_activity_at: new Date().toISOString() });
+      } catch (e) { console.warn('[cs-agent] session save after the contact ask failed', e); }
+      return { reply: { kind: 'text', body: ask }, phase: session.phase };
+    }
+
+    const ack = 'אני מעבירה אותך לנציג/ה אנושי/ת שיחזרו אליך בהקדם 🙏';
+    // Persist BEFORE dispatching so the escalation's transcript — the only thing the human taking
+    // over reads — actually contains the message that triggered it.
+    recentTurns.push({ role: 'assistant', text: ack });
+    try { await persistTurn(session.active_chat_session_id, userMessage, ack); } catch (e) { console.warn('[cs-agent] persist of the handoff turn failed', e); }
     try {
       const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch'); // Phase D (D4)
-      await runCsHandoffCheck({ accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, waId, userMessage, customerName: session.customer_name, imageUrl: img?.url ?? null, force: true });
+      await runCsHandoffCheck({ accountId: session.active_account_id, chatSessionId: session.active_chat_session_id, ticketId: session.active_ticket_id, waId, contactPhone: identityPhone(ctx.identity), contactEmail: ctx.contactEmail, userMessage: handoffMessage, customerName: session.customer_name, imageUrl: img?.url ?? null, force: true });
     } catch (e) {
       console.error('[cs-agent] runCsHandoffCheck failed — still handing off; a known escalation must never fall through to the model', e);
     }
-    try { await saveCsSession(session, { last_activity_at: new Date().toISOString() }); } catch (e) { console.warn('[cs-agent] session touch after handoff failed', e); }
-    return { reply: { kind: 'text', body: 'אני מעבירה אותך לנציג/ה אנושי/ת שיחזרו אליך בהקדם 🙏' }, phase: session.phase };
+    try { await saveCsSession(session, { context: { ...contextPatch, recentTurns: recentTurns.slice(-8), pendingHandoff: null }, last_activity_at: new Date().toISOString() }); } catch (e) { console.warn('[cs-agent] session touch after handoff failed', e); }
+    return { reply: { kind: 'text', body: ack }, phase: session.phase };
   }
 
   // 4) Build the brand-grounded system prompt (persona + RAG + re-entry digest — NO scripted menu).
@@ -348,6 +392,8 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   // just reported a problem — so the cards are dropped, not sent.
   if (handedOff) cards = [];
   const contextPatch: any = { ...(session.context || {}), recentTurns: recentTurns.slice(-8) };
+  if (harvested.phone) contextPatch.claimedPhone = harvested.phone;   // typed in passing — kept, so the next turn is already reachable
+  if (harvested.email) contextPatch.contactEmail = harvested.email;
   if (input.claimedPhone?.trim()) contextPatch.claimedPhone = input.claimedPhone.trim(); // asked once, kept forever (spec §7)
   if (learnedPhone) contextPatch.claimedPhone = learnedPhone; // typed in conversation — same rule, later wins
   if (learnedEmail) contextPatch.contactEmail = learnedEmail;
