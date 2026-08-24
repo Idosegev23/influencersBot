@@ -71,6 +71,16 @@ describe('runWeeklyReport', () => {
     expect(payload).not.toContain('s1');
   });
 
+  it('can build the snapshot without sending, for replaying past weeks', async () => {
+    const d = deps();
+    const res = await runWeeklyReport({
+      accountId: 'a1', now: new Date('2026-08-23T06:00:00Z'), sendEmail: false, deps: d,
+    });
+    expect(res.emailed).toBe(false);
+    expect(d.saveSnapshot).toHaveBeenCalledTimes(1);
+    expect(d.sendEmail).not.toHaveBeenCalled();
+  });
+
   it('writes a snapshot but sends nothing for an empty week', async () => {
     const d = deps({ fetchRows: vi.fn(async (_a: string, _f: string, _t: string) => []) });
     const res = await runWeeklyReport({ accountId: 'a1', now: new Date('2026-08-23T06:00:00Z'), deps: d });

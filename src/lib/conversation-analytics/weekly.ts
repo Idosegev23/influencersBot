@@ -45,6 +45,8 @@ export interface WeeklyDeps {
 export async function runWeeklyReport(opts: {
   accountId: string;
   now?: Date;
+  /** Off when replaying past weeks: the snapshots are wanted, ten emails are not. */
+  sendEmail?: boolean;
   deps?: Partial<WeeklyDeps>;
 }): Promise<{ periodStart: string; periodEnd: string; total: number; insights: number; emailed: boolean }> {
   const now = opts.now ?? new Date();
@@ -75,7 +77,7 @@ export async function runWeeklyReport(opts: {
   if (insights.length) await deps.saveInsights(opts.accountId, insights);
 
   // Aggregates only — the pushed email never carries conversation bodies.
-  const emailed = current.length
+  const emailed = current.length && opts.sendEmail !== false
     ? await deps.sendEmail({ periodStart, periodEnd, report, insights }, opts.accountId)
     : false;
 

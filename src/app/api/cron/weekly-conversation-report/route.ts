@@ -21,6 +21,9 @@ export async function GET(req: NextRequest) {
   const accountId = req.nextUrl.searchParams.get('account_id');
   const asOf = req.nextUrl.searchParams.get('as_of');
   const now = asOf && !Number.isNaN(Date.parse(asOf)) ? new Date(asOf) : undefined;
+  // `send_email=0` builds the snapshot without pushing — used when replaying
+  // past weeks so a backfill does not mail the brand once per week of history.
+  const sendEmail = req.nextUrl.searchParams.get('send_email') !== '0';
 
   const { data: accounts } = await supabase.from('accounts').select('id, config').eq('status', 'active');
 
@@ -32,7 +35,7 @@ export async function GET(req: NextRequest) {
   const results: any[] = [];
   for (const a of targets) {
     try {
-      results.push({ accountId: a.id, ...(await runWeeklyReport({ accountId: a.id, now })) });
+      results.push({ accountId: a.id, ...(await runWeeklyReport({ accountId: a.id, now, sendEmail })) });
     } catch (e: any) {
       console.error('[weekly-conversation-report]', a.id, e?.message || e);
       results.push({ accountId: a.id, error: String(e?.message || e) });
