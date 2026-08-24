@@ -44,7 +44,7 @@ function deps(over: any = {}) {
       occurrence_count: 1, confidence_score: 0.9, examples: ['x'], tags: [],
     }])),
     saveSnapshot: vi.fn(async (_a: string, _s: string, _e: string, _p: any) => {}),
-    saveInsights: vi.fn(async (_a: string, _i: any[]) => {}),
+    saveInsights: vi.fn(async (_a: string, _i: any[], _ps: string, _pe: string) => {}),
     sendEmail: vi.fn(async (_p: any, _a: string) => true),
     ...over,
   };
@@ -60,6 +60,9 @@ describe('runWeeklyReport', () => {
     expect(res.emailed).toBe(true);
     expect(d.saveSnapshot).toHaveBeenCalledTimes(1);
     expect(d.saveInsights).toHaveBeenCalledTimes(1);
+    // Insights must be stamped with the period they describe, not just written.
+    expect(d.saveInsights.mock.calls[0][2]).toBe('2026-08-16');
+    expect(d.saveInsights.mock.calls[0][3]).toBe('2026-08-23');
     expect(d.sendEmail).toHaveBeenCalledTimes(1);
   });
 

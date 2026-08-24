@@ -38,7 +38,7 @@ export interface WeeklyDeps {
   countSessions: (accountId: string, fromIso: string, toIso: string) => Promise<number>;
   generate: (report: ConversationReport) => Promise<GeneratedInsight[]>;
   saveSnapshot: (accountId: string, periodStart: string, periodEnd: string, payload: any) => Promise<void>;
-  saveInsights: (accountId: string, insights: GeneratedInsight[]) => Promise<void>;
+  saveInsights: (accountId: string, insights: GeneratedInsight[], periodStart: string, periodEnd: string) => Promise<void>;
   sendEmail: (payload: any, accountId: string) => Promise<boolean>;
 }
 
@@ -74,7 +74,7 @@ export async function runWeeklyReport(opts: {
   // Upsert on (account_id, period_start, period_end): re-running a week
   // overwrites its issue rather than stacking duplicates.
   await deps.saveSnapshot(opts.accountId, periodStart, periodEnd, payload);
-  if (insights.length) await deps.saveInsights(opts.accountId, insights);
+  if (insights.length) await deps.saveInsights(opts.accountId, insights, periodStart, periodEnd);
 
   // Aggregates only — the pushed email never carries conversation bodies.
   const emailed = current.length && opts.sendEmail !== false
@@ -204,7 +204,16 @@ insight_type חייב להיות אחד מאלה בדיוק: ${ALLOWED_INSIGHT_T
       if (error) throw new Error(`saveSnapshot: ${error.message}`);
     },
 
-    async saveInsights(accountId, insights) {
+    async saveInsights(accountId, insights, periodStart, periodEnd) {
+      // Replace this period's insights rather than appending: re-running a week
+      // must not stack a second set on top of the first.
+      await supabase
+        .from('conversation_insights')
+        .delete()
+        .eq('account_id', accountId)
+        .eq('first_seen_at', periodStart)
+        .eq('last_seen_at', periodEnd);
+
       await supabase.from('conversation_insights').insert(
         insights.map((i) => ({
           account_id: accountId,
@@ -215,6 +224,11 @@ insight_type חייב להיות אחד מאלה בדיוק: ${ALLOWED_INSIGHT_T
           occurrence_count: i.occurrence_count,
           confidence_score: i.confidence_score,
           tags: i.tags,
+          // The period the insight DESCRIBES. created_at is when the row was
+          // written, which for a backfill is today for every historical week —
+          // filtering on it mixes ten weeks into one view.
+          first_seen_at: periodStart,
+          last_seen_at: periodEnd,
         }))
       );
     },

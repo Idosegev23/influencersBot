@@ -143,12 +143,14 @@ export async function fetchInsights(opts: {
 }): Promise<Array<{ id: string; insight_type: string; title: string; content: string; occurrence_count: number; examples: any[] }>> {
   const { data, error } = await supabase
     .from('conversation_insights')
-    .select('id, insight_type, title, content, occurrence_count, examples, created_at')
+    .select('id, insight_type, title, content, occurrence_count, examples, first_seen_at, last_seen_at')
     .eq('account_id', opts.accountId)
     .eq('is_active', true)
-    .gte('created_at', opts.fromIso)
-    .lte('created_at', opts.toIso)
-    .order('created_at', { ascending: false })
+    // Overlap on the period the insight DESCRIBES, not when its row was written:
+    // a backfill stamps every historical week with today's created_at.
+    .lte('first_seen_at', opts.toIso)
+    .gte('last_seen_at', opts.fromIso)
+    .order('last_seen_at', { ascending: false })
     .order('occurrence_count', { ascending: false })
     .limit(opts.limit ?? 6);
 
