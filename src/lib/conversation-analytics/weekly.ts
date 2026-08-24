@@ -8,7 +8,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { buildReport, type ClassificationLite, type ConversationReport } from './aggregate';
-import { generateInsights, type GeneratedInsight } from './insights';
+import { generateInsights, ALLOWED_INSIGHT_TYPES, type GeneratedInsight } from './insights';
 import { sendEmail } from '@/lib/email';
 import OpenAI from 'openai';
 
@@ -35,6 +35,7 @@ export interface WeeklyDeps {
   fetchRows: (accountId: string, fromIso: string, toIso: string) => Promise<ClassificationLite[]>;
   fetchPreviousRows: (accountId: string, fromIso: string, toIso: string) => Promise<ClassificationLite[]>;
   fetchConnectedChannels: (accountId: string) => Promise<string[]>;
+  countSessions: (accountId: string, fromIso: string, toIso: string) => Promise<number>;
   generate: (report: ConversationReport) => Promise<GeneratedInsight[]>;
   saveSnapshot: (accountId: string, periodStart: string, periodEnd: string, payload: any) => Promise<void>;
   saveInsights: (accountId: string, insights: GeneratedInsight[]) => Promise<void>;
@@ -50,13 +51,18 @@ export async function runWeeklyReport(opts: {
   const w = lastFullWeek(now);
   const deps: WeeklyDeps = { ...defaultDeps(), ...(opts.deps || {}) } as WeeklyDeps;
 
-  const [current, previous, connected] = await Promise.all([
+  const [current, previous, connected, sessionsInRange, previousSessionsInRange] = await Promise.all([
     deps.fetchRows(opts.accountId, w.startIso, w.endIso),
     deps.fetchPreviousRows(opts.accountId, w.prevStartIso, w.prevEndIso),
     deps.fetchConnectedChannels(opts.accountId),
+    deps.countSessions(opts.accountId, w.startIso, w.endIso),
+    deps.countSessions(opts.accountId, w.prevStartIso, w.prevEndIso),
   ]);
 
-  const report = buildReport({ current, previous, connectedChannels: connected });
+  const report = buildReport({
+    current, previous, connectedChannels: connected,
+    sessionsInRange, previousSessionsInRange,
+  });
   const insights = current.length ? await deps.generate(report) : [];
 
   const periodStart = w.startIso.slice(0, 10);
@@ -111,6 +117,16 @@ function defaultDeps(): WeeklyDeps {
     fetchRows: selectRows,
     fetchPreviousRows: selectRows,
 
+    async countSessions(accountId, fromIso, toIso) {
+      const { count } = await supabase
+        .from('chat_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+        .gte('created_at', fromIso)
+        .lt('created_at', toIso);
+      return count || 0;
+    },
+
     async fetchConnectedChannels(accountId) {
       const out = ['web'];
       const { data: acc } = await supabase.from('accounts').select('config').eq('id', accountId).single();
@@ -130,8 +146,15 @@ function defaultDeps(): WeeklyDeps {
           const response = await openai().responses.create({
             model: 'gpt-5.6-luna',
             instructions: `אתה מנתח דוח שבועי של שיחות לקוחות ומחזיר 3 עד 6 תובנות פעולתיות בעברית.
+
 כל תובנה חייבת להישען על מספר מתוך הנתונים. אם אין מספר — אל תחזיר את התובנה.
-evidence: רשימת מחרוזות קצרות עם המספרים עצמם.`,
+evidence: רשימת מחרוזות קצרות עם המספרים עצמם.
+
+insight_type חייב להיות אחד מאלה בדיוק: ${ALLOWED_INSIGHT_TYPES.join(', ')}
+
+**אם coverageComparable הוא false — אסור לך להסיק שום מסקנה משינוי בנפח השיחות
+או מהשוואה לתקופה הקודמת.** במקרה כזה שתי התקופות סווגו במידה שונה, וכל הפרש
+ביניהן משקף את איסוף הנתונים ולא את מה שקרה בפועל. התמקד בהרכב התקופה הנוכחית.`,
             input: JSON.stringify(summary),
             max_output_tokens: 2000,
             reasoning: { effort: 'low' },

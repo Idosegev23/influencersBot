@@ -2,6 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { generateInsights } from '@/lib/conversation-analytics/insights';
 import { buildReport } from '@/lib/conversation-analytics/aggregate';
 
+const baseRow = (o: any) => ({
+  session_id: `s${Math.random()}`, channel: 'web', started_at: '2026-08-20T10:00:00Z',
+  inquiry_type: 'other', topic_label: 'x', is_complaint: false,
+  complaint_kind: null, sentiment: 'neutral', outcome: 'unknown',
+  product_id: null, product_name: null, product_category: null, product_line: null,
+  keywords: [], status: 'ok', ...o,
+});
+
 const report = buildReport({
   current: [
     {
@@ -14,6 +22,44 @@ const report = buildReport({
   ],
   previous: [],
   connectedChannels: ['web'],
+});
+
+describe('comparability guard', () => {
+  // A real incident: mid-backfill the previous week had fewer classified rows
+  // than the current one, and the generator confidently reported "conversation
+  // volume rose from 155 to 434 — staff up". Nothing had risen. Volume deltas
+  // are only meaningful when both periods are classified to a similar degree.
+  it('tells the model when the two periods are not comparably classified', async () => {
+    const { insightInput } = await import('@/lib/conversation-analytics/insights');
+    const skewed = buildReport({
+      current: Array.from({ length: 100 }, () => baseRow({})),
+      previous: Array.from({ length: 10 }, () => baseRow({})),
+      connectedChannels: ['web'],
+      sessionsInRange: 100,
+      previousSessionsInRange: 100,
+    });
+    expect(insightInput(skewed).coverageComparable).toBe(false);
+  });
+
+  it('marks comparable periods as comparable', async () => {
+    const { insightInput } = await import('@/lib/conversation-analytics/insights');
+    const even = buildReport({
+      current: Array.from({ length: 95 }, () => baseRow({})),
+      previous: Array.from({ length: 90 }, () => baseRow({})),
+      connectedChannels: ['web'],
+      sessionsInRange: 100,
+      previousSessionsInRange: 100,
+    });
+    expect(insightInput(even).coverageComparable).toBe(true);
+  });
+
+  it('assumes comparable when the universe is unknown', async () => {
+    const { insightInput } = await import('@/lib/conversation-analytics/insights');
+    const unknown = buildReport({
+      current: [baseRow({})], previous: [baseRow({})], connectedChannels: ['web'],
+    });
+    expect(insightInput(unknown).coverageComparable).toBe(true);
+  });
 });
 
 describe('generateInsights', () => {

@@ -8,10 +8,12 @@
 
 import type { ConversationReport } from './aggregate';
 
-const ALLOWED_TYPES = new Set([
+export const ALLOWED_INSIGHT_TYPES = [
   'rising_topic', 'complaint_cluster', 'product_risk', 'unanswered', 'channel_shift',
   'faq', 'topic_interest', 'pain_point', 'objection', 'sentiment', 'product_inquiry',
-]);
+] as const;
+
+const ALLOWED_TYPES = new Set<string>(ALLOWED_INSIGHT_TYPES);
 
 /** Cap so the page stays readable — six cards is already a lot to act on in a week. */
 const MAX_INSIGHTS = 6;
@@ -26,9 +28,22 @@ export interface GeneratedInsight {
   tags: string[];
 }
 
+/**
+ * How far the two periods' classification coverage may diverge before their
+ * volume delta stops meaning anything. Mid-backfill the gap reached 155 vs 434
+ * and the generator reported it as a business trend.
+ */
+const COVERAGE_COMPARABLE_TOLERANCE_PCT = 15;
+
 /** The aggregate slice handed to the model — deliberately free of session ids. */
 export function insightInput(report: ConversationReport) {
+  const { classifiedPct, previousClassifiedPct } = report.coverage;
+  const coverageComparable =
+    Math.abs(classifiedPct - previousClassifiedPct) <= COVERAGE_COMPARABLE_TOLERANCE_PCT;
+
   return {
+    coverageComparable,
+    coverage: { classifiedPct, previousClassifiedPct },
     kpis: report.kpis,
     inquiryTypes: report.inquiryTypes,
     topTopics: report.topics.slice(0, 20),

@@ -38,6 +38,8 @@ export interface ConversationReport {
     complaints: number;
     complaintsWithProduct: number;
     complaintsWithProductPct: number;
+    /** Share of the comparison period that is classified, for delta sanity. */
+    previousClassifiedPct: number;
   };
   kpis: KpiBlock & { previous: KpiBlock };
   inquiryTypes: Array<{ type: string; label: string; count: number; previousCount: number; delta: number }>;
@@ -114,9 +116,13 @@ export function buildReport(opts: {
    * describes the fetched rows alone.
    */
   sessionsInRange?: number;
+  /** Same, for the comparison period. Lets consumers tell a real change from an
+   *  uneven classification run. */
+  previousSessionsInRange?: number;
 }): ConversationReport {
   const { current, previous, connectedChannels } = opts;
   const universe = opts.sessionsInRange ?? current.length;
+  const previousUniverse = opts.previousSessionsInRange ?? previous.length;
 
   const usable = current.filter((r) => r.status === 'ok');
   const complaints = current.filter((r) => r.is_complaint);
@@ -212,6 +218,7 @@ export function buildReport(opts: {
       complaints: complaints.length,
       complaintsWithProduct: complaintsWithProduct.length,
       complaintsWithProductPct: pct(complaintsWithProduct.length, complaints.length),
+      previousClassifiedPct: pct(previous.filter((r) => r.status === 'ok').length, previousUniverse),
     },
     kpis: { ...kpisFor(current), previous: kpisFor(previous) },
     inquiryTypes,

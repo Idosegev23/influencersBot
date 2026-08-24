@@ -36,13 +36,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ username: s
     const range = parseRange(sp, new Date());
     const filters = filtersFromParams(sp);
 
-    const [current, previous, channels, insights, sessionsInRange] = await Promise.all([
+    const [current, previous, channels, insights, sessionsInRange, previousSessionsInRange] = await Promise.all([
       fetchClassificationRows({ accountId: influencer.id, fromIso: range.fromIso, toIso: range.toIso, filters }),
       fetchClassificationRows({ accountId: influencer.id, fromIso: range.prevFromIso, toIso: range.prevToIso, filters }),
       fetchConnectedChannels(influencer.id),
       // Insights are never filtered — they describe the period, not a slice of it.
       fetchInsights({ accountId: influencer.id, fromIso: range.fromIso, toIso: range.toIso }),
       countSessionsInRange({ accountId: influencer.id, fromIso: range.fromIso, toIso: range.toIso }),
+      countSessionsInRange({ accountId: influencer.id, fromIso: range.prevFromIso, toIso: range.prevToIso }),
     ]);
 
     return NextResponse.json({
@@ -54,6 +55,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ username: s
         previous,
         connectedChannels: channels,
         sessionsInRange: Object.values(filters).some(Boolean) ? undefined : sessionsInRange,
+        previousSessionsInRange: Object.values(filters).some(Boolean) ? undefined : previousSessionsInRange,
       }),
       insights,
     });

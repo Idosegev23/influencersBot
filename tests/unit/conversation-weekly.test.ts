@@ -38,6 +38,7 @@ function deps(over: any = {}) {
     fetchRows: vi.fn(async (_a: string, _f: string, _t: string) => rows),
     fetchPreviousRows: vi.fn(async (_a: string, _f: string, _t: string) => [] as typeof rows),
     fetchConnectedChannels: vi.fn(async (_a: string) => ['web']),
+    countSessions: vi.fn(async (_a: string, _f: string, _t: string) => 1),
     generate: vi.fn(async (_r: any) => ([{
       insight_type: 'complaint_cluster', title: 't', content: 'c',
       occurrence_count: 1, confidence_score: 0.9, examples: ['x'], tags: [],
