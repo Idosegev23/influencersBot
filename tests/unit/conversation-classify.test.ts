@@ -39,6 +39,18 @@ const GOOD = {
   confidence: 0.93,
 };
 
+describe('buildClassifyPrompt', () => {
+  // A hand-check of 20 real classifications found one systematic miss: a session
+  // opening with "מה מתאים לשיער יבש?" and closing with "אתה איש?" was labelled
+  // `other`, following the last turn instead of the reason the customer came.
+  it('tells the model to classify by the reason the customer came, not the last turn', async () => {
+    const { buildClassifyPrompt } = await import('@/lib/conversation-analytics/classify');
+    const prompt = buildClassifyPrompt('- מוצר');
+    expect(prompt).toContain('לא את המשפט האחרון');
+    expect(prompt).toContain('גוברת');
+  });
+});
+
 describe('classifySession', () => {
   it('maps a clean model answer onto a storable row', async () => {
     const callModel = modelReturning(GOOD);
