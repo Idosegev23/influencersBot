@@ -143,11 +143,12 @@
   var inlineLastChipBudget = null;
   // Set the instant a visitor engages from the inline surface, to the customer's
   // own body.style.overflow value at that moment; null the rest of the time.
-  // restoreAfterInline() uses "not null" as its own re-entrancy guard, so it must
-  // be cleared (not just restored) once consumed. openFromInline() only writes
-  // this (and its paddingRight counterpart below) when it is still null, so a
-  // second engage before the first close can never overwrite the customer's
-  // real value with our own 'hidden'/compensation padding.
+  // restoreAfterInline() uses "not null" as its own idempotency guard (safe to
+  // call from anywhere, including a failed open's recovery path), so it must
+  // be cleared — not just restored — once consumed. The re-entrancy guard
+  // against a double-click re-opening (and re-locking, re-tracking) is
+  // openFromInline()'s own `if (isOpen) return;` at its top — isOpen is set
+  // true, and this lock taken, only once per open.
   var inlineScrollLock = null;
   // The customer's own body.style.paddingRight at lock time, restored alongside
   // inlineScrollLock. Scrollbar-compensation padding (Important #4) is added on
@@ -2386,6 +2387,25 @@
   // what actually renders the overlay. The inline surface itself never grows in
   // place; it hands off to the panel and gets out of the way.
   function openFromInline(prefill) {
+    // Re-entrant guard: the desktop panel has no backdrop and the pill stays
+    // visible and clickable underneath it (review finding, Critical #1), so a
+    // double-click on the pill — or a pill click followed by a chip click —
+    // calls openFromInline() twice before the first close. Scoping the guard
+    // to the scroll lock alone (the first fix pass) stopped the page-freeze
+    // but left `widget_opened` firing twice per double-click, inflating the
+    // inline surface's own open-rate telemetry (review round 2). So the WHOLE
+    // engage is now guarded on isOpen, not just the lock — except the prefill:
+    // a chip click while the panel is already open (e.g. the visitor opened
+    // via the pill, then also clicked a chip before the panel repainted) must
+    // still fill the composer, it just skips re-opening/re-tracking.
+    if (isOpen) {
+      if (prefill) {
+        var alreadyOpenInput = container.querySelector('input,textarea');
+        if (alreadyOpenInput) { alreadyOpenInput.value = prefill; alreadyOpenInput.focus(); }
+        else report('inline_prefill_no_composer', { message: 'composer not found' });
+      }
+      return;
+    }
     try {
       isOpen = true;
       inputTouched = false;
@@ -2397,31 +2417,37 @@
       // clearing it. inlineScrollLock !== null is also this open's signature —
       // it is how the Escape handler and restoreAfterInline() know this session
       // was opened from the inline surface rather than the floating bubble.
+      inlineScrollLock = document.body.style.overflow;
+      inlineBodyPaddingLock = document.body.style.paddingRight;
+      // Locking overflow removes the desktop scrollbar, which on a page with
+      // html at its default overflow:visible shifts the whole viewport ~15px
+      // and reflows every fixed-width centred element on the host page —
+      // exactly what "the host layout never reflows" rules out (review
+      // finding, Important #4). Compensate by reserving that width as padding,
+      // restored alongside overflow in restoreAfterInline().
       //
-      // Guarded on inlineScrollLock already being null: the desktop panel has
-      // no backdrop and the pill stays visible and clickable underneath it
-      // (review finding, Critical #1), so a double-click on the pill — or a
-      // pill click followed by a chip click — calls openFromInline() twice
-      // before the first close. Without this guard the second call would save
-      // 'hidden' AS "the customer's own value", and every close path would then
-      // faithfully restore body.style.overflow to 'hidden' forever, freezing
-      // the host page's scroll until reload.
-      if (inlineScrollLock === null) {
-        inlineScrollLock = document.body.style.overflow;
-        // Locking overflow removes the desktop scrollbar, which on a page with
-        // html at its default overflow:visible shifts the whole viewport ~15px
-        // and reflows every fixed-width centred element on the host page —
-        // exactly what "the host layout never reflows" rules out (review
-        // finding, Important #4). Compensate by reserving that width as
-        // padding, restored alongside overflow in restoreAfterInline().
-        inlineBodyPaddingLock = document.body.style.paddingRight;
-        try {
-          var gap = window.innerWidth - document.documentElement.clientWidth;
-          if (gap > 0) {
-            var existing = parseFloat(window.getComputedStyle(document.body).paddingRight) || 0;
-            document.body.style.paddingRight = (existing + gap) + 'px';
-          }
-        } catch (e) { /* best-effort; missing compensation is cosmetic, not breaking */ }
+      // Measure the ACTUAL delta the lock causes, not window.innerWidth minus
+      // clientWidth beforehand: that gap assumes locking removes a scrollbar,
+      // which is only true when html is at overflow:visible. A host with
+      // `html{overflow-y:scroll}` or `scrollbar-gutter:stable` already
+      // reserves the gutter, so clientWidth would not move and the old
+      // formula added compensation for a shift that was never going to happen
+      // — introducing exactly the jump it existed to prevent, on those hosts
+      // (review round 2, new Important). Measuring before/after the actual
+      // `overflow:hidden` write is correct regardless of which case a given
+      // host is in.
+      try {
+        var beforeW = document.documentElement.clientWidth;
+        document.body.style.overflow = 'hidden';
+        var delta = document.documentElement.clientWidth - beforeW;
+        if (delta > 0) {
+          var existingPad = parseFloat(window.getComputedStyle(document.body).paddingRight) || 0;
+          document.body.style.paddingRight = (existingPad + delta) + 'px';
+        }
+      } catch (e) {
+        // Best-effort: missing compensation is cosmetic. But the lock itself
+        // is not — make sure `overflow:hidden` still lands even if the
+        // measurement above threw partway through.
         document.body.style.overflow = 'hidden';
       }
 
@@ -2464,6 +2490,21 @@
         else report('inline_prefill_no_composer', { message: 'composer not found' });
       }
     } catch (e) {
+      // A throw anywhere between taking the lock and finishing the open must
+      // not leave the host page stuck at overflow:hidden with no panel and no
+      // close affordance to escape it — restoreAfterInline() is a no-op unless
+      // inlineScrollLock is set, so it is always safe to call here (review
+      // round 2, Important: the lock is taken before render(), so a throw in
+      // render() or the prefill lookup previously left the visitor stranded).
+      try { restoreAfterInline(); } catch (e2) { /* */ }
+      // Also undo the `isOpen = true` set at the top of this function: without
+      // this, a failed open leaves isOpen permanently true, which trips the
+      // re-entrant guard at the top of this function (added this round) on
+      // every later click — the visitor's page would scroll again, but the
+      // pill itself would stay dead until reload. Not explicitly requested by
+      // the review, but the same "no way out" failure class as the scroll
+      // lock, in the same recovery path, at negligible risk.
+      isOpen = false;
       report('inline_open_failed', e);
     }
   }

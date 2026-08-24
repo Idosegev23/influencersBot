@@ -167,4 +167,58 @@ describe('engaging from the inline surface', () => {
     expect(input).not.toBeNull();
     expect(input.value).toBe('אני מותג');
   });
+
+  it('a chip click while the panel is already open still prefills, without re-opening', async () => {
+    // Review round 2: guarding the whole engage on `isOpen` (not just the
+    // scroll lock) stops a double-click from double-counting widget_opened,
+    // but the guard must not also break the case where a chip click lands
+    // while the panel is already open (pill click, then a chip click before
+    // the panel repaints) — that click should still land its prefill.
+    await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    (shadow().getElementById('ibot-inline-pill') as HTMLElement).click();
+    expect(document.getElementById('ibot-panel')).not.toBeNull();
+    (shadow().querySelector('[data-inline-chip="1"]') as HTMLElement).click();
+    const input = document.querySelector(
+      '#ibot-widget-container input, #ibot-widget-container textarea',
+    ) as HTMLInputElement;
+    expect(input).not.toBeNull();
+    expect(input.value).toBe('אני יוצר תוכן');
+  });
+
+  it('does not add scrollbar-compensation padding when the lock does not change page width', async () => {
+    // jsdom never lays out real content, so document.documentElement.clientWidth
+    // does not move across the lock — representative of a host with
+    // `scrollbar-gutter:stable` or `html{overflow-y:scroll}`, where the gutter
+    // is already reserved and locking body overflow reclaims nothing.
+    // Regression test for review round 2's new Important: the previous formula
+    // (window.innerWidth - clientWidth, measured only BEFORE the lock)
+    // assumed every lock removes a scrollbar and would have padded here with
+    // nothing to compensate for, shifting the page on exactly the hosts the
+    // original scrollbar-shift fix was meant to help.
+    await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    document.body.style.paddingRight = '';
+    (shadow().getElementById('ibot-inline-pill') as HTMLElement).click();
+    expect(document.body.style.paddingRight).toBe('');
+  });
+
+  it('restores host scroll even when the open throws before finishing', async () => {
+    // Forces a throw after the scroll lock is taken and render() has painted
+    // the panel, but before openFromInline() returns (panel.getBoundingClientRect(),
+    // called to compute the grow-from-origin point) — the lock must not
+    // survive an aborted open. Regression test for review round 2's Important:
+    // "a throw mid-open leaves the host page locked with no way out".
+    await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    document.body.style.overflow = 'auto';
+    const original = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      if ((this as HTMLElement).id === 'ibot-panel') throw new Error('boom');
+      return original.call(this);
+    };
+    try {
+      (shadow().getElementById('ibot-inline-pill') as HTMLElement).click();
+      expect(document.body.style.overflow).toBe('auto');
+    } finally {
+      Element.prototype.getBoundingClientRect = original;
+    }
+  });
 });
