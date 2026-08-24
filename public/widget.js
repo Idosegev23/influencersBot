@@ -127,6 +127,14 @@
   var lastTopic = null;
   try { lastTopic = localStorage.getItem('ibot_last_topic_' + ACCOUNT_ID); } catch (e) { /* */ }
 
+  // ---- Inline surface -------------------------------------------------------
+  // Resolved by /api/widget/config; null for every account that has not opted
+  // in, which is the state that reproduces today's behavior exactly.
+  var INLINE = null;
+  var inlineHost = null;      // the <div> we create inside the customer's page
+  var inlineRoot = null;      // its shadow root (Task 6)
+  var inlineVisible = false;  // is the mount currently on screen?
+
   // ---- View state (Phase: concierge) ----
   // The widget is no longer a chat-only surface. `view` switches the panel
   // between chat, the inline support-ticket form, and the post-submit
@@ -1238,6 +1246,12 @@
         };
       }
       updateContainerPosition();
+      // After updateContainerPosition(), which rewrites container.style.cssText
+      // wholesale and would wipe the display:none the inline mount may set.
+      if (data.inline && data.inline.selector) {
+        INLINE = data.inline;
+        try { setupInline(); } catch (e) { report('inline_setup_failed', e); }
+      }
       messages = [{ role: 'assistant', content: config.welcomeMessage }];
       widgetTrack('widget_loaded', { modules: modules, widget_version: WIDGET_VERSION });
       // Fire chip fetch in parallel — non-blocking; widget renders without chips
@@ -1535,6 +1549,135 @@
         ? 'bottom:calc(20px + env(safe-area-inset-bottom));left:20px;'
         : 'bottom:calc(20px + env(safe-area-inset-bottom));right:20px;') +
       'font-family:"' + locale.font + '",system-ui,sans-serif;direction:' + locale.dir + ';';
+  }
+
+  // ============================================
+  // Inline surface — mount resolution
+  // ============================================
+
+  // Resolve the customer's chosen element. Deliberately tolerant: a selector
+  // that no longer matches is a fallback, never an exception.
+  function resolveInlineTarget() {
+    try {
+      return document.querySelector(INLINE.selector);
+    } catch (e) {
+      report('inline_selector_invalid', { message: INLINE.selector });
+      return null;
+    }
+  }
+
+  function setupInline() {
+    // One mount per page. A customer who pastes the embed twice (head AND body
+    // is a common builder mistake) would otherwise get two invitations in the
+    // hero; the newest boot wins and every earlier one stands down.
+    var gen = {};
+    try { window.__ibotInlineGen = gen; } catch (e) { /* */ }
+    function current() {
+      try { return window.__ibotInlineGen === gen; } catch (e) { return true; }
+    }
+
+    var target = resolveInlineTarget();
+    if (target) { mountInline(target); return; }
+
+    // Missing right now. Report immediately — the visitor is looking at the
+    // fallback bubble at this instant, and a selector the customer's theme
+    // renamed must never fail quietly.
+    report('inline_mount_missing', { message: INLINE.selector });
+
+    // But it may simply not exist YET — SPA routing, lazy hydration, a builder
+    // that paints the hero after first paint. Watch briefly and mount late if
+    // it turns up.
+    var settled = false;
+    var mo = null;
+    function stop() {
+      settled = true;
+      try { if (mo) mo.disconnect(); } catch (e) { /* */ }
+    }
+    if (!window.MutationObserver) return;
+    mo = new MutationObserver(function () {
+      try {
+        if (settled) return;
+        if (!current()) { stop(); return; }
+        var el = resolveInlineTarget();
+        if (!el) return;
+        stop();
+        mountInline(el);
+      } catch (e) { stop(); report('inline_setup_failed', e); }
+    });
+    try { mo.observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { /* */ }
+    setTimeout(function () {
+      if (settled) return;
+      stop();
+      // Falls through to the floating bubble, which is already mounted.
+    }, 5000);
+  }
+
+  function mountInline(target) {
+    inlineHost = document.createElement('div');
+    inlineHost.setAttribute('data-bestie-inline', INLINE.preset || 'hero');
+    // The host box carries no font-family of its own: inherited properties
+    // cross the shadow boundary, and that inheritance IS how we speak the
+    // site's type.
+    inlineHost.style.cssText = 'all:initial;display:block;width:100%;font:inherit;color:inherit;';
+
+    var reserve = 0;
+    if (INLINE.reserve) {
+      reserve = (window.innerWidth < 640 ? INLINE.reserve.mobile : INLINE.reserve.desktop) || 0;
+    }
+    if (reserve > 0) inlineHost.style.minHeight = reserve + 'px';
+
+    if (INLINE.mode === 'replace') {
+      if (target.parentNode) target.parentNode.replaceChild(inlineHost, target);
+    } else if (INLINE.mode === 'overlay') {
+      // The only mode that touches the customer's styles, and only when the
+      // element gives us no positioning context of its own.
+      // `|| 'static'` normalizes environments whose computed style is empty
+      // for an unstyled element (jsdom does this; browsers always return one
+      // of the position keywords). Empty means "no positioning context", which
+      // is exactly the case we are here to fix.
+      var pos = 'static';
+      try { pos = window.getComputedStyle(target).position || 'static'; } catch (e) { /* */ }
+      if (pos === 'static') target.style.position = 'relative';
+      inlineHost.style.position = 'absolute';
+      inlineHost.style.inset = '0';
+      inlineHost.style.zIndex = '5';
+      target.appendChild(inlineHost);
+    } else {
+      target.appendChild(inlineHost);
+    }
+
+    inlineRoot = inlineHost.attachShadow({ mode: 'open' });
+    renderInline();                 // Task 6 supplies this
+    watchInlineVisibility(target);
+  }
+
+  // Task 6 replaces this body with the real inline render.
+  function renderInline() {
+    if (!inlineRoot) return;
+    inlineRoot.innerHTML = '';
+  }
+
+  // The bubble and the inline mount are the same conversation; showing both at
+  // once reads as two assistants. While the mount is on screen the bubble
+  // stands down, and it returns once the mount is fully out of view.
+  function watchInlineVisibility(target) {
+    if (INLINE.bubble === 'always') return;
+    if (INLINE.bubble === 'never') { container.style.display = 'none'; return; }
+
+    var apply = function (onScreen) {
+      inlineVisible = onScreen;
+      // Never hide the bubble while the visitor has the panel open.
+      container.style.display = onScreen && !isOpen ? 'none' : '';
+    };
+    apply(true);
+
+    if (!window.IntersectionObserver) return;   // no observer -> bubble stays hidden, mount is present
+    var io = new IntersectionObserver(function (entries) {
+      try {
+        for (var i = 0; i < entries.length; i++) apply(entries[i].isIntersecting);
+      } catch (e) { /* */ }
+    }, { threshold: 0 });
+    io.observe(inlineHost);
   }
 
   // Mobile open-state = clean full-screen (not a bottom sheet). Full dynamic
