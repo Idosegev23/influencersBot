@@ -117,6 +117,9 @@ function defaultDeps(): RunDeps {
           startedAt: s.created_at,
           messages: rows.map((m: any) => ({ role: m.role, content: m.content || '' })),
           intentHints: rows.map((m: any) => m.intent).filter(Boolean),
+          // Carried forward so a session that keeps failing eventually exceeds
+          // MAX_ATTEMPTS instead of being re-billed on every run forever.
+          priorAttempts: s.prior_attempts ?? 0,
         } as SessionForClassification;
       });
     },

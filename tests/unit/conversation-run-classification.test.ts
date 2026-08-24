@@ -34,7 +34,7 @@ function fakeDeps(sessions: any[], opts: { costPerRow?: number; classify?: any }
       complaint_kind: null, sentiment: 'neutral', urgency: 'normal',
       outcome: 'unknown', product_id: null, product_mention_raw: null,
       product_category: null, product_line: null, keywords: [], summary: 's', confidence: 0.9,
-      status: 'ok' as const, error_message: null, model: 'gpt-5.6-luna',
+      status: 'ok' as const, error_message: null, attempts: (s.priorAttempts ?? 0) + 1, model: 'gpt-5.6-luna',
       tokens_in: 100, tokens_out: 10, cost_usd: opts.costPerRow ?? 0.0002,
     })),
     saveRows: vi.fn(async (rows: any[]) => { inserted.push(...rows); return rows.length; }),
@@ -95,7 +95,7 @@ describe('runClassification', () => {
         complaint_kind: null, sentiment: 'neutral', urgency: 'normal',
         outcome: 'unknown', product_id: null, product_mention_raw: null,
         product_category: null, product_line: null, keywords: [], summary: 's', confidence: 0.9,
-        status: 'ok' as const, error_message: null, model: 'gpt-5.6-luna',
+        status: 'ok' as const, error_message: null, attempts: (s.priorAttempts ?? 0) + 1, model: 'gpt-5.6-luna',
         tokens_in: 100, tokens_out: 10, cost_usd: 0.0002,
       })),
       saveRows: vi.fn(async (rows: any[]) => {
@@ -116,6 +116,32 @@ describe('runClassification', () => {
     expect(done.size).toBe(250);
   });
 
+  // The attempt counter never incremented: the upsert payload omitted it, so it
+  // stayed at 1 forever and MAX_ATTEMPTS was inert. A row that always fails
+  // would be re-picked and re-billed on every hourly run, indefinitely.
+  it('increments the attempt counter so a poison row eventually stops retrying', async () => {
+    const failing = vi.fn(async (s: any) => ({
+      account_id: 'a1', session_id: s.id, channel: 'web',
+      started_at: s.startedAt, user_message_count: 1,
+      inquiry_type: null, topic_raw: null, is_complaint: false,
+      complaint_kind: null, sentiment: null, urgency: null, outcome: null,
+      product_id: null, product_mention_raw: null, product_category: null,
+      product_line: null, keywords: [], summary: null, confidence: null,
+      status: 'failed' as const, error_message: 'boom', attempts: (s.priorAttempts ?? 0) + 1,
+      model: null, tokens_in: null, tokens_out: null, cost_usd: null,
+    }));
+    const { deps, inserted } = fakeDeps([{ ...session('s1'), priorAttempts: 2 }], { classify: failing });
+
+    await runClassification({ accountId: 'a1', deps });
+    expect(inserted[0].attempts).toBe(3);
+  });
+
+  it('records a first attempt as attempt 1', async () => {
+    const { deps, inserted } = fakeDeps([session('s1')]);
+    await runClassification({ accountId: 'a1', deps });
+    expect(inserted[0].attempts).toBe(1);
+  });
+
   it('counts failed rows separately but still saves them for retry', async () => {
     const failing = vi.fn(async (s: any) => ({
       account_id: 'a1', session_id: s.id, channel: 'web',
@@ -124,7 +150,7 @@ describe('runClassification', () => {
       complaint_kind: null, sentiment: null, urgency: null, outcome: null,
       product_id: null, product_mention_raw: null, product_category: null,
       product_line: null, keywords: [], summary: null, confidence: null,
-      status: 'failed' as const, error_message: 'boom',
+      status: 'failed' as const, error_message: 'boom', attempts: (s.priorAttempts ?? 0) + 1,
       model: null, tokens_in: null, tokens_out: null, cost_usd: null,
     }));
     const { deps, inserted } = fakeDeps([session('s1'), session('s2')], { classify: failing });

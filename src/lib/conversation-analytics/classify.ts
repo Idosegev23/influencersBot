@@ -25,6 +25,8 @@ export interface SessionForClassification {
   startedAt: string;
   messages: Array<{ role: string; content: string }>;
   intentHints: any[];
+  /** Failed attempts already recorded for this session; 0 on a first pass. */
+  priorAttempts?: number;
 }
 
 export interface ClassificationRow {
@@ -49,6 +51,7 @@ export interface ClassificationRow {
   confidence: number | null;
   status: 'ok' | 'failed' | 'needs_review';
   error_message: string | null;
+  attempts: number;
   model: string | null;
   tokens_in: number | null;
   tokens_out: number | null;
@@ -130,6 +133,7 @@ function emptyRow(session: SessionForClassification): ClassificationRow {
     product_id: null, product_mention_raw: null, product_category: null, product_line: null,
     keywords: [], summary: null, confidence: null,
     status: 'ok', error_message: null,
+    attempts: (session.priorAttempts ?? 0) + 1,
     model: null, tokens_in: null, tokens_out: null, cost_usd: null,
   };
 }
