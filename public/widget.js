@@ -1548,6 +1548,21 @@
     }, { passive: true });
   }
 
+  // Re-render the inline mount on resize so the chip budget (inlineChipCount)
+  // follows the viewport — a visitor who rotates a phone or resizes a window
+  // should not get stuck with a stale chip count.
+  if (!window.__ibotInlineResizeBound) {
+    window.__ibotInlineResizeBound = true;
+    var inlineResizeTimer = null;
+    window.addEventListener('resize', function () {
+      if (!inlineRoot) return;
+      if (inlineResizeTimer) clearTimeout(inlineResizeTimer);
+      inlineResizeTimer = setTimeout(function () {
+        try { renderInline(); } catch (e) { report('inline_render_failed', e); }
+      }, 150);
+    });
+  }
+
   function updateContainerPosition() {
     container.style.cssText = 'position:fixed;z-index:2147483647;' +
       (config.position === 'bottom-left'
@@ -1679,10 +1694,101 @@
     watchInlineVisibility(target);
   }
 
-  // Task 6 replaces this body with the real inline render.
+  // How many starter chips fit without pushing the pill below the fold. Mirrors
+  // chipBudget() in src/lib/widget/inline.ts — widget.js cannot import it, so
+  // both copies carry their own test.
+  function inlineChipCount() {
+    var w = window.innerWidth;
+    if (w >= 640) return 3;
+    if (w >= 360) return 2;
+    return 0;
+  }
+
+  // Styles for the shadow root. Deliberately omits font-family: inherited
+  // properties cross the shadow boundary, so the host page's type comes to us
+  // for free and the widget looks native without any configuration.
+  function inlineStylesCss() {
+    var t = INLINE.theme;
+    var light = t.ground === 'light';
+    var ink = light ? '#141413' : '#f5f4f1';
+    var fill = light ? 'rgba(20,20,19,0.06)' : 'rgba(245,244,241,0.11)';
+    var edge = light ? 'rgba(20,20,19,0.18)' : 'rgba(245,244,241,0.26)';
+    var glass = INLINE.surface === 'glass';
+    var solid = INLINE.surface === 'solid';
+    var solidBg = light ? '#ffffff' : '#141413';
+    var radius = t.radius === null ? 999 : t.radius;
+
+    return ':host{display:block;width:100%;}' +
+      '*{box-sizing:border-box;}' +
+      '.wrap{display:flex;flex-direction:column;align-items:center;width:100%;' +
+        'direction:' + locale.dir + ';}' +
+      '.pane{width:100%;max-width:560px;' +
+        (glass
+          ? 'background:' + fill + ';border:1px solid ' + edge + ';border-radius:22px;padding:16px;' +
+            'backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);'
+          : solid
+            ? 'background:' + solidBg + ';border:1px solid ' + edge + ';border-radius:22px;padding:16px;' +
+              'box-shadow:0 10px 30px rgba(0,0,0,0.18);'
+            : '') + '}' +
+      // No backdrop-filter support, or a visitor who asked for less
+      // transparency: fall back to an opaque panel rather than an unreadable one.
+      (glass
+        ? '@supports not (backdrop-filter:blur(2px)){.pane{background:' +
+            (light ? 'rgba(245,244,241,0.94)' : 'rgba(12,12,14,0.9)') + ';}}' +
+          '@media (prefers-reduced-transparency:reduce){.pane{background:' +
+            (light ? 'rgba(245,244,241,0.96)' : 'rgba(12,12,14,0.94)') + ';backdrop-filter:none;}}'
+        : '') +
+      '.pill{display:flex;align-items:center;gap:10px;width:100%;cursor:text;' +
+        'padding:12px 14px 12px 6px;border-radius:' + radius + 'px;' +
+        'background:' + fill + ';border:1px solid ' + edge + ';color:' + ink + ';' +
+        'transition:border-color .18s ease,transform .18s ease;}' +
+      '.pill:hover,.pill:focus-visible{border-color:' + (light ? 'rgba(20,20,19,0.4)' : 'rgba(245,244,241,0.5)') + ';}' +
+      '.pill:active{transform:scale(0.995);}' +
+      '.pill:focus-visible{outline:2px solid ' + (t.accent || ink) + ';outline-offset:2px;}' +
+      '.ph{flex:1;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';opacity:.62;font-size:15px;}' +
+      '.av{width:28px;height:28px;border-radius:999px;flex:none;display:grid;place-items:center;' +
+        'overflow:hidden;background:' + (t.accent || '#9334EB') + ';color:#fff;font-size:11px;font-weight:700;}' +
+      '.go{width:34px;height:34px;border-radius:999px;flex:none;display:grid;place-items:center;' +
+        'background:' + ink + ';color:' + (light ? '#f5f4f1' : '#141413') + ';font-size:15px;}' +
+      '.chips{display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap;}' +
+      '.chip{font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;' +
+        'border:1px solid ' + edge + ';background:' + fill + ';color:' + ink + ';' +
+        'min-height:32px;display:inline-flex;align-items:center;}' +
+      '@media (max-width:639px){.chip{min-height:44px;}.pill{min-height:52px;}}' +
+      '@media (prefers-reduced-motion:reduce){.pill{transition:none;}}';
+  }
+
+  function inlinePillHtml() {
+    var ph = (INLINE.banner && INLINE.banner.headline) || config.placeholder;
+    return '<div class="pill" id="ibot-inline-pill" role="button" tabindex="0" ' +
+      'aria-label="' + escapeHtml(ph) + '">' +
+      '<span class="av">' + avatarHtml(28) + '</span>' +
+      '<span class="ph">' + escapeHtml(ph) + '</span>' +
+      '<span class="go" aria-hidden="true">&#8593;</span>' +
+      '</div>';
+  }
+
   function renderInline() {
-    if (!inlineRoot) return;
-    inlineRoot.innerHTML = '';
+    if (!inlineRoot || !INLINE) return;
+
+    var chips = '';
+    if (INLINE.preset === 'hero') {
+      var items = (INLINE.banner && INLINE.banner.starters && INLINE.banner.starters.items) || [];
+      var budget = inlineChipCount();
+      var shown = items.slice(0, budget);
+      if (shown.length) {
+        chips = '<div class="chips">';
+        for (var i = 0; i < shown.length; i++) {
+          chips += '<button type="button" class="chip" data-inline-chip="' + i + '">' +
+            escapeHtml(shown[i]) + '</button>';
+        }
+        chips += '</div>';
+      }
+    }
+
+    inlineRoot.innerHTML =
+      '<style>' + inlineStylesCss() + '</style>' +
+      '<div class="wrap"><div class="pane">' + inlinePillHtml() + chips + '</div></div>';
   }
 
   // The bubble and the inline mount are the same conversation; showing both at
