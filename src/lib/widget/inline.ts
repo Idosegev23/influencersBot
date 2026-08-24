@@ -8,6 +8,8 @@
  * value can never reach a customer's DOM.
  */
 
+import { resolveBanner, type BannerContext, type ResolvedBanner } from './banner';
+
 export type InlineEnabled = true | 'preview';
 export type InlineMountMode = 'into' | 'replace' | 'overlay';
 export type InlinePreset = 'hero' | 'bar';
@@ -104,4 +106,23 @@ export function resolveInlineMount(config: any): ResolvedInlineMount | null {
     },
     bubble: oneOf(raw.bubble, BUBBLES, 'after-scroll'),
   };
+}
+
+export interface InlinePayload extends ResolvedInlineMount {
+  /** null when the account has no banner copy — the host page supplies the headline. */
+  banner: ResolvedBanner | null;
+}
+
+/**
+ * What /api/widget/config sends to the browser for the inline surface: the
+ * mount, plus the banner resolved for it (art already forced to `host`).
+ */
+export function buildInlinePayload(
+  config: any,
+  ctx: BannerContext = {},
+  now: Date = new Date(),
+): InlinePayload | null {
+  const mount = resolveInlineMount(config);
+  if (!mount) return null;
+  return { ...mount, banner: resolveBanner(config, 'inline', ctx, now) };
 }

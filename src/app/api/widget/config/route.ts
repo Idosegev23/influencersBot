@@ -7,6 +7,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { signWidgetToken } from '@/lib/analytics/widget-token';
 import { resolveBanner, resolveInvitation } from '@/lib/widget/banner';
+import { buildInlinePayload } from '@/lib/widget/inline';
 import { demoAccessFromConfig } from '@/lib/demo/guard';
 import { recordInstallPing } from '@/lib/telemetry/install-ping';
 
@@ -120,6 +121,11 @@ export async function GET(req: NextRequest) {
       }
     });
 
+    // The inline surface. `null` for every account that has not opted in,
+    // which is all of them until a mount is configured — so the widget's
+    // behavior is unchanged by this field's mere presence.
+    const inline = buildInlinePayload(config, { brandName: config.display_name || config.username || null });
+
     return NextResponse.json(
       {
         language,
@@ -140,6 +146,9 @@ export async function GET(req: NextRequest) {
         // ladder (gradient from primaryColor, coverImage as art, copy caps)
         // lives in resolveBanner so widget.js and the chat page can't drift.
         banner: resolveBanner(config, 'widget', { brandName: config.display_name || config.username }),
+        // The inline surface (see `inline` above). Null keeps every account
+        // that has not opted in exactly as it was.
+        inline: inline,
         // The launcher's own copy. Separate from `tooltip` below, which is the
         // legacy string field the manage page writes; this one honours an
         // active promotion.
