@@ -30,8 +30,17 @@ describe('inline mount resolution', () => {
     });
     expect(w.inlineHost).toBeNull();
     expect(document.getElementById('ibot-trigger')).not.toBeNull();
+    // The report is deliberately held until the 5s late-mount deadline, so a
+    // hero that hydrates late is never reported as missing. It is waited out in
+    // real time rather than with fake timers: the timer is scheduled inside
+    // widget.js *during* the boot, so any fake-timer install would have to
+    // precede bootWidget — and the harness's own setTimeout wrapper is captured
+    // on the first boot of the file, which would then capture the fake one and
+    // corrupt every later test.
+    expect(w.reports.map((r) => r.type)).not.toContain('inline_mount_missing');
+    await new Promise((r) => setTimeout(r, 5200));
     expect(w.reports.map((r) => r.type)).toContain('inline_mount_missing');
-  });
+  }, 20000);
 
   it('hides the floating bubble while the inline mount is on screen', async () => {
     await bootWidget({ html: HERO, config: { inline: MOUNT } });
@@ -107,7 +116,12 @@ describe('inline mount resolution', () => {
 
     expect(document.querySelector('[data-bestie-inline]')).not.toBeNull();
     expect(document.querySelector('[data-bestie-inline]')!.parentElement).toBe(hero);
-  });
+    // A mount that succeeded must never have been reported as missing — and the
+    // deadline must stay stood down now that we have settled.
+    expect(w.reports.map((r) => r.type)).not.toContain('inline_mount_missing');
+    await new Promise((r) => setTimeout(r, 5200));
+    expect(w.reports.map((r) => r.type)).not.toContain('inline_mount_missing');
+  }, 20000);
 
   it('reserves height from the desktop budget above 640px', async () => {
     const w = await bootWidget({
@@ -125,5 +139,34 @@ describe('inline mount resolution', () => {
       config: { inline: { ...MOUNT, reserve: { desktop: 220, mobile: 300 } } },
     });
     expect(w.inlineHost!.style.minHeight).toBe('300px');
+  });
+
+  it('does not mount at all when the account kill switch is off', async () => {
+    const w = await bootWidget({ html: HERO, config: { enabled: false, inline: MOUNT } });
+    const target = document.querySelector('.content_home-c-hero') as HTMLElement;
+    expect(w.inlineHost).toBeNull();
+    expect(target).not.toBeNull();
+    expect(target.children.length).toBe(1);          // just the <h1>
+    expect(target.getAttribute('style')).toBeNull();
+  });
+
+  it('does not delete the hero in `replace` mode when the account is off', async () => {
+    const w = await bootWidget({
+      html: HERO,
+      config: { enabled: false, inline: { ...MOUNT, mode: 'replace' } },
+    });
+    expect(document.querySelector('.content_home-c-hero')).not.toBeNull();
+    expect(w.inlineHost).toBeNull();
+  });
+
+  it('never mounts twice when a superseded copy of the widget is still watching', async () => {
+    // Boot A misses and leaves its MutationObserver watching the document.
+    await bootWidget({ html: '<section id="late"></section>', config: { inline: MOUNT } });
+    // Boot B claims the surface and mounts synchronously. Writing B's page also
+    // wakes A's observer, which now resolves the same hero.
+    const w = await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.querySelectorAll('[data-bestie-inline]').length).toBe(1);
+    expect(document.querySelector('[data-bestie-inline]')).toBe(w.inlineHost);
   });
 });

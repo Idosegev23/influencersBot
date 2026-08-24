@@ -1248,7 +1248,12 @@
       updateContainerPosition();
       // After updateContainerPosition(), which rewrites container.style.cssText
       // wholesale and would wipe the display:none the inline mount may set.
-      if (data.inline && data.inline.selector) {
+      // config.enabled is the account kill switch (set 25 lines up, honoured by
+      // render()). It has to gate the inline mount too: the server emits
+      // `inline` and `enabled` independently, so a switched-off account with a
+      // configured mount would otherwise still have us write into their page —
+      // and in `replace` mode that means deleting their hero element.
+      if (config.enabled !== false && data.inline && data.inline.selector) {
         INLINE = data.inline;
         try { setupInline(); } catch (e) { report('inline_setup_failed', e); }
       }
@@ -1566,53 +1571,76 @@
     }
   }
 
+  // One inline mount per page, enforced across separate copies of widget.js.
+  // A customer who pastes the embed into BOTH <head> and the body — a common
+  // builder mistake — would otherwise get two invitations in the same hero.
+  // First copy to get here owns the surface; every later copy stands down
+  // before it resolves anything. `ownsInlineSurface` is re-checked inside
+  // mountInline because the deferred paths (MutationObserver, late mount) can
+  // fire long after ownership was decided.
+  var inlineToken = {};
+  var inlineLatched = false;   // did we actually manage to write the shared latch?
+
+  function claimInlineSurface() {
+    try {
+      if (window.__ibotInlineGen) return false;
+      window.__ibotInlineGen = inlineToken;
+      inlineLatched = true;
+    } catch (e) { /* no shared latch reachable — behave as the only copy */ }
+    return true;
+  }
+
+  function ownsInlineSurface() {
+    // Never latched (a locked-down window) means there is nothing to lose the
+    // claim to. Latched-but-no-longer-ours means another copy superseded us,
+    // and we must not paint a second invitation into the page.
+    if (!inlineLatched) return true;
+    try { return window.__ibotInlineGen === inlineToken; } catch (e) { return true; }
+  }
+
   function setupInline() {
-    // One mount per page. A customer who pastes the embed twice (head AND body
-    // is a common builder mistake) would otherwise get two invitations in the
-    // hero; the newest boot wins and every earlier one stands down.
-    var gen = {};
-    try { window.__ibotInlineGen = gen; } catch (e) { /* */ }
-    function current() {
-      try { return window.__ibotInlineGen === gen; } catch (e) { return true; }
-    }
+    if (!claimInlineSurface()) return;
 
     var target = resolveInlineTarget();
     if (target) { mountInline(target); return; }
 
-    // Missing right now. Report immediately — the visitor is looking at the
-    // fallback bubble at this instant, and a selector the customer's theme
-    // renamed must never fail quietly.
-    report('inline_mount_missing', { message: INLINE.selector });
-
-    // But it may simply not exist YET — SPA routing, lazy hydration, a builder
-    // that paints the hero after first paint. Watch briefly and mount late if
-    // it turns up.
+    // Not there right now — but that is not the same as absent. SPA routing,
+    // lazy hydration, and head-embedded scripts on builders that paint the hero
+    // after first paint all land here on a page where the mount then succeeds.
+    // So: watch briefly, mount late if it turns up, and only report as missing
+    // once the deadline passes with nothing found. Reporting on entry would
+    // make a hero that hydrates 200ms late indistinguishable from a selector
+    // the customer's theme renamed.
     var settled = false;
     var mo = null;
     function stop() {
       settled = true;
       try { if (mo) mo.disconnect(); } catch (e) { /* */ }
     }
-    if (!window.MutationObserver) return;
-    mo = new MutationObserver(function () {
-      try {
-        if (settled) return;
-        if (!current()) { stop(); return; }
-        var el = resolveInlineTarget();
-        if (!el) return;
-        stop();
-        mountInline(el);
-      } catch (e) { stop(); report('inline_setup_failed', e); }
-    });
-    try { mo.observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { /* */ }
+    if (window.MutationObserver) {
+      mo = new MutationObserver(function () {
+        try {
+          if (settled) return;
+          if (!ownsInlineSurface()) { stop(); return; }
+          var el = resolveInlineTarget();
+          if (!el) return;
+          stop();
+          mountInline(el);
+        } catch (e) { stop(); report('inline_setup_failed', e); }
+      });
+      try { mo.observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { /* */ }
+    }
     setTimeout(function () {
       if (settled) return;
       stop();
       // Falls through to the floating bubble, which is already mounted.
+      report('inline_mount_missing', { message: INLINE.selector });
     }, 5000);
   }
 
   function mountInline(target) {
+    // Covers both the synchronous path and every deferred one.
+    if (!ownsInlineSurface()) return;
     inlineHost = document.createElement('div');
     inlineHost.setAttribute('data-bestie-inline', INLINE.preset || 'hero');
     // The host box carries no font-family of its own: inherited properties
