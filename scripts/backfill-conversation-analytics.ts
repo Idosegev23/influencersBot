@@ -100,9 +100,15 @@ async function main() {
 
     console.log(
       `clustering pass ${pass}: aliases=${c.matchedByAlias} clustered=${c.clustered} ` +
-      `new=${c.newTopics} remaining=${c.remaining}`
+      `new=${c.newTopics} rows still unlinked=${c.rowsRemaining}`
     );
-    if (!c.remaining) { console.log('clustering complete'); break; }
+    // Loop on rowsRemaining: `remaining` only describes the page just fetched,
+    // so it can rise between passes as the window slides and is not a finish line.
+    if (!c.rowsRemaining) { console.log('clustering complete'); break; }
+    if (!c.clustered && !c.matchedByAlias) {
+      console.log('no progress this pass — stopping rather than spinning');
+      break;
+    }
   }
 
   console.log('\nNext: hand-check ~20 classifications against the real conversations');

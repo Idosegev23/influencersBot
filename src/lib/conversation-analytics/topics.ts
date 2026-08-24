@@ -42,7 +42,10 @@ export function matchAlias(topics: TopicRow[], raw: string): string | null {
 
 export interface ClusterDeps {
   fetchTopics: (accountId: string) => Promise<TopicRow[]>;
+  /** A page of distinct unassigned raw topics — never the whole set. */
   fetchUnassignedRaw: (accountId: string) => Promise<string[]>;
+  /** Rows still lacking a topic across the whole account, for honest progress. */
+  countUnassignedRows: (accountId: string) => Promise<number>;
   callModel: (args: { existingLabels: string[]; rawTopics: string[] }) => Promise<{
     assignments: Array<{ raw: string; label: string }>;
   }>;
@@ -54,14 +57,24 @@ export async function clusterTopics(opts: {
   accountId: string;
   maxBatches?: number;
   deps?: Partial<ClusterDeps>;
-}): Promise<{ matchedByAlias: number; clustered: number; newTopics: number; remaining: number }> {
+}): Promise<{
+  matchedByAlias: number;
+  clustered: number;
+  newTopics: number;
+  /** Distinct raw topics left in THIS page — a window estimate, not a total. */
+  remaining: number;
+  /** Classification rows still without a topic, account-wide. This is the number to loop on. */
+  rowsRemaining: number;
+}> {
   const deps: ClusterDeps = { ...defaultDeps(), ...(opts.deps || {}) } as ClusterDeps;
   const { accountId } = opts;
 
   const maxBatches = opts.maxBatches ?? MAX_BATCHES_PER_RUN;
 
   const raws = await deps.fetchUnassignedRaw(accountId);
-  if (!raws.length) return { matchedByAlias: 0, clustered: 0, newTopics: 0, remaining: 0 };
+  if (!raws.length) {
+    return { matchedByAlias: 0, clustered: 0, newTopics: 0, remaining: 0, rowsRemaining: 0 };
+  }
 
   const topics = await deps.fetchTopics(accountId);
   const known = new Set(topics.map((t) => t.label));
@@ -79,7 +92,12 @@ export async function clusterTopics(opts: {
     }
   }
 
-  if (!unseen.length) return { matchedByAlias, clustered: 0, newTopics: 0, remaining: 0 };
+  if (!unseen.length) {
+    return {
+      matchedByAlias, clustered: 0, newTopics: 0, remaining: 0,
+      rowsRemaining: await deps.countUnassignedRows(accountId),
+    };
+  }
 
   let clustered = 0;
   let newTopics = 0;
@@ -114,7 +132,10 @@ export async function clusterTopics(opts: {
     }
   }
 
-  return { matchedByAlias, clustered, newTopics, remaining };
+  return {
+    matchedByAlias, clustered, newTopics, remaining,
+    rowsRemaining: await deps.countUnassignedRows(accountId),
+  };
 }
 
 function defaultDeps(): ClusterDeps {
@@ -128,6 +149,16 @@ function defaultDeps(): ClusterDeps {
         .select('id, label, aliases')
         .eq('account_id', accountId);
       return (data || []).map((t: any) => ({ id: t.id, label: t.label, aliases: t.aliases || [] }));
+    },
+
+    async countUnassignedRows(accountId) {
+      const { count } = await supabase
+        .from('conversation_classifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+        .is('topic_id', null)
+        .not('topic_raw', 'is', null);
+      return count || 0;
     },
 
     async fetchUnassignedRaw(accountId) {

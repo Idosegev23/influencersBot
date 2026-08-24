@@ -30,6 +30,7 @@ describe('clusterTopics', () => {
       accountId: 'a1',
       deps: {
         fetchTopics: async () => TOPICS,
+        countUnassignedRows: async () => 0,
         fetchUnassignedRaw: async () => ['נשירת שיער', 'שיער נושר'],
         callModel,
         upsertTopic: vi.fn(async () => 't1'),
@@ -54,6 +55,7 @@ describe('clusterTopics', () => {
       accountId: 'a1',
       deps: {
         fetchTopics: async () => TOPICS,
+        countUnassignedRows: async () => 0,
         fetchUnassignedRaw: async () => ['נשירת שיער', 'התקרחות'],
         callModel,
         upsertTopic,
@@ -80,6 +82,7 @@ describe('clusterTopics', () => {
       accountId: 'a1',
       deps: {
         fetchTopics: async () => [],
+        countUnassignedRows: async () => 0,
         fetchUnassignedRaw: async () => many,
         callModel,
         upsertTopic: vi.fn(async () => 't1'),
@@ -107,6 +110,7 @@ describe('clusterTopics', () => {
       accountId: 'a1',
       deps: {
         fetchTopics: async () => [],
+        countUnassignedRows: async () => 0,
         fetchUnassignedRaw: async () => many,
         callModel,
         upsertTopic: vi.fn(async () => 't1'),
@@ -128,6 +132,7 @@ describe('clusterTopics', () => {
       accountId: 'a1',
       deps: {
         fetchTopics: async () => [],
+        countUnassignedRows: async () => 0,
         fetchUnassignedRaw: async () => many,
         callModel,
         upsertTopic: vi.fn(async () => 't1'),
@@ -152,6 +157,7 @@ describe('clusterTopics', () => {
       maxBatches: 2,
       deps: {
         fetchTopics: async () => [],
+        countUnassignedRows: async () => 0,
         fetchUnassignedRaw: async () => many,
         callModel,
         upsertTopic: vi.fn(async () => 't1'),
@@ -171,6 +177,7 @@ describe('clusterTopics', () => {
       maxBatches: 6,
       deps: {
         fetchTopics: async () => [],
+        countUnassignedRows: async () => 0,
         fetchUnassignedRaw: async () => few,
         callModel: vi.fn(async (a: any) => ({ assignments: a.rawTopics.map((raw: string) => ({ raw, label: raw })) })),
         upsertTopic: vi.fn(async () => 't1'),
@@ -186,6 +193,7 @@ describe('clusterTopics', () => {
       accountId: 'a1',
       deps: {
         fetchTopics: async () => TOPICS,
+        countUnassignedRows: async () => 0,
         fetchUnassignedRaw: async () => [],
         callModel,
         upsertTopic: vi.fn(),
@@ -193,6 +201,6 @@ describe('clusterTopics', () => {
       },
     });
     expect(callModel).not.toHaveBeenCalled();
-    expect(res).toEqual({ matchedByAlias: 0, clustered: 0, newTopics: 0, remaining: 0 });
+    expect(res).toEqual({ matchedByAlias: 0, clustered: 0, newTopics: 0, remaining: 0, rowsRemaining: 0 });
   });
 });
