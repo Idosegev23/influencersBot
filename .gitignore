@@ -55,3 +55,6 @@ scripts/.dekel-cache/
 
 # Besty sales/brand decks — AI slides, screenshots, PDFs (heavy, local-only; never deploy to Vercel)
 /besty-deck/
+
+# Superpowers scratch (brainstorm mockups, SDD ledgers)
+.superpowers/
