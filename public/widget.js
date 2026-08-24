@@ -141,6 +141,11 @@
   // changes innerHeight, not innerWidth, but any height-only resize would still
   // reach this check).
   var inlineLastChipBudget = null;
+  // Set the instant a visitor engages from the inline surface, to the customer's
+  // own body.style.overflow value at that moment; null the rest of the time.
+  // restoreAfterInline() uses "not null" as its own re-entrancy guard, so it must
+  // be cleared (not just restored) once consumed.
+  var inlineScrollLock = null;
 
   // ---- View state (Phase: concierge) ----
   // The widget is no longer a chat-only surface. `view` switches the panel
@@ -1076,6 +1081,17 @@
     styleEl.textContent =
       vars +
       '@keyframes ibot-slide-up{from{opacity:0;transform:translateY(20px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}' +
+      // A panel opened from the inline surface grows out of the box the
+      // visitor clicked (--ibot-origin-x/-y, set by openFromInline) instead of
+      // sliding up from the launcher corner — the resting invitation and the
+      // conversation it opens must read as the same object. openFromInline()
+      // also forces panelPainted=true before this markup is built, so no
+      // competing `animation:ibot-slide-up` ends up in the SAME inline style
+      // attribute (which would otherwise win over this stylesheet rule).
+      '#ibot-widget-container #ibot-panel[data-from-inline]{transform-origin:var(--ibot-origin-x) var(--ibot-origin-y);' +
+        'animation:ibot-inline-grow 0.26s cubic-bezier(.16,1,.3,1);}' +
+      '@keyframes ibot-inline-grow{from{opacity:0;transform:scale(0.94);}to{opacity:1;transform:scale(1);}}' +
+      '@media (prefers-reduced-motion:reduce){#ibot-widget-container #ibot-panel[data-from-inline]{animation:none;}}' +
       // Rises from the launcher rather than fading in place, so the bubble
       // reads as something the button said.
       '@keyframes ibot-teaser-in{from{opacity:0;transform:translateY(12px) scale(0.94);}to{opacity:1;transform:translateY(0) scale(1);}}' +
@@ -1578,6 +1594,20 @@
     });
   }
 
+  // Escape closes the panel — but only the session the inline surface opened.
+  // The floating bubble's own open/close already has no Escape-to-close today,
+  // and adding one for it is outside this task's scope; `inlineScrollLock` (set
+  // only by openFromInline, cleared only by restoreAfterInline) is the signal
+  // that this particular open came from the inline pill/chip.
+  if (!window.__ibotInlineEscBound) {
+    window.__ibotInlineEscBound = true;
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' && e.key !== 'Esc') return;
+      if (!isOpen || inlineScrollLock === null) return;
+      try { closeWidget(); } catch (err) { /* never break the host page */ }
+    });
+  }
+
   function updateContainerPosition() {
     container.style.cssText = 'position:fixed;z-index:2147483647;' +
       (config.position === 'bottom-left'
@@ -1705,16 +1735,46 @@
     }
 
     inlineRoot = inlineHost.attachShadow({ mode: 'open' });
-    // IMPORTANT for whoever attaches the open handler (Task 7): renderInline()
-    // replaces inlineRoot.innerHTML wholesale, and the resize listener above
-    // can call it again after a chip-budget-crossing resize. A listener bound
-    // directly to the #ibot-inline-pill element (or a chip) will be silently
-    // detached the next time that happens. Bind ONE delegated listener on
-    // inlineRoot itself instead — e.g. inlineRoot.addEventListener('click',
-    // function (e) { if (e.target.closest('#ibot-inline-pill')) { ... } }) —
-    // registered once here or in renderInline(), never re-registered per pill.
+    // Task 7: renderInline() replaces inlineRoot.innerHTML wholesale, and the
+    // resize listener above can call it again after a chip-budget-crossing
+    // resize. A listener bound directly to #ibot-inline-pill (or a chip) would
+    // be silently detached the next time that happens. So there is exactly ONE
+    // delegated listener per event type, bound to inlineRoot itself — which is
+    // never replaced, only its innerHTML — registered here, once, and never
+    // re-registered by renderInline().
+    bindInlineDelegatedHandlers();
     renderInline();                 // Task 6 supplies this
     watchInlineVisibility(target);
+  }
+
+  // The one click listener and the one keydown listener for the entire inline
+  // surface, for the lifetime of the mount. Delegation (rather than binding to
+  // #ibot-inline-pill / each [data-inline-chip] directly) is what survives
+  // renderInline() rebuilding the shadow root's innerHTML on a resize — see the
+  // comment above this call for why per-element handlers would go silently dead.
+  function bindInlineDelegatedHandlers() {
+    if (!inlineRoot) return;
+
+    function activate(el) {
+      var chip = el && el.closest ? el.closest('[data-inline-chip]') : null;
+      if (chip) { openFromInline(chip.textContent || ''); return; }
+      var pill = el && el.closest ? el.closest('#ibot-inline-pill') : null;
+      if (pill) openFromInline(null);
+    }
+
+    inlineRoot.addEventListener('click', function (e) {
+      try { activate(e.target); } catch (err) { report('inline_open_failed', err); }
+    });
+    inlineRoot.addEventListener('keydown', function (e) {
+      try {
+        if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+        var el = e.target;
+        var hit = (el && el.closest) ? (el.closest('#ibot-inline-pill') || el.closest('[data-inline-chip]')) : null;
+        if (!hit) return;
+        e.preventDefault();
+        activate(el);
+      } catch (err) { report('inline_open_failed', err); }
+    });
   }
 
   // How many starter chips fit without pushing the pill below the fold. Mirrors
@@ -2292,10 +2352,103 @@
     attachSheetBehaviors();
   }
 
+  // Where the panel should appear to grow from. The inline pill is centred in
+  // the customer's hero, so the panel scales out of it — a corner pop would
+  // read as a different, unrelated component that has nothing to do with what
+  // the visitor just clicked.
+  function inlineOriginRect() {
+    if (!inlineHost) return null;
+    try { return inlineHost.getBoundingClientRect(); } catch (e) { return null; }
+  }
+
+  // Engaging from the inline surface: opens the SAME conversation (existing
+  // sessionId/messages — no new session state) in the floating panel, which is
+  // what actually renders the overlay. The inline surface itself never grows in
+  // place; it hands off to the panel and gets out of the way.
+  function openFromInline(prefill) {
+    try {
+      isOpen = true;
+      inputTouched = false;
+      widgetTrack('widget_opened', { surface: 'inline' });
+      trackBannerViewed();
+
+      // Lock the page behind the overlay, remembering exactly what we replaced
+      // so restoreAfterInline() puts back the customer's own value rather than
+      // clearing it. inlineScrollLock !== null is also this open's signature —
+      // it is how the Escape handler and restoreAfterInline() know this session
+      // was opened from the inline surface rather than the floating bubble.
+      inlineScrollLock = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+
+      // The floating panel is where the overlay actually lives — the resize
+      // listener's inline-surface bookkeeping (and, on the 'never'/'after-scroll'
+      // bubble modes, its own earlier logic) may have hidden this container.
+      container.style.display = '';
+
+      // panelStyle's slide-up entrance animation only plays when !panelPainted.
+      // Forcing it true here means renderOpen() emits no competing `animation`
+      // inline style, so the grow-from-origin keyframe below (added to the
+      // stylesheet, lower specificity than an inline style) is free to run
+      // instead of losing to ibot-slide-up. (Deviation from the brief, which
+      // did not address this collision — see the task report.)
+      panelPainted = true;
+      render();
+
+      var panel = document.getElementById('ibot-panel');
+      var rect = inlineOriginRect();
+      if (panel && rect) {
+        panel.style.setProperty('--ibot-origin-x', Math.round(rect.left + rect.width / 2) + 'px');
+        panel.style.setProperty('--ibot-origin-y', Math.round(rect.top + rect.height / 2) + 'px');
+        panel.setAttribute('data-from-inline', '1');
+      }
+
+      if (prefill) {
+        // Grab the composer structurally — its id has changed before, and a
+        // chip click's prefill silently becoming a no-op is exactly the kind of
+        // failure that must not happen without at least a diagnostic.
+        var input = container.querySelector('input,textarea');
+        if (input) { input.value = prefill; input.focus(); }
+        else report('inline_prefill_no_composer', { message: 'composer not found' });
+      }
+    } catch (e) {
+      report('inline_open_failed', e);
+    }
+  }
+
+  // Close returns the page and the focus to where the visitor left them. Runs
+  // even when this open did NOT come from the inline surface (inlineScrollLock
+  // stays null, so the body/pop-focus/bubble work below is a no-op) — closeWidget()
+  // is the one shared close path for every entry point.
+  function restoreAfterInline() {
+    if (inlineScrollLock === null) return;
+    document.body.style.overflow = inlineScrollLock;
+    inlineScrollLock = null;
+
+    var pill = inlineRoot && inlineRoot.getElementById('ibot-inline-pill');
+    if (pill) { try { pill.focus(); } catch (e) { /* */ } }
+
+    // Undo the open-time `container.style.display = ''` override so the bubble
+    // goes back to whatever its own bubble mode implies, rather than staying
+    // forced visible forever after the first inline-triggered open. This is the
+    // "natural owner" call site flagged for watchInlineVisibility's apply(): it
+    // is deliberately NOT re-invoking that closure (apply()'s onScreen-driven
+    // formula is only correct for 'after-scroll' — feeding it a bubble mode of
+    // 'never' would make it show the bubble again the moment the mount scrolls
+    // off-screen, which is exactly what 'never' promises will not happen).
+    // 'always' needs no action: watchInlineVisibility() returns before ever
+    // touching container.style.display for that mode, so the container was
+    // already visible the whole time.
+    if (INLINE) {
+      if (INLINE.bubble === 'never') container.style.display = 'none';
+      else if (INLINE.bubble === 'after-scroll' && inlineVisible) container.style.display = 'none';
+    }
+  }
+
   // Shared close: used by the backdrop tap (and available to later tasks'
   // drag/keyboard-close behaviors). Mirrors the inline isOpen/track/render
   // sequence the close buttons already use.
   function closeWidget() {
+    restoreAfterInline();
     isOpen = false;
     view = 'chat';
     widgetTrack('widget_closed', { msg_count: messages.length });
@@ -2646,24 +2799,20 @@
     if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
 
     // Event listeners
+    // Both routed through the shared closeWidget() (not a duplicated
+    // isOpen/track/render sequence) so restoreAfterInline() always runs — a
+    // session opened from the inline surface must unlock scroll and return
+    // focus no matter which of the two close buttons the visitor uses.
     var closeEl = document.getElementById('ibot-close');
     if (closeEl) {
-      closeEl.onclick = function () {
-        isOpen = false;
-        widgetTrack('widget_closed', { msg_count: messages.length });
-        render();
-      };
+      closeEl.onclick = closeWidget;
       closeEl.onmouseover = function () { this.style.transform = 'scale(1.08)'; };
       closeEl.onmouseout = function () { this.style.transform = 'scale(1)'; };
     }
 
     var closeMobileEl = document.getElementById('ibot-close-mobile');
     if (closeMobileEl) {
-      closeMobileEl.onclick = function () {
-        isOpen = false;
-        widgetTrack('widget_closed', { msg_count: messages.length });
-        render();
-      };
+      closeMobileEl.onclick = closeWidget;
       closeMobileEl.onmouseover = function () { this.style.background = 'rgba(255,255,255,0.25)'; };
       closeMobileEl.onmouseout = function () { this.style.background = 'rgba(255,255,255,0.15)'; };
     }
@@ -3641,7 +3790,11 @@
     var sub = document.getElementById('ibot-sf-submit');
     if (sub) sub.onclick = submitSupportTicket;
     var closeBtn = document.getElementById('ibot-close');
-    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+    // closeWidget() (not a duplicated isOpen/view/render sequence): whatever
+    // opened this session — including the inline surface — needs its
+    // restoreAfterInline() cleanup (scroll unlock, focus return) to run no
+    // matter which view the visitor closes from.
+    if (closeBtn) closeBtn.onclick = closeWidget;
     // File picker — uploads on selection so the visitor sees ✓ before submitting.
     var fileInput = document.getElementById('ibot-sf-file');
     if (fileInput) {
@@ -3710,7 +3863,11 @@
     var back = document.getElementById('ibot-ss-back');
     if (back) back.onclick = closeSupportForm;
     var closeBtn = document.getElementById('ibot-close');
-    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+    // closeWidget() (not a duplicated isOpen/view/render sequence): whatever
+    // opened this session — including the inline surface — needs its
+    // restoreAfterInline() cleanup (scroll unlock, focus return) to run no
+    // matter which view the visitor closes from.
+    if (closeBtn) closeBtn.onclick = closeWidget;
   }
 
   // Inline action card — rendered inside the chat after the bot proposes
@@ -4101,7 +4258,11 @@
     var back = document.getElementById('ibot-form-back');
     if (back) back.onclick = function () { view = 'chat'; render(); };
     var closeBtn = document.getElementById('ibot-close');
-    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+    // closeWidget() (not a duplicated isOpen/view/render sequence): whatever
+    // opened this session — including the inline surface — needs its
+    // restoreAfterInline() cleanup (scroll unlock, focus return) to run no
+    // matter which view the visitor closes from.
+    if (closeBtn) closeBtn.onclick = closeWidget;
   }
 
   // ============================================
@@ -4420,7 +4581,11 @@
     var back = document.getElementById('ibot-gs-back');
     if (back) back.onclick = function () { view = 'chat'; render(); };
     var closeBtn = document.getElementById('ibot-close');
-    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+    // closeWidget() (not a duplicated isOpen/view/render sequence): whatever
+    // opened this session — including the inline surface — needs its
+    // restoreAfterInline() cleanup (scroll unlock, focus return) to run no
+    // matter which view the visitor closes from.
+    if (closeBtn) closeBtn.onclick = closeWidget;
   }
 
   // ============================================
