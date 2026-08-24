@@ -90,23 +90,46 @@ function findWidgetJs(): string {
 let widgetSource: string | null = null;
 
 /**
- * Listener isolation between boots.
+ * Teardown between boots — listeners and timers.
  *
  * Every global listener widget.js installs goes on `window` or `document`
  * (error, unhandledrejection, message, scroll, click, visibilitychange,
  * pagehide, mouseout, mouseleave, keydown, DOMContentLoaded). A test file boots
  * many times into one jsdom window, so without this every previous boot's copy
  * of widget.js stays live and reacts to the current boot's events — three boots
- * turned one dispatched `error` into three diagnostics reports. We record what
- * gets attached and detach it at the start of the next boot.
+ * turned one dispatched `error` into three diagnostics reports.
+ *
+ * Timers are the same hazard on a delay. Each boot unconditionally schedules
+ * `setTimeout(showBubbleTooltip, 2500)` (widget.js:1262) and, via
+ * initCartWatcher, a `setInterval(…, 2000)` (widget.js:3123). Every guard in
+ * showBubbleTooltip passes here — `locale.teaser.generic` is non-empty, isOpen
+ * is false, and tooltipSeen() reads the localStorage mock from tests/setup.ts,
+ * which returns undefined — so it reaches `document.body.appendChild(#ibot-tip)`
+ * against whatever page is current 2.5s later. That lands nondeterministically
+ * on whether a file's runtime crosses 2.5s past its first boot.
+ *
+ * NOTE ON SCOPE: the addEventListener patch is unconditional, so a listener a
+ * *test* attaches to window/document between boots is also detached at the next
+ * boot. That is intentional isolation, not an oversight. Timer recording is
+ * narrower — only timers scheduled inside the boot window (see `recordingTimers`)
+ * are tracked, deliberately, so the harness never cancels a vitest-internal
+ * timer such as a test-timeout scheduled between boots.
  */
 type Attached = { target: EventTarget; type: string; fn: any; opts: any };
 let attached: Attached[] = [];
-let listenersPatched = false;
+let patched = false;
 
-function patchListeners() {
-  if (listenersPatched) return;
-  listenersPatched = true;
+/** Timers scheduled while a boot was in flight, cleared at the next boot. */
+let bootTimers: Array<{ id: any; kind: 'timeout' | 'interval' }> = [];
+let recordingTimers = false;
+
+/** Captured before patching, so the harness's own ticks are never recorded. */
+const rawSetTimeout: typeof window.setTimeout = window.setTimeout.bind(window);
+
+function patchGlobals() {
+  if (patched) return;
+  patched = true;
+
   for (const target of [window, document] as EventTarget[]) {
     const original = target.addEventListener.bind(target);
     (target as any).addEventListener = function (type: string, fn: any, options?: any) {
@@ -114,6 +137,19 @@ function patchListeners() {
       return original(type, fn, options);
     };
   }
+
+  const origSetTimeout = window.setTimeout.bind(window);
+  const origSetInterval = window.setInterval.bind(window);
+  (window as any).setTimeout = function (fn: any, ms?: any, ...rest: any[]) {
+    const id = origSetTimeout(fn, ms, ...rest);
+    if (recordingTimers) bootTimers.push({ id, kind: 'timeout' });
+    return id;
+  };
+  (window as any).setInterval = function (fn: any, ms?: any, ...rest: any[]) {
+    const id = origSetInterval(fn, ms, ...rest);
+    if (recordingTimers) bootTimers.push({ id, kind: 'interval' });
+    return id;
+  };
 }
 
 function detachPreviousBoot() {
@@ -121,6 +157,11 @@ function detachPreviousBoot() {
     try { a.target.removeEventListener(a.type, a.fn, a.opts); } catch { /* */ }
   }
   attached = [];
+
+  for (const t of bootTimers) {
+    try { t.kind === 'interval' ? clearInterval(t.id) : clearTimeout(t.id); } catch { /* */ }
+  }
+  bootTimers = [];
 }
 
 export async function bootWidget(opts: BootOptions = {}): Promise<BootedWidget> {
@@ -128,12 +169,21 @@ export async function bootWidget(opts: BootOptions = {}): Promise<BootedWidget> 
   const width = opts.viewportWidth ?? 1440;
   const reports: Array<{ type: string; message: string }> = [];
 
-  patchListeners();
+  patchGlobals();
   detachPreviousBoot();
+  recordingTimers = true;
 
   OBSERVERS.length = 0;
   document.head.innerHTML = '';
   document.body.innerHTML = opts.html || '';
+  // render()'s mobile scroll lock (widget.js:1948-1956) writes position/top/
+  // left/right/width onto body and overflow onto documentElement. Its restore
+  // branch is gated on window.__ibotScrollLocked, which the latch reset below
+  // deletes — so the restore can never run, and innerHTML clears children, not
+  // the element's own inline style. Any test that opens the widget under 640px
+  // would otherwise pin the body for every later boot in the file.
+  document.body.removeAttribute('style');
+  document.documentElement.removeAttribute('style');
   // widget.js sets one-shot latches on window (__ibotVVBound, __ibotScrollBound,
   // …) so its global listeners register once per page. A test file boots many
   // times into the same jsdom window; clearing them keeps each boot equivalent
@@ -237,10 +287,19 @@ export async function bootWidget(opts: BootOptions = {}): Promise<BootedWidget> 
   //      modules, updateContainerPosition, render — has run. A macrotask
   //      flushes the whole microtask queue, so one is enough for a plain
   //      promise chain; three leaves headroom for a chained setTimeout(0).
-  await waitFor(() => configConsumed || reports.length > 0);
+  // The second disjunct is the config-failure path specifically, not any
+  // diagnostic: widget.js's .catch reports `config_load_failed` and then
+  // renders defaults, which is a legitimately settled boot. Any other
+  // diagnostic type says nothing about whether config arrived.
+  await waitFor(
+    () => configConsumed || reports.some((r) => r.type === 'config_load_failed'),
+    'config never reached widget.js',
+  );
   await tick();
   await tick();
   await tick();
+
+  recordingTimers = false;
 
   return {
     container: document.getElementById('ibot-widget-container'),
@@ -249,15 +308,25 @@ export async function bootWidget(opts: BootOptions = {}): Promise<BootedWidget> 
   };
 }
 
-/** One macrotask — flushes the entire pending microtask queue with it. */
+/**
+ * One macrotask — flushes the entire pending microtask queue with it. Uses the
+ * pre-patch setTimeout so the harness's own ticks are never recorded as boot
+ * timers.
+ */
 function tick(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 0));
+  return new Promise((r) => rawSetTimeout(r, 0));
 }
 
-/** Drain macrotasks until `cond` holds, or give up after `tries` ticks. */
-async function waitFor(cond: () => boolean, tries = 50): Promise<void> {
+/**
+ * Drain macrotasks until `cond` holds. Throws on exhaustion rather than
+ * returning: the entire point of this wait is that a pre-config widget poisons
+ * downstream assertions silently, so the guard against it must not itself have
+ * a silent fallback into that state.
+ */
+async function waitFor(cond: () => boolean, what: string, tries = 50): Promise<void> {
   for (let i = 0; i < tries; i++) {
     if (cond()) return;
     await tick();
   }
+  throw new Error(`boot-widget: ${what} (gave up after ${tries} macrotask ticks)`);
 }
