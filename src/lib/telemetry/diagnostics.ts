@@ -7,7 +7,12 @@
  * values — can reach our database.
  */
 
-const DIAGNOSTIC_TYPES = new Set(['client_error', 'config_load_failed', 'csp_blocked']);
+const DIAGNOSTIC_TYPES = new Set([
+  'client_error', 'config_load_failed', 'csp_blocked',
+  // Inline-surface mount diagnostics (public/widget.js) — "mount failure is
+  // never silent" is a spec requirement; these four must stay allow-listed.
+  'inline_mount_missing', 'inline_render_failed', 'inline_selector_invalid', 'inline_setup_failed',
+]);
 const MAX_MESSAGE = 500;
 const MAX_STACK_FRAMES = 3;
 

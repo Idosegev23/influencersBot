@@ -57,17 +57,66 @@ describe('the inline resting state', () => {
   it('omits the headline when the host page already has one', async () => {
     // preset `hero` on LDRS sits under their own H1; ours would be a second one.
     await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    // Anchor on something actually rendering — an empty shadow root would also
+    // satisfy "no h2", which is exactly the no-op-stub state this must rule out.
+    expect(root().getElementById('ibot-inline-pill')).not.toBeNull();
     expect(root().querySelectorAll('h2')).toHaveLength(0);
   });
 
   it('draws no background of its own — art is host', async () => {
     await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    // Anchor on something actually rendering — same reasoning as above.
+    expect(root().getElementById('ibot-inline-pill')).not.toBeNull();
     expect(root().querySelector('video')).toBeNull();
     expect(root().innerHTML).not.toContain('background-image');
   });
 
   it('bar preset renders no chips', async () => {
     await bootWidget({ html: HERO, config: { inline: { ...MOUNT, preset: 'bar' } } });
+    // Anchor on something actually rendering — same reasoning as above.
+    expect(root().getElementById('ibot-inline-pill')).not.toBeNull();
     expect(root().querySelectorAll('[data-inline-chip]')).toHaveLength(0);
+  });
+
+  describe('glass surface — opaque fallback', () => {
+    it('falls back to a fully opaque panel, and resets both backdrop-filter prefixes, when transparency is unsupported or reduced', async () => {
+      await bootWidget({ html: HERO, config: { inline: { ...MOUNT, surface: 'glass' } } });
+      const css = root().querySelector('style')!.textContent!;
+      // Dark theme (MOUNT.theme.ground === 'dark') opaque fallback colour.
+      expect(css).toContain('#0c0c0e');
+      // Must not contain a translucent rgba(...) fallback — that was the bug:
+      // 6-10% of the host's video still bled through.
+      expect(css).not.toMatch(/rgba\(12,\s*12,\s*14,\s*0\.9/);
+      // Safari/WebKit only honours the prefixed property; the reduced-
+      // transparency override must reset both, not just the unprefixed one.
+      const reducedBlock = css.slice(css.indexOf('prefers-reduced-transparency'));
+      expect(reducedBlock).toContain('backdrop-filter:none');
+      expect(reducedBlock).toContain('-webkit-backdrop-filter:none');
+    });
+  });
+
+  describe('resize re-render', () => {
+    it('does not rebuild the shadow root when a resize does not cross a chip-budget breakpoint', async () => {
+      await bootWidget({ html: HERO, config: { inline: MOUNT }, viewportWidth: 1440 });
+      const pillBefore = root().getElementById('ibot-inline-pill');
+      // 1440 -> 1024 stays within the >=640 desktop bucket (budget still 3):
+      // a rebuild here would needlessly detach anything bound to the pill.
+      Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+      window.dispatchEvent(new Event('resize'));
+      await new Promise((r) => setTimeout(r, 250));
+      const pillAfter = root().getElementById('ibot-inline-pill');
+      expect(pillAfter).toBe(pillBefore);
+      expect(root().querySelectorAll('[data-inline-chip]')).toHaveLength(3);
+    });
+
+    it('does rebuild once a resize crosses a chip-budget breakpoint', async () => {
+      await bootWidget({ html: HERO, config: { inline: MOUNT }, viewportWidth: 1440 });
+      expect(root().querySelectorAll('[data-inline-chip]')).toHaveLength(3);
+      // 1440 -> 390 crosses into the phone bucket (budget 2).
+      Object.defineProperty(window, 'innerWidth', { value: 390, configurable: true });
+      window.dispatchEvent(new Event('resize'));
+      await new Promise((r) => setTimeout(r, 250));
+      expect(root().querySelectorAll('[data-inline-chip]')).toHaveLength(2);
+    });
   });
 });

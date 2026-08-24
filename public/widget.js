@@ -134,6 +134,13 @@
   var inlineHost = null;      // the <div> we create inside the customer's page
   var inlineRoot = null;      // its shadow root (Task 6)
   var inlineVisible = false;  // is the mount currently on screen?
+  // Chip budget as of the last renderInline() call. The resize listener uses
+  // this to skip rebuilding the shadow root's innerHTML — and thereby dropping
+  // any delegated listener bound to it — when a resize did not actually cross
+  // an inlineChipCount() breakpoint (e.g. iOS collapsing its URL bar mid-scroll
+  // changes innerHeight, not innerWidth, but any height-only resize would still
+  // reach this check).
+  var inlineLastChipBudget = null;
 
   // ---- View state (Phase: concierge) ----
   // The widget is no longer a chat-only surface. `view` switches the panel
@@ -1558,7 +1565,15 @@
       if (!inlineRoot) return;
       if (inlineResizeTimer) clearTimeout(inlineResizeTimer);
       inlineResizeTimer = setTimeout(function () {
-        try { renderInline(); } catch (e) { report('inline_render_failed', e); }
+        try {
+          // renderInline() replaces the shadow root's innerHTML wholesale —
+          // rebuilding on every resize (including height-only ones, e.g. iOS
+          // collapsing its URL bar mid-scroll) would drop any delegated
+          // listener needlessly. Only rebuild when the chip budget itself
+          // actually crossed a breakpoint.
+          if (inlineChipCount() === inlineLastChipBudget) return;
+          renderInline();
+        } catch (e) { report('inline_render_failed', e); }
       }, 150);
     });
   }
@@ -1690,6 +1705,14 @@
     }
 
     inlineRoot = inlineHost.attachShadow({ mode: 'open' });
+    // IMPORTANT for whoever attaches the open handler (Task 7): renderInline()
+    // replaces inlineRoot.innerHTML wholesale, and the resize listener above
+    // can call it again after a chip-budget-crossing resize. A listener bound
+    // directly to the #ibot-inline-pill element (or a chip) will be silently
+    // detached the next time that happens. Bind ONE delegated listener on
+    // inlineRoot itself instead — e.g. inlineRoot.addEventListener('click',
+    // function (e) { if (e.target.closest('#ibot-inline-pill')) { ... } }) —
+    // registered once here or in renderInline(), never re-registered per pill.
     renderInline();                 // Task 6 supplies this
     watchInlineVisibility(target);
   }
@@ -1731,15 +1754,22 @@
               'box-shadow:0 10px 30px rgba(0,0,0,0.18);'
             : '') + '}' +
       // No backdrop-filter support, or a visitor who asked for less
-      // transparency: fall back to an opaque panel rather than an unreadable one.
+      // transparency: fall back to a FULLY opaque panel — the host's
+      // autoplaying video must not bleed through at all, not just less.
+      // Reset BOTH the unprefixed and -webkit- prefixed property: Safari/
+      // WebKit only honours the prefixed one, so resetting just the
+      // unprefixed form leaves the blur active there.
       (glass
         ? '@supports not (backdrop-filter:blur(2px)){.pane{background:' +
-            (light ? 'rgba(245,244,241,0.94)' : 'rgba(12,12,14,0.9)') + ';}}' +
+            (light ? '#f5f4f1' : '#0c0c0e') + ';}}' +
           '@media (prefers-reduced-transparency:reduce){.pane{background:' +
-            (light ? 'rgba(245,244,241,0.96)' : 'rgba(12,12,14,0.94)') + ';backdrop-filter:none;}}'
+            (light ? '#f5f4f1' : '#0c0c0e') + ';backdrop-filter:none;-webkit-backdrop-filter:none;}}'
         : '') +
       '.pill{display:flex;align-items:center;gap:10px;width:100%;cursor:text;' +
-        'padding:12px 14px 12px 6px;border-radius:' + radius + 'px;' +
+        // Logical padding, not physical: the pilot is RTL, and physical
+        // left/right would put the 6px against the wrong side once direction
+        // flips (avatar should hug the leading edge, arrow the trailing one).
+        'padding:12px;padding-inline-start:6px;padding-inline-end:14px;border-radius:' + radius + 'px;' +
         'background:' + fill + ';border:1px solid ' + edge + ';color:' + ink + ';' +
         'transition:border-color .18s ease,transform .18s ease;}' +
       '.pill:hover,.pill:focus-visible{border-color:' + (light ? 'rgba(20,20,19,0.4)' : 'rgba(245,244,241,0.5)') + ';}' +
@@ -1771,10 +1801,12 @@
   function renderInline() {
     if (!inlineRoot || !INLINE) return;
 
+    var budget = inlineChipCount();
+    inlineLastChipBudget = budget;
+
     var chips = '';
     if (INLINE.preset === 'hero') {
       var items = (INLINE.banner && INLINE.banner.starters && INLINE.banner.starters.items) || [];
-      var budget = inlineChipCount();
       var shown = items.slice(0, budget);
       if (shown.length) {
         chips = '<div class="chips">';
