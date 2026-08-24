@@ -11,6 +11,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { buildProductIndex, type CatalogProduct, type ProductIndex } from './product-resolver';
+import { buildSeriesIndex, type SeriesIndex } from './series-resolver';
 import { classifySession, type ClassificationRow, type SessionForClassification } from './classify';
 import { callClassifyModel } from './openai-call';
 
@@ -28,7 +29,7 @@ export function channelOf(anonId: string | null | undefined): 'web' | 'whatsapp'
 export interface RunDeps {
   fetchPendingSessions: (accountId: string, sinceIso: string | undefined, limit: number) => Promise<SessionForClassification[]>;
   fetchCatalog: (accountId: string) => Promise<CatalogProduct[]>;
-  classify: (s: SessionForClassification, index: ProductIndex) => Promise<ClassificationRow>;
+  classify: (s: SessionForClassification, index: ProductIndex, seriesIndex: SeriesIndex) => Promise<ClassificationRow>;
   saveRows: (rows: ClassificationRow[]) => Promise<number>;
 }
 
@@ -48,7 +49,9 @@ export async function runClassification(opts: {
     return { classified: 0, skipped: 0, failed: 0, spentUsd: 0, stoppedOnBudget: false };
   }
 
-  const index = buildProductIndex(await deps.fetchCatalog(opts.accountId));
+  const catalog = await deps.fetchCatalog(opts.accountId);
+  const index = buildProductIndex(catalog);
+  const seriesIndex = buildSeriesIndex(catalog);
 
   const rows: ClassificationRow[] = [];
   let spentUsd = 0;
@@ -56,7 +59,7 @@ export async function runClassification(opts: {
 
   for (const s of sessions) {
     if (spentUsd >= budget) { stoppedOnBudget = true; break; }
-    const row = await deps.classify(s, index);
+    const row = await deps.classify(s, index, seriesIndex);
     spentUsd += row.cost_usd || 0;
     rows.push(row);
   }
@@ -121,13 +124,13 @@ function defaultDeps(): RunDeps {
     async fetchCatalog(accountId) {
       const { data } = await supabase
         .from('widget_products')
-        .select('id, name, name_he, slug, category')
+        .select('id, name, name_he, slug, category, product_line')
         .eq('account_id', accountId);
       return (data || []) as CatalogProduct[];
     },
 
-    classify(s, index) {
-      return classifySession(s, index, { callModel: callClassifyModel });
+    classify(s, index, seriesIndex) {
+      return classifySession(s, index, { callModel: callClassifyModel }, seriesIndex);
     },
 
     async saveRows(rows) {

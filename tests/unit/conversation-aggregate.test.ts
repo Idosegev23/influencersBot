@@ -15,6 +15,7 @@ const row = (o: Partial<ClassificationLite>): ClassificationLite => ({
   product_id: null,
   product_name: null,
   product_category: null,
+  product_line: null,
   keywords: [],
   status: 'ok',
   ...o,
@@ -102,6 +103,45 @@ describe('products', () => {
       connectedChannels: ['web'],
     });
     expect(r.products.byComplaintRate).toEqual([]);
+  });
+});
+
+describe('sample floor on rate rankings', () => {
+  // Real numbers from Argania: חומצה היאלורונית showed 40% on 10 mentions while
+  // סדרת קיק showed 6% on 509. Ranking purely by rate puts a ten-conversation
+  // sample above the flagship line and sends the brand chasing noise.
+  it('keeps a tiny sample from topping the complaint-rate ranking', () => {
+    const current = [
+      ...Array.from({ length: 2 }, () => row({ product_id: 'tiny', product_name: 'זעיר' })),
+      ...Array.from({ length: 2 }, () => row({ product_id: 'tiny', product_name: 'זעיר', is_complaint: true })),
+      ...Array.from({ length: 400 }, () => row({ product_id: 'big', product_name: 'גדול' })),
+      ...Array.from({ length: 100 }, () => row({ product_id: 'big', product_name: 'גדול', is_complaint: true })),
+    ];
+    const r = buildReport({ current, previous: [], connectedChannels: ['web'] });
+
+    // tiny is 50%, big is 20% — but tiny has 4 mentions and must not lead.
+    expect(r.products.byComplaintRate[0].productId).toBe('big');
+  });
+
+  it('still reports the small sample, just not as a ranked signal', () => {
+    const current = [
+      ...Array.from({ length: 2 }, () => row({ product_id: 'tiny', product_name: 'זעיר' })),
+      ...Array.from({ length: 2 }, () => row({ product_id: 'tiny', product_name: 'זעיר', is_complaint: true })),
+    ];
+    const r = buildReport({ current, previous: [], connectedChannels: ['web'] });
+    expect(r.products.byMentions.find((p) => p.productId === 'tiny')).toBeTruthy();
+    expect(r.products.byComplaintRate.find((p) => p.productId === 'tiny')?.belowSampleFloor).toBe(true);
+  });
+
+  it('applies the same floor to series', () => {
+    const current = [
+      ...Array.from({ length: 2 }, () => row({ product_line: 'קטנה' })),
+      ...Array.from({ length: 2 }, () => row({ product_line: 'קטנה', is_complaint: true })),
+      ...Array.from({ length: 400 }, () => row({ product_line: 'גדולה' })),
+      ...Array.from({ length: 100 }, () => row({ product_line: 'גדולה', is_complaint: true })),
+    ];
+    const r = buildReport({ current, previous: [], connectedChannels: ['web'] });
+    expect(r.series.byComplaintRate[0].line).toBe('גדולה');
   });
 });
 

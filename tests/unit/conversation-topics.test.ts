@@ -139,6 +139,47 @@ describe('clusterTopics', () => {
     expect(callModel.mock.calls[1][0].existingLabels).toContain('מאוחד');
   });
 
+  // Regression: 2,542 raw topics after the first retro meant 64 sequential
+  // model calls in one request, which died as FUNCTION_INVOCATION_TIMEOUT.
+  it('stops after its batch budget and reports what is left', async () => {
+    const many = Array.from({ length: 500 }, (_, i) => `נושא ${i}`);
+    const callModel = vi.fn(async (a: { existingLabels: string[]; rawTopics: string[] }) => ({
+      assignments: a.rawTopics.map((raw) => ({ raw, label: raw })),
+    }));
+
+    const res = await clusterTopics({
+      accountId: 'a1',
+      maxBatches: 2,
+      deps: {
+        fetchTopics: async () => [],
+        fetchUnassignedRaw: async () => many,
+        callModel,
+        upsertTopic: vi.fn(async () => 't1'),
+        assignTopicToRaw: vi.fn(async () => {}),
+      },
+    });
+
+    expect(callModel).toHaveBeenCalledTimes(2);
+    expect(res.clustered).toBe(80);
+    expect(res.remaining).toBe(420);
+  });
+
+  it('reports nothing remaining once it fits inside the budget', async () => {
+    const few = Array.from({ length: 10 }, (_, i) => `נושא ${i}`);
+    const res = await clusterTopics({
+      accountId: 'a1',
+      maxBatches: 6,
+      deps: {
+        fetchTopics: async () => [],
+        fetchUnassignedRaw: async () => few,
+        callModel: vi.fn(async (a: any) => ({ assignments: a.rawTopics.map((raw: string) => ({ raw, label: raw })) })),
+        upsertTopic: vi.fn(async () => 't1'),
+        assignTopicToRaw: vi.fn(async () => {}),
+      },
+    });
+    expect(res.remaining).toBe(0);
+  });
+
   it('does nothing when there is nothing unassigned', async () => {
     const callModel = vi.fn();
     const res = await clusterTopics({
@@ -152,6 +193,6 @@ describe('clusterTopics', () => {
       },
     });
     expect(callModel).not.toHaveBeenCalled();
-    expect(res).toEqual({ matchedByAlias: 0, clustered: 0, newTopics: 0 });
+    expect(res).toEqual({ matchedByAlias: 0, clustered: 0, newTopics: 0, remaining: 0 });
   });
 });

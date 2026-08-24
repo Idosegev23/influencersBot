@@ -11,7 +11,7 @@ import type { ClassificationLite } from './aggregate';
 /** Columns every surface needs, joined to the canonical topic and product name. */
 const SELECT =
   'session_id, channel, started_at, inquiry_type, topic_raw, is_complaint, complaint_kind, ' +
-  'sentiment, outcome, summary, product_id, product_category, keywords, status, ' +
+  'sentiment, outcome, summary, product_id, product_category, product_line, keywords, status, ' +
   'conversation_topics(label), widget_products(name_he, name)';
 
 export interface RowFilters {
@@ -48,6 +48,7 @@ export function toLite(r: any): ClassificationLite & { summary?: string | null }
     product_id: r.product_id,
     product_name: r.widget_products?.name_he || r.widget_products?.name || null,
     product_category: r.product_category,
+    product_line: r.product_line ?? null,
     keywords: r.keywords || [],
     status: r.status,
     summary: r.summary ?? null,

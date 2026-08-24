@@ -18,6 +18,14 @@ const CLUSTER_MODEL = 'gpt-5.6-luna';
  */
 const CLUSTER_BATCH = 40;
 
+/**
+ * Batches per invocation. A full backfill leaves thousands of raw topics —
+ * 2,542 after Argania's first retro, which is 64 sequential model calls and a
+ * guaranteed FUNCTION_INVOCATION_TIMEOUT inside one 300s request. The caller
+ * loops on `remaining` instead.
+ */
+const MAX_BATCHES_PER_RUN = 6;
+
 export interface TopicRow { id: string; label: string; aliases: string[] }
 
 const norm = (s: string) => s.trim().replace(/[\s ]+/g, ' ');
@@ -44,13 +52,16 @@ export interface ClusterDeps {
 
 export async function clusterTopics(opts: {
   accountId: string;
+  maxBatches?: number;
   deps?: Partial<ClusterDeps>;
-}): Promise<{ matchedByAlias: number; clustered: number; newTopics: number }> {
+}): Promise<{ matchedByAlias: number; clustered: number; newTopics: number; remaining: number }> {
   const deps: ClusterDeps = { ...defaultDeps(), ...(opts.deps || {}) } as ClusterDeps;
   const { accountId } = opts;
 
+  const maxBatches = opts.maxBatches ?? MAX_BATCHES_PER_RUN;
+
   const raws = await deps.fetchUnassignedRaw(accountId);
-  if (!raws.length) return { matchedByAlias: 0, clustered: 0, newTopics: 0 };
+  if (!raws.length) return { matchedByAlias: 0, clustered: 0, newTopics: 0, remaining: 0 };
 
   const topics = await deps.fetchTopics(accountId);
   const known = new Set(topics.map((t) => t.label));
@@ -68,13 +79,17 @@ export async function clusterTopics(opts: {
     }
   }
 
-  if (!unseen.length) return { matchedByAlias, clustered: 0, newTopics: 0 };
+  if (!unseen.length) return { matchedByAlias, clustered: 0, newTopics: 0, remaining: 0 };
 
   let clustered = 0;
   let newTopics = 0;
 
-  for (let i = 0; i < unseen.length; i += CLUSTER_BATCH) {
-    const batch = unseen.slice(i, i + CLUSTER_BATCH);
+  const budget = maxBatches * CLUSTER_BATCH;
+  const thisRun = unseen.slice(0, budget);
+  const remaining = unseen.length - thisRun.length;
+
+  for (let i = 0; i < thisRun.length; i += CLUSTER_BATCH) {
+    const batch = thisRun.slice(i, i + CLUSTER_BATCH);
 
     let assignments: Array<{ raw: string; label: string }> = [];
     try {
@@ -99,7 +114,7 @@ export async function clusterTopics(opts: {
     }
   }
 
-  return { matchedByAlias, clustered, newTopics };
+  return { matchedByAlias, clustered, newTopics, remaining };
 }
 
 function defaultDeps(): ClusterDeps {

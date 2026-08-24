@@ -14,6 +14,8 @@ export async function GET(req: NextRequest) {
   }
 
   const accountId = req.nextUrl.searchParams.get('account_id');
+  const maxBatchesRaw = parseInt(req.nextUrl.searchParams.get('max_batches') || '', 10);
+  const maxBatches = Number.isFinite(maxBatchesRaw) && maxBatchesRaw > 0 ? maxBatchesRaw : undefined;
   const { data: accounts } = await supabase.from('accounts').select('id, config').eq('status', 'active');
 
   const targets = (accounts || []).filter((a: any) =>
@@ -24,7 +26,7 @@ export async function GET(req: NextRequest) {
   const results: any[] = [];
   for (const a of targets) {
     try {
-      results.push({ accountId: a.id, ...(await clusterTopics({ accountId: a.id })) });
+      results.push({ accountId: a.id, ...(await clusterTopics({ accountId: a.id, maxBatches })) });
     } catch (e: any) {
       console.error('[cluster-conversation-topics]', a.id, e?.message || e);
       results.push({ accountId: a.id, error: String(e?.message || e) });

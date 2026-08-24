@@ -8,7 +8,7 @@ const report = buildReport({
       session_id: 's1', channel: 'web', started_at: '2026-08-20T10:00:00Z',
       inquiry_type: 'complaint', topic_label: 'בקבוק דלף', is_complaint: true,
       complaint_kind: 'defective', sentiment: 'negative', outcome: 'escalated',
-      product_id: 'p1', product_name: 'שמפו', product_category: 'hair_care',
+      product_id: 'p1', product_name: 'שמפו', product_category: 'hair_care', product_line: 'סדרת קיק',
       keywords: ['דליפה'], status: 'ok',
     },
   ],

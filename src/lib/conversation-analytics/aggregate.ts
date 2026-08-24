@@ -21,6 +21,7 @@ export interface ClassificationLite {
   product_id: string | null;
   product_name: string | null;
   product_category: string | null;
+  product_line: string | null;
   keywords: string[];
   status: string;
 }
@@ -48,11 +49,29 @@ export interface ConversationReport {
   };
   products: {
     byMentions: Array<{ productId: string; productName: string; mentions: number; complaints: number; complaintRate: number }>;
-    byComplaintRate: Array<{ productId: string; productName: string; mentions: number; complaints: number; complaintRate: number }>;
+    byComplaintRate: Array<{ productId: string; productName: string; mentions: number; complaints: number; complaintRate: number; belowSampleFloor: boolean }>;
+  };
+  /**
+   * Product lines (סדרות). Customers name a line far more often than a SKU, so
+   * this is where most of the real product attribution lands.
+   */
+  series: {
+    byMentions: Array<{ line: string; mentions: number; complaints: number; complaintRate: number }>;
+    byComplaintRate: Array<{ line: string; mentions: number; complaints: number; complaintRate: number; belowSampleFloor: boolean }>;
+    attributedPct: number;
   };
   channels: Array<{ channel: string; count: number; connected: boolean }>;
   keywords: Array<{ keyword: string; count: number }>;
 }
+
+/**
+ * Mentions a product or line needs before its complaint RATE is treated as a
+ * ranked signal. Argania's data made the case: חומצה היאלורונית showed 40% on
+ * 10 mentions while the flagship סדרת קיק showed 6% on 509 — ranking on rate
+ * alone puts a ten-conversation sample at the top of the page. Rows below the
+ * floor are still returned, flagged, and sorted after the ones above it.
+ */
+export const MIN_MENTIONS_FOR_RATE = 10;
 
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 
@@ -64,6 +83,23 @@ function tally<T>(rows: T[], key: (r: T) => string | null | undefined): Map<stri
     m.set(k, (m.get(k) || 0) + 1);
   }
   return m;
+}
+
+/**
+ * Orders by complaint rate, but only among entries with enough mentions for the
+ * rate to mean anything. Thin samples keep their place in the list, flagged, so
+ * nothing is hidden — they simply stop outranking real signal.
+ */
+function rankByComplaintRate<T extends { mentions: number; complaints: number; complaintRate: number }>(
+  stats: T[]
+): Array<T & { belowSampleFloor: boolean }> {
+  return stats
+    .filter((s) => s.complaints > 0)
+    .map((s) => ({ ...s, belowSampleFloor: s.mentions < MIN_MENTIONS_FOR_RATE }))
+    .sort((a, b) =>
+      Number(a.belowSampleFloor) - Number(b.belowSampleFloor) ||
+      b.complaintRate - a.complaintRate ||
+      b.mentions - a.mentions);
 }
 
 export function buildReport(opts: {
@@ -134,6 +170,21 @@ export function buildReport(opts: {
     complaintRate: pct(e.complaints, e.mentions),
   }));
 
+  const perSeries = new Map<string, { mentions: number; complaints: number }>();
+  for (const r of current) {
+    if (!r.product_line) continue;
+    const e = perSeries.get(r.product_line) || { mentions: 0, complaints: 0 };
+    e.mentions++;
+    if (r.is_complaint) e.complaints++;
+    perSeries.set(r.product_line, e);
+  }
+  const seriesStats = [...perSeries.entries()].map(([line, e]) => ({
+    line,
+    mentions: e.mentions,
+    complaints: e.complaints,
+    complaintRate: pct(e.complaints, e.mentions),
+  }));
+
   const kindByCategory = new Map<string, number>();
   for (const r of complaints) {
     if (!r.complaint_kind || !r.product_category) continue;
@@ -189,10 +240,12 @@ export function buildReport(opts: {
     },
     products: {
       byMentions: [...productStats].sort((a, b) => b.mentions - a.mentions),
-      // Rate first, mentions as the tie-breaker so a 1-of-1 fluke does not top the list.
-      byComplaintRate: [...productStats]
-        .filter((p) => p.complaints > 0)
-        .sort((a, b) => b.complaintRate - a.complaintRate || b.mentions - a.mentions),
+      byComplaintRate: rankByComplaintRate(productStats),
+    },
+    series: {
+      byMentions: [...seriesStats].sort((a, b) => b.mentions - a.mentions),
+      byComplaintRate: rankByComplaintRate(seriesStats),
+      attributedPct: pct(complaints.filter((r) => !!r.product_line).length, complaints.length),
     },
     channels: ALL_CHANNELS.map((channel) => ({
       channel,

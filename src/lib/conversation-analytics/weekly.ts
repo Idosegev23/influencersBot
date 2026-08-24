@@ -83,7 +83,7 @@ function defaultDeps(): WeeklyDeps {
   const selectRows = async (accountId: string, fromIso: string, toIso: string) => {
     const { data } = await supabase
       .from('conversation_classifications')
-      .select('session_id, channel, started_at, inquiry_type, topic_raw, is_complaint, complaint_kind, sentiment, outcome, product_id, product_category, keywords, status, conversation_topics(label), widget_products(name_he, name)')
+      .select('session_id, channel, started_at, inquiry_type, topic_raw, is_complaint, complaint_kind, sentiment, outcome, product_id, product_category, product_line, keywords, status, conversation_topics(label), widget_products(name_he, name)')
       .eq('account_id', accountId)
       .gte('started_at', fromIso)
       .lt('started_at', toIso);
@@ -101,6 +101,7 @@ function defaultDeps(): WeeklyDeps {
       product_id: r.product_id,
       product_name: r.widget_products?.name_he || r.widget_products?.name || null,
       product_category: r.product_category,
+      product_line: r.product_line ?? null,
       keywords: r.keywords || [],
       status: r.status,
     })) as ClassificationLite[];

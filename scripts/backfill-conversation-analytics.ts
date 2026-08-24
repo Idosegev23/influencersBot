@@ -89,8 +89,21 @@ async function main() {
   console.log(`\nClassification done: ${classified} classified, ${failed} failed, $${spent.toFixed(4)} spent.`);
   console.log('Clustering topics…');
 
-  const cluster = await call(`/api/cron/cluster-conversation-topics?account_id=${account}`);
-  console.log('clustering:', JSON.stringify(cluster.results?.[0] ?? cluster));
+  // Clustering is capped per invocation (a full backfill leaves thousands of
+  // raw topics, far more than one 300s request can chew through), so loop until
+  // the endpoint reports nothing remaining.
+  for (let pass = 1; pass <= 200; pass++) {
+    const cluster = await call(`/api/cron/cluster-conversation-topics?account_id=${account}`);
+    const c = cluster.results?.[0];
+    if (!c) { console.log('clustering: no result', JSON.stringify(cluster)); break; }
+    if (c.error) { console.log(`clustering pass ${pass} error: ${c.error}`); break; }
+
+    console.log(
+      `clustering pass ${pass}: aliases=${c.matchedByAlias} clustered=${c.clustered} ` +
+      `new=${c.newTopics} remaining=${c.remaining}`
+    );
+    if (!c.remaining) { console.log('clustering complete'); break; }
+  }
 
   console.log('\nNext: hand-check ~20 classifications against the real conversations');
   console.log('before setting config.conversation_analytics.visible = true.');

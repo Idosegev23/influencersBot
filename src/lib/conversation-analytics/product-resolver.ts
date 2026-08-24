@@ -14,6 +14,7 @@ export interface CatalogProduct {
   name_he: string | null;
   slug: string | null;
   category: string | null;
+  product_line?: string | null;
 }
 
 export interface ProductIndex {
@@ -48,12 +49,15 @@ export function buildProductIndex(products: CatalogProduct[]): ProductIndex {
 export function resolveProduct(
   index: ProductIndex,
   mention: string | null | undefined
-): { productId: string | null; category: string | null } {
-  if (typeof mention !== 'string') return { productId: null, category: null };
+): { productId: string | null; category: string | null; productLine: string | null } {
+  const miss = { productId: null, category: null, productLine: null };
+  if (typeof mention !== 'string') return miss;
   const k = key(mention);
-  if (!k) return { productId: null, category: null };
+  if (!k) return miss;
   const hit = index.byKey.get(k);
-  return hit ? { productId: hit.id, category: hit.category } : { productId: null, category: null };
+  return hit
+    ? { productId: hit.id, category: hit.category, productLine: hit.product_line ?? null }
+    : miss;
 }
 
 /**

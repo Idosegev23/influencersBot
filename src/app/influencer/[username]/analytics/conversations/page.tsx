@@ -49,7 +49,12 @@ interface Report {
   };
   products: {
     byMentions: Array<{ productId: string; productName: string; mentions: number; complaints: number; complaintRate: number }>;
-    byComplaintRate: Array<{ productId: string; productName: string; mentions: number; complaints: number; complaintRate: number }>;
+    byComplaintRate: Array<{ productId: string; productName: string; mentions: number; complaints: number; complaintRate: number; belowSampleFloor: boolean }>;
+  };
+  series: {
+    byMentions: Array<{ line: string; mentions: number; complaints: number; complaintRate: number }>;
+    byComplaintRate: Array<{ line: string; mentions: number; complaints: number; complaintRate: number; belowSampleFloor: boolean }>;
+    attributedPct: number;
   };
   channels: Array<{ channel: string; count: number; connected: boolean }>;
   keywords: Array<{ keyword: string; count: number }>;
@@ -341,7 +346,34 @@ export default function ConversationAnalyticsPage({
               </div>
             </Section>
 
-            {/* 6. Products — rate first, deliberately */}
+            {/* 6a. Series — where most real attribution lands, so it comes
+                 before individual products. */}
+            <Section title={t.sectionSeries}>
+              <p className="text-xs mb-3" style={{ color: 'var(--dash-text-3)' }}>{t.seriesHint}</p>
+              <div className="grid md:grid-cols-2 gap-6">
+                <Panel title={t.seriesByRate}>
+                  <SimpleTable
+                    headers={[t.colSeries, t.colMentions, t.colComplaints, t.colComplaintRate]}
+                    rows={report.series.byComplaintRate.slice(0, 15).map((sx) => [
+                      sx.belowSampleFloor ? `${sx.line} (${t.lowSample})` : sx.line,
+                      formatNumber(sx.mentions), formatNumber(sx.complaints), `${sx.complaintRate}%`,
+                    ])}
+                    emptyText={t.empty}
+                  />
+                </Panel>
+                <Panel title={t.seriesByMentions}>
+                  <SimpleTable
+                    headers={[t.colSeries, t.colMentions, t.colComplaints]}
+                    rows={report.series.byMentions.slice(0, 15).map((sx) => [
+                      sx.line, formatNumber(sx.mentions), formatNumber(sx.complaints),
+                    ])}
+                    emptyText={t.empty}
+                  />
+                </Panel>
+              </div>
+            </Section>
+
+            {/* 6b. Products — rate first, deliberately */}
             <Section title={t.sectionProducts}>
               <p className="text-xs mb-3" style={{ color: 'var(--dash-text-3)' }}>{t.productsRateHint}</p>
               <div className="grid md:grid-cols-2 gap-6">
@@ -349,7 +381,8 @@ export default function ConversationAnalyticsPage({
                   <SimpleTable
                     headers={[t.colProduct, t.colMentions, t.colComplaints, t.colComplaintRate]}
                     rows={report.products.byComplaintRate.slice(0, 15).map((p) => [
-                      p.productName, formatNumber(p.mentions), formatNumber(p.complaints), `${p.complaintRate}%`,
+                      p.belowSampleFloor ? `${p.productName} (${t.lowSample})` : p.productName,
+                      formatNumber(p.mentions), formatNumber(p.complaints), `${p.complaintRate}%`,
                     ])}
                     emptyText={t.empty}
                   />

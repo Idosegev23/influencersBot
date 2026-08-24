@@ -61,6 +61,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ username: s
       ['סנטימנט שלילי', report.kpis.negative],
       ['אחוז שיחות שסווגו', report.coverage.classifiedPct],
       ['אחוז תלונות ששויכו למוצר', report.coverage.complaintsWithProductPct],
+      ['אחוז תלונות ששויכו לסדרה', report.series.attributedPct],
     ]);
 
     addSheet(wb, 'סוגי פנייה', ['סוג', 'כמות', 'תקופה קודמת', 'שינוי'],
@@ -78,8 +79,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ username: s
     addSheet(wb, 'תלונה מול קטגוריה', ['סוג תלונה', 'קטגוריה', 'כמות'],
       report.complaints.kindByCategory.map((c) => [c.kind, c.category, c.count]));
 
-    addSheet(wb, 'מוצרים', ['מוצר', 'אזכורים', 'תלונות', 'שיעור תלונה %'],
-      report.products.byComplaintRate.map((p) => [p.productName, p.mentions, p.complaints, p.complaintRate]));
+    addSheet(wb, 'סדרות', ['סדרה', 'אזכורים', 'תלונות', 'שיעור תלונה %', 'מדגם קטן'],
+      report.series.byComplaintRate.map((sx) => [
+        sx.line, sx.mentions, sx.complaints, sx.complaintRate, sx.belowSampleFloor ? 'כן' : 'לא',
+      ]));
+
+    addSheet(wb, 'מוצרים', ['מוצר', 'אזכורים', 'תלונות', 'שיעור תלונה %', 'מדגם קטן'],
+      report.products.byComplaintRate.map((p) => [
+        p.productName, p.mentions, p.complaints, p.complaintRate, p.belowSampleFloor ? 'כן' : 'לא',
+      ]));
 
     addSheet(wb, 'ערוצים', ['ערוץ', 'כמות', 'מחובר'],
       report.channels.map((c) => [

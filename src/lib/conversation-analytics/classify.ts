@@ -12,6 +12,7 @@ import {
   INQUIRY_TYPES, COMPLAINT_KINDS,
 } from './taxonomy';
 import { resolveProduct, productCatalogPrompt, type ProductIndex } from './product-resolver';
+import { resolveSeries, type SeriesIndex } from './series-resolver';
 
 export const CLASSIFY_MODEL = 'gpt-5.6-luna';
 export const RETRY_MODEL = 'gpt-5.6-terra';
@@ -42,6 +43,7 @@ export interface ClassificationRow {
   product_id: string | null;
   product_mention_raw: string | null;
   product_category: string | null;
+  product_line: string | null;
   keywords: string[];
   summary: string | null;
   confidence: number | null;
@@ -122,7 +124,7 @@ function emptyRow(session: SessionForClassification): ClassificationRow {
     user_message_count: session.messages.filter((m) => m.role === 'user').length,
     inquiry_type: null, topic_raw: null, is_complaint: false, complaint_kind: null,
     sentiment: null, urgency: null, outcome: null,
-    product_id: null, product_mention_raw: null, product_category: null,
+    product_id: null, product_mention_raw: null, product_category: null, product_line: null,
     keywords: [], summary: null, confidence: null,
     status: 'ok', error_message: null,
     model: null, tokens_in: null, tokens_out: null, cost_usd: null,
@@ -132,7 +134,8 @@ function emptyRow(session: SessionForClassification): ClassificationRow {
 export async function classifySession(
   session: SessionForClassification,
   index: ProductIndex,
-  deps: ClassifyDeps
+  deps: ClassifyDeps,
+  seriesIndex?: SeriesIndex
 ): Promise<ClassificationRow> {
   const row = emptyRow(session);
   const instructions = buildClassifyPrompt(productCatalogPrompt(index));
@@ -177,6 +180,11 @@ export async function classifySession(
   row.product_mention_raw = mention || null;
   row.product_id = resolved.productId;
   row.product_category = resolved.category;
+  // A matched SKU carries its own line; otherwise fall back to reading a line
+  // out of what the customer wrote, which is how they usually refer to things.
+  row.product_line = seriesIndex
+    ? (resolved.productLine ?? resolveSeries(seriesIndex, mention))
+    : (resolved.productLine ?? null);
   row.keywords = normalizeKeywords(json?.keywords);
   row.summary = typeof json?.summary === 'string' ? json.summary.trim() || null : null;
   row.confidence = Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : null;
