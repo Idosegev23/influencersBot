@@ -202,17 +202,66 @@ evidence: רשימת מחרוזות קצרות עם המספרים עצמם.`,
       if (!to) return false;
 
       const username = config.username || '';
-      const link = `${process.env.NEXT_PUBLIC_APP_URL || ''}/influencer/${username}/analytics/conversations?from=${payload.periodStart}&to=${payload.periodEnd}`;
+      // Same base-URL convention as pipeline/notify: an unset env var must not
+      // turn the link into a relative path, which is dead inside an email.
+      const appBase = (process.env.NEXT_PUBLIC_APP_URL || 'https://bestie.ldrsgroup.com').replace(/\/$/, '');
+      const link = `${appBase}/influencer/${username}/analytics/conversations?from=${payload.periodStart}&to=${payload.periodEnd}`;
       const r = payload.report;
 
+      const delta = (now: number, before: number) => {
+        const d = now - before;
+        if (!d || !before) return '';
+        const arrow = d > 0 ? '▲' : '▼';
+        return ` <span style="color:${d > 0 ? '#dc2626' : '#059669'}">${arrow}${Math.abs(d)}</span>`;
+      };
+
+      const rows = (items: string[]) =>
+        items.length ? `<ul style="margin:4px 0 12px;padding-inline-start:20px">${items.join('')}</ul>` : '';
+
+      const topTypes = r.inquiryTypes.slice(0, 5).map((t: any) =>
+        `<li>${t.label} — <b>${t.count}</b>${delta(t.count, t.previousCount)}</li>`);
+
+      const risers = r.topics.filter((t: any) => t.delta > 0).slice(0, 5).map((t: any) =>
+        `<li>${t.label} — <b>${t.count}</b>${delta(t.count, t.previousCount)}${t.isNew ? ' <i>(חדש)</i>' : ''}</li>`);
+
+      const series = r.series.byComplaintRate.slice(0, 5).map((sx: any) =>
+        `<li>${sx.line} — ${sx.complaints}/${sx.mentions} (<b>${sx.complaintRate}%</b>)${sx.belowSampleFloor ? ' <i>(מדגם קטן)</i>' : ''}</li>`);
+
+      const insightList = payload.insights.length
+        ? `<ul style="margin:4px 0 12px;padding-inline-start:20px">${payload.insights
+            .map((i: any) => `<li><b>${i.title}</b> — ${i.content}</li>`).join('')}</ul>`
+        : '<p style="color:#6b7280">אין תובנות מובהקות לשבוע הזה.</p>';
+
       const html = `
-        <div dir="rtl" style="font-family:Arial,sans-serif">
-          <h2>דוח שיחות שבועי · ${payload.periodStart} – ${payload.periodEnd}</h2>
-          <p>${r.kpis.total} פניות · ${r.kpis.complaints} תלונות · ${r.kpis.escalated} הוסלמו</p>
-          <p>כיסוי: ${r.coverage.classifiedPct}% מהשיחות סווגו · ${r.coverage.complaintsWithProductPct}% מהתלונות שויכו למוצר</p>
-          <h3>תובנות</h3>
-          <ul>${payload.insights.map((i: any) => `<li><b>${i.title}</b> — ${i.content}</li>`).join('')}</ul>
-          <p><a href="${link}">לדוח המלא</a></p>
+        <div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;max-width:640px;color:#111">
+          <h2 style="margin-bottom:4px">דוח שיחות שבועי</h2>
+          <p style="color:#6b7280;margin-top:0">${payload.periodStart} – ${payload.periodEnd}</p>
+
+          <p style="font-size:15px">
+            <b>${r.kpis.total}</b> פניות${delta(r.kpis.total, r.kpis.previous.total)} ·
+            <b>${r.kpis.complaints}</b> תלונות${delta(r.kpis.complaints, r.kpis.previous.complaints)} ·
+            <b>${r.kpis.escalated}</b> הוסלמו${delta(r.kpis.escalated, r.kpis.previous.escalated)}
+          </p>
+
+          <h3 style="margin-bottom:2px">תובנות</h3>
+          ${insightList}
+
+          <h3 style="margin-bottom:2px">סוגי פנייה מובילים</h3>
+          ${rows(topTypes)}
+
+          <h3 style="margin-bottom:2px">נושאים עולים</h3>
+          ${risers.length ? rows(risers) : '<p style="color:#6b7280">אין נושא שעלה משמעותית.</p>'}
+
+          <h3 style="margin-bottom:2px">סדרות לפי שיעור תלונה</h3>
+          ${series.length ? rows(series) : '<p style="color:#6b7280">אין תלונות המשויכות לסדרה.</p>'}
+
+          <p style="color:#6b7280;font-size:13px;border-top:1px solid #e5e7eb;padding-top:8px">
+            כיסוי: ${r.coverage.classifiedPct}% מהשיחות סווגו ·
+            ${r.coverage.complaintsWithProductPct}% מהתלונות שויכו למוצר ·
+            ${r.series.attributedPct}% שויכו לסדרה
+          </p>
+
+          <p><a href="${link}" style="background:#883fe2;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">לדוח המלא</a></p>
         </div>`;
 
       const res = await sendEmail({
