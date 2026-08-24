@@ -63,7 +63,7 @@ proven sale, not precede it).
 // accounts.config
 "widget": {
   "inline": {
-    "enabled": true,
+    "enabled": true,                       // true | false | "preview"
     "selector": ".content_home-c-hero",   // produced by the picker
     "mode": "into",                        // into | replace | overlay
     "preset": "hero",                      // hero | bar
@@ -95,6 +95,22 @@ No existing account changes.
 container. `overlay` is the only mode that mutates the host element (it sets
 `position: relative` when the computed position is `static`); the other two do
 not touch host styles at all.
+
+### Preview mode
+
+`enabled` is a tri-state. `"preview"` mounts the inline surface **only** for a
+visitor who arrived with `?bestie=1`, recorded in `sessionStorage` so it
+survives navigation within the site. Every other visitor sees exactly today's
+behavior — floating bubble, nothing else.
+
+This is how a customer tastes the feature: their real site, their real domain,
+their real hero video, with no deploy on their side and no exposure to their
+traffic. What we hand over is a link, not an installation. Going live is
+flipping `"preview"` to `true` in the dashboard — no deploy on our side either.
+
+The preview flag must not leak into analytics as a real install: events emitted
+while in preview mode carry `preview: true` and are excluded from the
+`/admin/health` install signal.
 
 ### Mount resolution — three outcomes, none silent
 
@@ -232,6 +248,19 @@ floating ones at exactly the moment the distinction starts to matter.
 - Preset `hero`, mode `into`, target `.content_home-c-hero`, surface `bare`,
   art `host`, bubble `after-scroll`.
 - Sampled theme: font inherited (Google Sans), ground dark, accent `#4c3e5e`.
+- **Blocking fix before anything is shown to them:** `config.widget.primaryColor`
+  is `#6ec1e4`, a pale blue that appears nowhere on their site — it is
+  Elementor's stock primary, seeded automatically and never corrected. The
+  floating bubble survives it by hovering above the page; an inline hero will
+  not. Correct it by hand first, then check whether the sampler would have
+  reached the same answer unaided. That check is the cheapest evidence we will
+  get that the sampler works, and LDRS is a safer place to find out than a
+  paying account.
+- Verified 2026-08-24: `widget.js` is already installed in their `<head>` with
+  `data-account-id="de38eac6-d2fb-46a7-ac09-5ec860147ca0"` and `defer`;
+  `config.widget.domain` is `ldrsgroup.com`; `.content_home-c-hero` is identical
+  on `/he` and `/en`, so one selector covers the site. Nothing is installed on
+  their side for this feature.
 - Entrance must wait for their H1 blur-in to finish. Their embed sets
   `html.ldrs-h1-lock` with a 3s failsafe; mount when the class clears or after
   3.2s, whichever comes first. Bestie must not animate in against the headline.
@@ -248,6 +277,8 @@ floating ones at exactly the moment the distinction starts to matter.
   stability rule, `art: "host"` enforcement in `resolveBanner`, sampler token
   extraction from a fixture computed-style, the mobile chip-drop rule.
 - Unit: config absence produces today's behavior byte-for-byte.
+- Unit: `enabled: "preview"` mounts only with `?bestie=1` / the sessionStorage
+  flag, and its events carry `preview: true`.
 - Manual on the pilot: the host video still plays during and after the overlay;
   page height unchanged with the mount present; bubble appears only after the
   mount scrolls out; session continues across both mounts; keyboard on iOS
@@ -267,5 +298,5 @@ should follow evidence from the pilot.
 2. Who approves the Hebrew copy in the pilot's resting state and first turn?
    The reel-banner copy on `/chat/danielamit` shipped unapproved and is still
    Claude's writing.
-3. `bubble: "after-scroll"` needs a threshold. Proposal: the bubble appears once
-   the mount is fully out of view, not on first pixel.
+3. ~~Bubble threshold.~~ Decided: the bubble appears once the mount is **fully**
+   out of view, not on first pixel.
