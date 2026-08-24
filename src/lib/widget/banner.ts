@@ -12,8 +12,8 @@
  * place instead of being re-derived per surface.
  */
 
-export type BannerSurface = 'widget' | 'chat';
-export type BannerArtMode = 'gradient' | 'image' | 'video';
+export type BannerSurface = 'widget' | 'chat' | 'inline';
+export type BannerArtMode = 'gradient' | 'image' | 'video' | 'host';
 export type BannerCtaAction = 'prefill' | 'url' | 'none';
 
 export interface BannerReel {
@@ -249,6 +249,19 @@ export function todayInIsrael(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(now);
 }
 
+/**
+ * Whether an override's declared surface applies to the surface being
+ * resolved. The inline surface has no overrides of its own — it has no
+ * `chat.banner`-style slot to write one against — so it follows whatever was
+ * written for the widget, the same way it follows the widget's banner.
+ */
+function surfaceMatches(want: BannerSurface, got: string | undefined): boolean {
+  const target = got || 'both';
+  if (target === 'both') return true;
+  if (want === 'inline') return target === 'widget';
+  return target === want;
+}
+
 /** The overrides whose window is open and whose surface matches. */
 export function activeOverrides(
   config: any,
@@ -259,8 +272,7 @@ export function activeOverrides(
   const today = todayInIsrael(now);
   return list.filter((o: BannerOverride) => {
     if (!o || typeof o !== 'object') return false;
-    const target = o.surface || 'both';
-    if (target !== 'both' && target !== surface) return false;
+    if (!surfaceMatches(surface, o.surface)) return false;
     if (typeof o.from === 'string' && o.from > today) return false;
     if (typeof o.until === 'string' && o.until < today) return false;
     return true;
@@ -430,7 +442,7 @@ export function resolveBanner(
     ? BESTIE_PRIMARY
     : (widgetConfig.primaryColor || config?.theme?.colors?.primary || null);
 
-  return {
+  const resolved: ResolvedBanner = {
     eyebrow: copy(merged.eyebrow, MAX_EYEBROW),
     headline,
     subline: copy(merged.subline, MAX_SUBLINE) || subtitle,
@@ -439,4 +451,14 @@ export function resolveBanner(
     art: resolveArt(merged.art, widgetConfig, primaryColor, config?.reels),
     starters: resolveStarters(merged.starters),
   };
+
+  // The inline surface sits inside the customer's own layout. Whatever is
+  // behind it — a Webflow background video, a photo, a gradient section — is
+  // theirs and is already painted. Drawing our own art there would stack a
+  // second autoplaying video on top of theirs.
+  if (surface === 'inline') {
+    resolved.art = { ...resolved.art, mode: 'host', image: null, reels: null };
+  }
+
+  return resolved;
 }
