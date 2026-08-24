@@ -643,6 +643,10 @@
       widget_version: WIDGET_VERSION,
       attribution: WIDGET_ATTRIBUTION,
     };
+    // Preview traffic is the account owner looking at their own site. Counting
+    // it as an install would make /admin/health claim a customer deployed
+    // something they are still deciding about.
+    if (INLINE && INLINE.enabled === 'preview') enriched.preview = true;
     for (var k in params) enriched[k] = params[k];
     // Dual-write funnel events into the new /api/widget/events pipeline too
     // (transition period — see Behavioral Events block below). MUST run before
@@ -1289,7 +1293,12 @@
         try { setupInline(); } catch (e) { report('inline_setup_failed', e); }
       }
       messages = [{ role: 'assistant', content: config.welcomeMessage }];
-      widgetTrack('widget_loaded', { modules: modules, widget_version: WIDGET_VERSION });
+      widgetTrack('widget_loaded', {
+        modules: modules,
+        widget_version: WIDGET_VERSION,
+        surface: INLINE ? 'inline' : 'floating',
+        mount_preset: INLINE ? INLINE.preset : null,
+      });
       // Fire chip fetch in parallel — non-blocking; widget renders without chips
       // first, chips populate when ready (≈400ms on cache miss).
       fetchChips('initial');
@@ -1666,7 +1675,28 @@
     try { return window.__ibotInlineGen === inlineToken; } catch (e) { return true; }
   }
 
+  var INLINE_PREVIEW_KEY = 'ibot_inline_preview_' + ACCOUNT_ID;
+
+  // `enabled: 'preview'` shows the inline surface only to someone who asked
+  // for it with ?bestie=1, remembered for the rest of the browsing session so
+  // it survives navigation. Every other visitor sees today's widget. This is
+  // how a customer tries the feature on their own live site with no deploy.
+  function inlinePreviewAllowed() {
+    try {
+      if (location.search.indexOf('bestie=1') !== -1) {
+        sessionStorage.setItem(INLINE_PREVIEW_KEY, '1');
+        return true;
+      }
+      return sessionStorage.getItem(INLINE_PREVIEW_KEY) === '1';
+    } catch (e) {
+      // Private mode / storage disabled: the query string alone still works.
+      return location.search.indexOf('bestie=1') !== -1;
+    }
+  }
+
   function setupInline() {
+    // Not a failure — an explicit decision by the account. No report().
+    if (INLINE.enabled === 'preview' && !inlinePreviewAllowed()) { INLINE = null; return; }
     if (!claimInlineSurface()) return;
 
     var target = resolveInlineTarget();
