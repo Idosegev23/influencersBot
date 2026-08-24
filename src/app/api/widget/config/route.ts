@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
         banner: resolveBanner(config, 'widget', { brandName: config.display_name || config.username }),
         // The inline surface (see `inline` above). Null keeps every account
         // that has not opted in exactly as it was.
-        inline: inline,
+        inline,
         // The launcher's own copy. Separate from `tooltip` below, which is the
         // legacy string field the manage page writes; this one honours an
         // active promotion.

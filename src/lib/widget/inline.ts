@@ -27,6 +27,20 @@ export interface ResolvedInlineTheme {
 export interface ResolvedInlineMount {
   enabled: InlineEnabled;
   selector: string;
+  /**
+   * Path prefixes the mount is allowed on, or `null` for "every page".
+   *
+   * The script is site-wide; every real selector is page-specific. Without
+   * this, a hero selector that only exists on the home page makes every other
+   * pageview run a document-wide MutationObserver for 5s and then file an
+   * `inline_mount_missing` diagnostic — a fault report for a condition that is
+   * not a fault, which buries the real misses it exists to surface.
+   *
+   * Deliberately prefixes, not regexes or globs: a regex arriving from account
+   * config is a foot-gun (catastrophic backtracking on the customer's own
+   * page) and nothing in the pilot needs one.
+   */
+  paths: string[] | null;
   mode: InlineMountMode;
   preset: InlinePreset;
   surface: InlineTreatment;
@@ -37,6 +51,8 @@ export interface ResolvedInlineMount {
 
 const MAX_SELECTOR = 200;
 const MAX_RESERVE = 2000;
+const MAX_PATHS = 20;
+const MAX_PATH = 200;
 
 const MODES: InlineMountMode[] = ['into', 'replace', 'overlay'];
 const PRESETS: InlinePreset[] = ['hero', 'bar'];
@@ -51,6 +67,27 @@ function hex(value: unknown): string | null {
   return typeof value === 'string' && /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)
     ? value
     : null;
+}
+
+/**
+ * A capped list of non-empty path prefixes, or null.
+ *
+ * Null (absent, not an array, or an array with nothing usable in it) means
+ * "every page" — which is exactly today's behavior, so an account already
+ * configured without `paths`, or one whose `paths` is malformed, keeps
+ * mounting rather than silently losing the feature.
+ */
+function pathPrefixes(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    const trimmed = entry.trim();
+    if (!trimmed || trimmed.length > MAX_PATH) continue;
+    out.push(trimmed);
+    if (out.length >= MAX_PATHS) break;
+  }
+  return out.length ? out : null;
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
@@ -89,6 +126,7 @@ export function resolveInlineMount(config: any): ResolvedInlineMount | null {
   return {
     enabled,
     selector,
+    paths: pathPrefixes(raw.paths),
     mode: oneOf(raw.mode, MODES, 'into'),
     preset: oneOf(raw.preset, PRESETS, 'hero'),
     surface: oneOf(raw.surface, TREATMENTS, 'bare'),

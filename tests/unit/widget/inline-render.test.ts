@@ -54,13 +54,22 @@ describe('the inline resting state', () => {
     expect(root().getElementById('ibot-inline-pill')).not.toBeNull();
   });
 
-  it('omits the headline when the host page already has one', async () => {
-    // preset `hero` on LDRS sits under their own H1; ours would be a second one.
+  it('renders no headline of its own in any case — the banner headline becomes the pill placeholder', async () => {
+    // Renamed from "omits the headline when the host page already has one",
+    // which stated a conditionality that has no implementation behind it: the
+    // `hero` preset never renders a headline element at all, and
+    // inlinePillHtml() repurposes the resolved banner headline as the pill's
+    // placeholder text. Whether the preset SHOULD grow a conditional headline
+    // (spec: "the resolved banner headline (or none, when the host page already
+    // has one)") is an open spec question, not a fix — see the final fix report.
     await bootWidget({ html: HERO, config: { inline: MOUNT } });
     // Anchor on something actually rendering — an empty shadow root would also
     // satisfy "no h2", which is exactly the no-op-stub state this must rule out.
     expect(root().getElementById('ibot-inline-pill')).not.toBeNull();
-    expect(root().querySelectorAll('h2')).toHaveLength(0);
+    expect(root().querySelectorAll('h1,h2,h3')).toHaveLength(0);
+    // The headline is not dropped, it is relocated: this is what the renderer
+    // actually does today.
+    expect(root().querySelector('.ph')!.textContent).toBe(BANNER.headline);
   });
 
   it('draws no background of its own — art is host', async () => {

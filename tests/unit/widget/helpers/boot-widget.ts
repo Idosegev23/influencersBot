@@ -19,6 +19,8 @@ export interface BootOptions {
   viewportWidth?: number;
   /** Query string for the fake page, e.g. '?bestie=1'. */
   search?: string;
+  /** Pathname for the fake page, e.g. '/products/shoes'. Defaults to '/'. */
+  path?: string;
 }
 
 export interface BootedWidget {
@@ -262,12 +264,9 @@ export async function bootWidget(opts: BootOptions = {}): Promise<BootedWidget> 
 
   const script = document.createElement('script');
   script.setAttribute('data-account-id', accountId);
-  if (opts.search) {
-    // widget.js reads location.search for the preview gate.
-    window.history.replaceState({}, '', '/' + opts.search);
-  } else {
-    window.history.replaceState({}, '', '/');
-  }
+  // widget.js reads location.search for the preview gate and location.pathname
+  // for the inline mount's path scope.
+  window.history.replaceState({}, '', (opts.path || '/') + (opts.search || ''));
   Object.defineProperty(script, 'src', {
     value: 'https://influencers-bot.vercel.app/widget.js',
     configurable: true,

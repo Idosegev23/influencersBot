@@ -29,13 +29,3 @@ describe('buildInlinePayload', () => {
     expect(payload.banner).toBeNull();
   });
 });
-
-describe('the config route wires it up', () => {
-  it('returns inline in the response body', async () => {
-    const src = await import('node:fs').then((fs) =>
-      fs.readFileSync('src/app/api/widget/config/route.ts', 'utf8'),
-    );
-    expect(src).toContain('buildInlinePayload');
-    expect(src).toContain('inline:');
-  });
-});

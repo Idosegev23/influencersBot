@@ -53,8 +53,11 @@ describe('sanitizeDiagnostic', () => {
     expect(sanitizeDiagnostic({ type: 'widget_opened', message: 'm' })).toBeNull();
   });
 
-  it('keeps all four inline-mount diagnostic types — "mount failure is never silent" depends on this allowlist', () => {
-    const types = ['inline_mount_missing', 'inline_render_failed', 'inline_selector_invalid', 'inline_setup_failed'];
+  it('keeps every inline-mount diagnostic type — "mount failure is never silent" depends on this allowlist', () => {
+    const types = [
+      'inline_mount_missing', 'inline_render_failed', 'inline_selector_invalid', 'inline_setup_failed',
+      'inline_mount_failed',
+    ];
     for (const type of types) {
       const out = sanitizeDiagnostic({ type, message: 'm' });
       expect(out?.type).toBe(type);

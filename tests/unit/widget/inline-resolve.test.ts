@@ -32,7 +32,49 @@ describe('resolveInlineMount', () => {
   });
 
   it('resolves the LDRS config verbatim', () => {
-    expect(resolveInlineMount(LDRS)).toEqual(LDRS.widget.inline);
+    // `paths` is the one resolved field LDRS's stored config does not carry:
+    // absent means "every page", which is what every account configured before
+    // the field existed already gets.
+    expect(resolveInlineMount(LDRS)).toEqual({ ...LDRS.widget.inline, paths: null });
+  });
+
+  describe('paths — the mount is site-wide, the selector is not', () => {
+    function withPaths(paths: unknown) {
+      return resolveInlineMount({ widget: { inline: { enabled: true, selector: '#x', paths } } })!;
+    }
+
+    it('is null when absent, which means every page', () => {
+      expect(withPaths(undefined).paths).toBeNull();
+    });
+
+    it('keeps a list of prefixes in order', () => {
+      expect(withPaths(['/he', '/en/']).paths).toEqual(['/he', '/en/']);
+    });
+
+    it('drops non-strings and blanks rather than rejecting the whole mount', () => {
+      expect(withPaths(['/he', 42, '', '   ', null, '/en']).paths).toEqual(['/he', '/en']);
+    });
+
+    it('trims entries', () => {
+      expect(withPaths(['  /he  ']).paths).toEqual(['/he']);
+    });
+
+    it('caps the number of entries', () => {
+      const many = Array.from({ length: 50 }, (_, i) => '/p' + i);
+      expect(withPaths(many).paths).toHaveLength(20);
+    });
+
+    it('drops an over-long entry', () => {
+      expect(withPaths(['/' + 'a'.repeat(400), '/ok']).paths).toEqual(['/ok']);
+    });
+
+    it('falls back to every page when nothing in the array is usable', () => {
+      // Not "mount nowhere": a malformed paths value must not silently switch
+      // the whole feature off for the account.
+      expect(withPaths([]).paths).toBeNull();
+      expect(withPaths([1, 2, 3]).paths).toBeNull();
+      expect(withPaths('/he').paths).toBeNull();
+    });
   });
 
   it('keeps the preview tri-state distinct from true', () => {

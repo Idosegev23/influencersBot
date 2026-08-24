@@ -95,7 +95,11 @@ describe('the analytics surface dimension', () => {
     expect(loaded!.payload.preview).toBeUndefined();
   });
 
-  it("an inline boot's widget_loaded carries surface: 'inline' and the mount_preset", async () => {
+  it("an inline boot's widget_loaded still says 'floating' — it fires before the mount is known", async () => {
+    // widget_loaded is emitted before mount resolution finishes and long before
+    // the 5s late-mount deadline, so an 'inline' claim there would only mean
+    // "config carried a mount". mount_preset is kept as the "a mount was
+    // configured for this pageview" dimension; the surface claim is not.
     await bootWidget({
       html: HERO,
       config: { analyticsToken: 'test-token', inline: { ...PREVIEW, enabled: true } },
@@ -104,8 +108,34 @@ describe('the analytics surface dimension', () => {
     const events = await flushedEvents(beacons);
     const loaded = events.find((e) => e.name === 'widget_loaded');
     expect(loaded).toBeDefined();
-    expect(loaded!.payload.surface).toBe('inline');
+    expect(loaded!.payload.surface).toBe('floating');
     expect(loaded!.payload.mount_preset).toBe('hero');
+  });
+
+  it('widget_inline_mounted is emitted once the surface is actually in the page', async () => {
+    await bootWidget({
+      html: HERO,
+      config: { analyticsToken: 'test-token', inline: { ...PREVIEW, enabled: true } },
+    });
+    const beacons = captureAnalyticsBeacons();
+    const events = await flushedEvents(beacons);
+    const mounted = events.filter((e) => e.name === 'widget_inline_mounted');
+    expect(mounted).toHaveLength(1);
+    expect(mounted[0].payload.mount_preset).toBe('hero');
+    expect(mounted[0].payload.mount_mode).toBe('into');
+  });
+
+  it('a configured mount whose selector misses never claims an inline surface', async () => {
+    // The exact case that made `surface: 'inline'` on widget_loaded a lie: the
+    // account is configured, the selector is gone, and nothing mounted.
+    await bootWidget({
+      html: '<section><div class="renamed-by-webflow"></div></section>',
+      config: { analyticsToken: 'test-token', inline: { ...PREVIEW, enabled: true } },
+    });
+    const beacons = captureAnalyticsBeacons();
+    const events = await flushedEvents(beacons);
+    expect(events.find((e) => e.name === 'widget_inline_mounted')).toBeUndefined();
+    expect(events.find((e) => e.name === 'widget_loaded')!.payload.surface).toBe('floating');
   });
 
   it('preview events are marked so they cannot be counted as installs', async () => {

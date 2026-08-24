@@ -80,6 +80,11 @@ export const EVENT_CATALOG: Record<string, EventDef> = {
 
   // Widget — lifecycle & engagement
   widget_loaded: { category: 'session', surface: 'widget' },
+  // Emitted only once the inline surface is actually in the customer's page —
+  // widget_loaded fires before mount resolution finishes, so it can never make
+  // that claim honestly. This is the event that separates a real inline install
+  // from a configured-but-never-mounted one.
+  widget_inline_mounted: { category: 'session', surface: 'widget' },
   widget_opened: { category: 'engagement', surface: 'widget' },
   widget_closed: { category: 'engagement', surface: 'widget' },
   widget_proactive_opened: { category: 'engagement', surface: 'widget' },

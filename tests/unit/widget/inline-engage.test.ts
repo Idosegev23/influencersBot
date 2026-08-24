@@ -1,6 +1,45 @@
 import { describe, it, expect } from 'vitest';
 import { bootWidget } from './helpers/boot-widget';
 
+// Analytics ride navigator.sendBeacon as a Blob, and only once ANALYTICS_TOKEN
+// is set from the config response — so a capturing test must pass
+// `analyticsToken` and force the flush itself. `pagehide` is wired to
+// flushAnalytics() unconditionally, which is the only way to force a flush from
+// outside the IIFE without waiting on the real 3s batch timer. (Same pattern as
+// tests/unit/widget/inline-preview.test.ts.)
+function captureAnalyticsBeacons(): Blob[] {
+  const beacons: Blob[] = [];
+  Object.defineProperty(navigator, 'sendBeacon', {
+    configurable: true,
+    value: (url: string, body: Blob) => {
+      if (String(url).includes('/api/analytics/widget')) beacons.push(body);
+      return true;
+    },
+  });
+  return beacons;
+}
+
+// jsdom's Blob implements only slice/size/type — FileReader is the only way to
+// read the body back out.
+function readBlobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
+}
+
+async function flushedEvents(beacons: Blob[]): Promise<Array<{ name: string; payload: any }>> {
+  window.dispatchEvent(new Event('pagehide'));
+  const out: Array<{ name: string; payload: any }> = [];
+  for (const b of beacons) {
+    const parsed = JSON.parse(await readBlobText(b));
+    for (const e of parsed.events || []) out.push(e);
+  }
+  return out;
+}
+
 const HERO = '<section><div class="content_home-c-hero"><h1>We Turn Brands Into Leaders</h1></div></section>';
 const BANNER = {
   eyebrow: null, headline: 'ספרו לי על המותג שלכם', subline: null, valueLine: null, cta: null,
@@ -149,10 +188,28 @@ describe('engaging from the inline surface', () => {
   });
 
   it('tags the open event with the surface it came from', async () => {
-    await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    // Was a readFileSync + toContain match on widget.js, which proved only that
+    // a string exists in the file. This asserts the event that actually shipped.
+    await bootWidget({ html: HERO, config: { analyticsToken: 'test-token', inline: MOUNT } });
+    const beacons = captureAnalyticsBeacons();
     (shadow().getElementById('ibot-inline-pill') as HTMLElement).click();
-    const src = await import('node:fs').then((fs) => fs.readFileSync('public/widget.js', 'utf8'));
-    expect(src).toContain("widgetTrack('widget_opened', { surface: 'inline' })");
+    const opened = (await flushedEvents(beacons)).filter((e) => e.name === 'widget_opened');
+    expect(opened).toHaveLength(1);
+    expect(opened[0].payload.surface).toBe('inline');
+  });
+
+  it('a double-click on the pill emits widget_opened exactly once', async () => {
+    // The desktop panel has no backdrop, so the pill stays clickable underneath
+    // it. This is the regression shape that actually occurred during the plan
+    // and would have shipped green: the re-entrant guard existed, but nothing
+    // counted the event it was there to protect.
+    await bootWidget({ html: HERO, config: { analyticsToken: 'test-token', inline: MOUNT } });
+    const beacons = captureAnalyticsBeacons();
+    const pill = shadow().getElementById('ibot-inline-pill') as HTMLElement;
+    pill.click();
+    pill.click();
+    const opened = (await flushedEvents(beacons)).filter((e) => e.name === 'widget_opened');
+    expect(opened).toHaveLength(1);
   });
 
   it('a chip click opens the panel with that starter prefilled', async () => {
@@ -183,6 +240,60 @@ describe('engaging from the inline surface', () => {
     ) as HTMLInputElement;
     expect(input).not.toBeNull();
     expect(input.value).toBe('אני יוצר תוכן');
+  });
+
+  it('a chip click while a FORM view is open is ignored, not typed into the form', async () => {
+    // Open from the pill -> support from the banner -> view is 'support_form'.
+    // The inline chips are still visible and clickable under the backdrop-less
+    // desktop panel, and container.querySelector('input,textarea') in a form
+    // view is that form's FIRST FIELD — so the starter text landed in the
+    // customer's name/email box.
+    await bootWidget({
+      html: HERO,
+      config: {
+        inline: MOUNT,
+        banner: { headline: 'Hi', subline: null, valueLine: null },
+        modules: { support: { enabled: true } },
+      },
+    });
+    (shadow().getElementById('ibot-inline-pill') as HTMLElement).click();
+    (document.getElementById('ibot-banner-support') as HTMLElement).click();
+    const fields = Array.from(
+      document.querySelectorAll('#ibot-widget-container input, #ibot-widget-container textarea'),
+    ) as HTMLInputElement[];
+    expect(fields.length).toBeGreaterThan(0);
+    const before = fields.map((f) => f.value);
+    (shadow().querySelector('[data-inline-chip="0"]') as HTMLElement).click();
+    expect(fields.map((f) => f.value)).toEqual(before);
+  });
+
+  describe('the mobile panel animation stays exactly as it is for existing customers', () => {
+    // The branch changed mobilePanelStyle()'s `animation` from unconditional to
+    // panelPainted-gated. The collision it fixes only exists for an
+    // inline-originated open (where [data-from-inline]'s grow must win), but
+    // the gate also silenced the slide-up that every existing customer's mobile
+    // widget replays on each render() — and "any change to the floating
+    // widget's own appearance" is out of scope for this branch.
+    it('a floating-bubble open still replays the slide-up on a later render', async () => {
+      await bootWidget({ html: HERO, viewportWidth: 390 });
+      (document.getElementById('ibot-trigger') as HTMLElement).click();
+      expect(document.getElementById('ibot-panel')!.getAttribute('style')).toContain('ibot-slide-up');
+      // The second render is the one the panelPainted-only gate silenced:
+      // sending sets panelPainted (true since the first renderOpen) and
+      // re-renders synchronously.
+      const input = document.getElementById('ibot-input') as HTMLInputElement;
+      input.value = 'hello';
+      (document.getElementById('ibot-send') as HTMLElement).click();
+      expect(document.getElementById('ibot-panel')!.getAttribute('style')).toContain('ibot-slide-up');
+    });
+
+    it('an inline-originated open suppresses it so the grow-from-origin can run', async () => {
+      await bootWidget({ html: HERO, viewportWidth: 390, config: { inline: MOUNT } });
+      (shadow().getElementById('ibot-inline-pill') as HTMLElement).click();
+      const panel = document.getElementById('ibot-panel') as HTMLElement;
+      expect(panel.getAttribute('data-from-inline')).toBe('1');
+      expect(panel.getAttribute('style')).not.toContain('ibot-slide-up');
+    });
   });
 
   it('does not add scrollbar-compensation padding when the lock does not change page width', async () => {

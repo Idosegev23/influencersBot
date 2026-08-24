@@ -12,6 +12,9 @@ const DIAGNOSTIC_TYPES = new Set([
   // Inline-surface mount diagnostics (public/widget.js) — "mount failure is
   // never silent" is a spec requirement; these four must stay allow-listed.
   'inline_mount_missing', 'inline_render_failed', 'inline_selector_invalid', 'inline_setup_failed',
+  // Raised when inserting the (already rendered) host into the customer's DOM
+  // throws and we roll the page back — see mountInline().
+  'inline_mount_failed',
   // Inline-surface engagement diagnostics (Task 7, public/widget.js
   // openFromInline()) — same "never silent" requirement for the open path: a
   // thrown error opening the panel, or a chip prefill that found no composer.
