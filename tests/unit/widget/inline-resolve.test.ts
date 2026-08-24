@@ -64,6 +64,24 @@ describe('resolveInlineMount', () => {
     expect(resolveInlineMount(cfg)!.theme.accent).toBeNull();
   });
 
+  it('rejects hex colours with an invalid digit count (5 or 7)', () => {
+    const accent5 = resolveInlineMount({
+      widget: { inline: { enabled: true, selector: '#x', theme: { accent: '#12345' } } },
+    })!.theme.accent;
+    const accent7 = resolveInlineMount({
+      widget: { inline: { enabled: true, selector: '#x', theme: { accent: '#1234567' } } },
+    })!.theme.accent;
+    expect(accent5).toBeNull();
+    expect(accent7).toBeNull();
+  });
+
+  it('accepts hex colours with a valid digit count (3, 4, 6, 8)', () => {
+    for (const accent of ['#abc', '#abcd', '#aabbcc', '#aabbccdd']) {
+      const cfg = { widget: { inline: { enabled: true, selector: '#x', theme: { accent } } } };
+      expect(resolveInlineMount(cfg)!.theme.accent).toBe(accent);
+    }
+  });
+
   it('clamps a nonsense reserve', () => {
     const cfg = { widget: { inline: { enabled: true, selector: '#x', reserve: { desktop: -40, mobile: 99999 } } } };
     expect(resolveInlineMount(cfg)!.reserve).toEqual({ desktop: 0, mobile: 2000 });

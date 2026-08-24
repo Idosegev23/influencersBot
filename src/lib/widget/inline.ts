@@ -46,7 +46,9 @@ function oneOf<T extends string>(value: unknown, allowed: T[], fallback: T): T {
 }
 
 function hex(value: unknown): string | null {
-  return typeof value === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(value) ? value : null;
+  return typeof value === 'string' && /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)
+    ? value
+    : null;
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
