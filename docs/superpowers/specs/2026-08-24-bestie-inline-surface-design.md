@@ -268,10 +268,21 @@ a new attribute or channel:
   is 748px tall" summary. The picker itself only ever proposes `mode: 'into'`;
   `replace` and `overlay` are not offered from a click today (see "Out of
   scope" below).
+- **`ibot:pick-failed` (widget → dashboard)** — `{ type: 'ibot:pick-failed', label }`,
+  posted when neither the clicked element nor its three nearest ancestors
+  carry a selector the save path would store. The refusal is also filed as a
+  `picker_no_stable_selector` diagnostic, but a diagnostic reaches only us:
+  without this message the picker stays armed, the dashboard shows nothing,
+  and the click reads as a broken UI, so the customer clicks the same dead
+  element again.
 
 **Selector rule, as actually implemented:** prefer an `id`, then the first
 single class that matches exactly one element on the page, then the shortest
-class chain (two classes, then three) that does. Nothing else is ever
+class *combination* (two classes, then three) that does — combinations rather
+than prefixes of the class list, and only over the tokens that are legal in
+the grammar below, since a utility-CSS class like Tailwind's `md:flex`,
+`-mt-4` or `bg-white/50` is legal HTML and illegal here and would otherwise
+poison every chain built through it. Nothing else is ever
 proposed — no descendant combinators, no `:nth-child`, no attribute
 selectors. The grammar this allows is exactly `#id` or
 `.a[.b[.c]]` (regex: `^(#[A-Za-z_][\w-]*|\.[A-Za-z_][\w-]*(\.[A-Za-z_][\w-]*){0,2})$`),
@@ -281,6 +292,14 @@ behind `isUnsafeSelector` in `src/lib/widget/inline.ts` (gates what
 `resolveInlineMount` will store) — pinned against each other by a shared
 corpus test (`picker-mode.test.ts`) so the two cannot silently drift apart.
 Anything outside that shape is refused at save time, whatever produced it.
+
+The picker considers the clicked element first and then, only if that element
+yields nothing storable, its three nearest ancestors — clicking a hero's `<h1>`
+otherwise picked nothing at all, since a heading rarely carries an id or a
+unique class. The label and the theme/height sample always describe the element
+the emitted selector actually names, never the descendant that was clicked. Past
+three ancestors the pick is refused rather than silently creeping up to half
+the page.
 
 **Why an allowlist, not a blocklist.** The first version refused selectors by
 pattern-matching for `html`/`body`/`head`. Two rounds of patching individual
@@ -317,9 +336,16 @@ looser heuristic that flags builder-generated hash classes and deep
 unit-tested but not yet called from the save path or the picker; today
 nothing acts on it.)
 
-The dashboard shows the proposed mode, preset, sampled theme and measured
-reserve, renders a live preview on the customer's own page, and saves to
-`config.widget.inline` on approval (`mountFromPick` → `inlineForPost` →
+The dashboard shows the picked element's label, its measured height and the
+sampled accent, and lets the customer choose the preset and the surface
+treatment. It does *not* display `mode` — the picker only ever proposes
+`into`, and there is no control for the other two. It renders a live preview on
+the customer's own page: `WidgetDraftPreview` loads the preview iframe as
+`/api/widget/preview/<id>?bestie=1`, which is inert server-side (the route reads
+only `path`) but is what satisfies `inlinePreviewAllowed()` inside the frame —
+without it a mount stored as `enabled: 'preview'`, which is where every fresh
+pick lands by design, rendered nowhere in the dashboard while a *live* one did.
+It saves to `config.widget.inline` on approval (`mountFromPick` → `inlineForPost` →
 `/api/influencer/settings` → `resolveInlineMount`). A pick against a
 brand-new mount (no existing `config.widget.inline`) always saves with
 `enabled: 'preview'`, never straight to live — going live is a separate,
@@ -375,7 +401,7 @@ actually in the page and carrying `mount_preset`. `mount_preset` stays on
 
 ## Known gaps
 
-Two places where what shipped is thinner than the config schema suggests:
+Places where what shipped is thinner than the config schema suggests:
 
 - **No "pause but keep the pick" state.** `config.widget.inline.enabled` is a
   two-value tri-state (`true` | `'preview'`) — there is no stored "off, but
@@ -397,6 +423,23 @@ Two places where what shipped is thinner than the config schema suggests:
   it. Today it can only be set by hand in the database; the picker always
   proposes a mount with `paths: null` (every page) unless one already existed
   on the mount being re-picked.
+- **A mount the editor cannot represent is read-only in the dashboard.**
+  `resolveInlineMount` returns null for anything outside the storable grammar
+  — the hand-written combinator/attribute selectors that are the only way the
+  gap above gets filled today — so `InlineMountSection` shows its empty state
+  for those accounts, with a line of copy saying a mount configured by the team
+  exists and cannot be edited here. The save path omits the `inline` key
+  entirely rather than posting `null` (`inlineSaveSlice`), so an unrelated save
+  cannot delete it; but the customer still cannot see or change it, and picking
+  a new spot replaces it outright.
+- **Picking only works against the site's home page.** `WidgetDraftPreview`
+  hardcodes the preview URL with no `?path=`, though
+  `/api/widget/preview/[accountId]` supports it (`/admin/websites/[id]/preview`
+  already passes one). Fine for the LDRS pilot, whose hero is on `/`, but it
+  narrows "self-serve" for any account whose hero lives elsewhere: they can
+  neither reach the page nor pick on it. Needs a decision on what the control
+  should be — a free-text path box, a list of crawled pages — before it is
+  built.
 
 ## Testing
 
