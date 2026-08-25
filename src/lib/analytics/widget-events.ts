@@ -20,10 +20,43 @@ export interface NormalizedRow {
   payload: Record<string, unknown>; created_at: string;
 }
 
+/**
+ * Remove unpaired UTF-16 surrogates.
+ *
+ * A lone surrogate is legal JSON but is not a Unicode scalar value, so
+ * Postgres refuses the text and PostgREST rejects the entire batch with
+ * PGRST102 "Empty or invalid json". Because the drain deliberately leaves a
+ * failed batch in the buffer, one such row halts the whole pipeline — which
+ * is exactly what happened on 2026-08-19, costing six days of events and
+ * filling the Redis list to Upstash's 100 MiB per-key ceiling.
+ *
+ * They arrive whenever the client truncates captured text at a fixed
+ * character count and the cut lands between the two halves of an emoji.
+ * `public/widget.js` now slices on whole code points, but it sits in
+ * visitors' browser caches for weeks, so this is the boundary that actually
+ * makes the row storable.
+ *
+ * Well-formed pairs are untouched: real emoji survive. Only the orphan goes.
+ */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+export function stripLoneSurrogates<T>(value: T): T {
+  if (typeof value === 'string') return value.replace(LONE_SURROGATE, '') as unknown as T;
+  if (Array.isArray(value)) return value.map(stripLoneSurrogates) as unknown as T;
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(value as Record<string, unknown>)) {
+      out[k.replace(LONE_SURROGATE, '')] = stripLoneSurrogates((value as Record<string, unknown>)[k]);
+    }
+    return out as unknown as T;
+  }
+  return value;
+}
+
 // Strip query string (may carry PII) — keep pathname only.
 function cleanPath(p: unknown): string | null {
   if (typeof p !== 'string' || !p) return null;
-  return p.split('?')[0].slice(0, 512);
+  return p.split('?')[0].slice(0, 512).replace(LONE_SURROGATE, '');
 }
 
 export function normalizeWidgetEvents(
@@ -37,7 +70,11 @@ export function normalizeWidgetEvents(
   const events = Array.isArray(raw?.events) ? raw.events.slice(0, MAX_EVENTS) : [];
   for (const e of events) {
     if (!e || typeof e.type !== 'string' || !WIDGET_EVENT_TYPES.has(e.type)) { rejected++; continue; }
-    const payload = e.payload && typeof e.payload === 'object' ? e.payload : {};
+    // Sanitise before measuring: stripping can only shrink, and an unstorable
+    // row must never reach the buffer in the first place.
+    const payload = stripLoneSurrogates(
+      e.payload && typeof e.payload === 'object' ? e.payload : {},
+    ) as Record<string, unknown>;
     if (Buffer.byteLength(JSON.stringify(payload), 'utf8') > 4096) { rejected++; continue; }
     // Clamp untrusted client clocks to a sane window. A skewed device (wrong
     // year) would otherwise route to a far-off partition; the DEFAULT partition
@@ -50,7 +87,7 @@ export function normalizeWidgetEvents(
     const ts = new Date(inWindow ? clientTs : nowMs).toISOString();
     rows.push({
       account_id: accountId, anon_id: anon, session_id: session,
-      event_uid: typeof e.uid === 'string' ? e.uid.slice(0, 64) : null,
+      event_uid: typeof e.uid === 'string' ? e.uid.slice(0, 64).replace(LONE_SURROGATE, '') : null,
       type: e.type, path: cleanPath(e.path), payload, created_at: ts,
     });
   }

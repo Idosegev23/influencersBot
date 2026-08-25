@@ -38,6 +38,29 @@
   // page), which historically left us totally blind to failures at the customer.
   // This reports them out-of-band. Capped and deduped so a render loop cannot
   // flood us, and it can never itself throw.
+  // Truncate without splitting a surrogate pair.
+  //
+  // A plain .slice() that lands between the two halves of an emoji leaves an
+  // orphaned surrogate. That is legal JSON but not a legal Unicode scalar, so
+  // Postgres refuses the text and PostgREST rejects the entire batch it
+  // travelled in. On 2026-08-19 exactly that happened to one click event on a
+  // customer's checkout page: the analytics queue stopped draining for six
+  // days, filled to Upstash's 100 MiB per-key ceiling, and every widget event
+  // after that was dropped on the floor.
+  //
+  // The ingest route sanitises too — that is the authoritative fix, since this
+  // file lives in visitors' browser caches for weeks. This stops us producing
+  // the garbage in the first place.
+  function safeSlice(value, max) {
+    var s = String(value == null ? '' : value);
+    if (s.length <= max) return s;
+    var out = s.slice(0, max);
+    var last = out.charCodeAt(out.length - 1);
+    // A high surrogate at the cut means its partner was left behind.
+    if (last >= 0xD800 && last <= 0xDBFF) out = out.slice(0, -1);
+    return out;
+  }
+
   var DIAG_CAP = 5;
   var diagSent = 0;
   var diagSeen = {};
@@ -45,7 +68,7 @@
   function report(type, detail) {
     try {
       if (diagSent >= DIAG_CAP) return;
-      var msg = String((detail && detail.message) || detail || '').slice(0, 500);
+      var msg = safeSlice((detail && detail.message) || detail || '', 500);
       if (!msg) return;
       if (diagSeen[msg]) return;
       diagSeen[msg] = 1;
@@ -58,7 +81,7 @@
         // but a deep stack plus a long UA can push the whole body past its
         // 2KB cap, which is dropped silently — losing exactly the failures
         // most worth having.
-        stack: (detail && detail.stack) ? String(detail.stack).slice(0, 1000) : null,
+        stack: (detail && detail.stack) ? safeSlice(detail.stack, 1000) : null,
         filename: (detail && detail.filename) || null,
         line: (detail && detail.line) || null,
         widgetVersion: WIDGET_VERSION,
@@ -872,7 +895,7 @@
         if (!el || el.nodeType !== 1) return;
         behaviorTrack('click', {
           tag: el.tagName || null,
-          text: ((el.textContent || '') + '').trim().slice(0, 80),
+          text: safeSlice(((el.textContent || '') + '').trim(), 80),
           href: el.href || null,
         });
       } catch (err) { /* */ }
@@ -3757,7 +3780,7 @@
     };
     try {
       var h1El = document.querySelector('h1');
-      if (h1El) ctx.h1 = (h1El.textContent || '').trim().slice(0, 200);
+      if (h1El) ctx.h1 = safeSlice((h1El.textContent || '').trim(), 200);
     } catch (e) { /* */ }
 
     // ---- OpenGraph fallback (most sites have these) ----
