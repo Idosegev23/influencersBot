@@ -54,8 +54,6 @@ const MAX_RESERVE = 2000;
 const MAX_PATHS = 20;
 const MAX_PATH = 200;
 
-const UNSAFE_TARGETS = /(^|[\s,>+~])(html|body|head)\s*$/i;
-
 /**
  * A selector we refuse to store at all.
  *
@@ -63,12 +61,30 @@ const UNSAFE_TARGETS = /(^|[\s,>+~])(html|body|head)\s*$/i;
  * to the document root, `body` or `head` deletes the customer's page — and
  * our own container with it. The widget refuses these at mount time too;
  * this stops one ever being saved.
+ *
+ * This is a string-parsing problem, not a single-regex-pattern problem: a
+ * selector *list* ("body,.foo") resolves to the first element in document
+ * order that matches ANY member, not the first member written, and `body`
+ * precedes nearly everything — so one dangerous member anywhere in the list
+ * is enough. And a trailing pseudo-class or attribute filter narrows a match
+ * without changing which element type it is ("body:not(.x)" is still
+ * `<body>`). So: split the list, take the last compound selector of each
+ * member (that's what the whole chain resolves to), strip the parts that
+ * only narrow rather than retarget, and check what's left.
  */
 export function isUnsafeSelector(sel: string): boolean {
   const s = (sel || '').trim();
   if (!s) return true;
-  if (/^(html|body|head)$/i.test(s)) return true;
-  return UNSAFE_TARGETS.test(s);
+  return s.split(',').some((member) => {
+    const m = member.trim();
+    if (!m) return true;
+    // The last compound selector is what the whole chain resolves to.
+    const last = m.split(/[\s>+~]+/).filter(Boolean).pop() || '';
+    // Attribute filters and pseudo-classes narrow a match, they never change
+    // which element type it is: `body:not(.x)` is still <body>.
+    const bare = last.replace(/\[[^\]]*\]/g, '').split(/[:.#]/)[0];
+    return /^(html|body|head)$/i.test(bare);
+  });
 }
 
 /**

@@ -15,6 +15,28 @@ describe('isUnsafeSelector', () => {
     expect(isUnsafeSelector('.content_home-c-hero')).toBe(false);
     expect(isUnsafeSelector('#hero-search')).toBe(false);
   });
+
+  it('refuses a selector list with a dangerous member anywhere in it — a list resolves to the first DOCUMENT-ORDER match across every member, not the first member written, and body precedes nearly everything', () => {
+    expect(isUnsafeSelector('body,.foo')).toBe(true);
+    expect(isUnsafeSelector('body, .foo')).toBe(true);
+  });
+
+  it('refuses a pseudo-class filter on body — it narrows the match, it does not retarget it', () => {
+    expect(isUnsafeSelector('body:not(.x)')).toBe(true);
+  });
+
+  it('allows an attribute filter whose value happens to contain the word "body"', () => {
+    expect(isUnsafeSelector('div[data-x="body"]')).toBe(false);
+  });
+
+  it('allows a class or id that merely starts with "body"', () => {
+    expect(isUnsafeSelector('.body-content')).toBe(false);
+    expect(isUnsafeSelector('body-content')).toBe(false);
+  });
+
+  it('fails safe on a descendant chain ending in a bare body — not a real mount anyone wants, refused anyway', () => {
+    expect(isUnsafeSelector('#hero body')).toBe(true);
+  });
 });
 
 describe('isStableSelector', () => {
