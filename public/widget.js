@@ -2202,7 +2202,11 @@
         try {
           var replacedStyle = window.getComputedStyle(target);
           var replacedPos = replacedStyle.position;
-          if (replacedPos && replacedPos !== 'static') {
+          // Only contexts we can adopt without also copying geometry.
+          // `absolute`/`fixed` without their insets, width and height would take
+          // us out of flow with `inset:auto` and collapse the parent — silently
+          // not inheriting is the safer failure.
+          if (replacedPos === 'relative' || replacedPos === 'sticky') {
             host.style.position = replacedPos;
             var replacedZ = replacedStyle.zIndex;
             if (replacedZ && replacedZ !== 'auto') host.style.zIndex = replacedZ;
@@ -2309,16 +2313,24 @@
 
     return ':host{display:block;width:100%;}' +
       '*{box-sizing:border-box;}' +
+      // min-height:inherit pulls the host's computed reserve through. A
+      // percentage height would not resolve — min-height on the host does not
+      // make its height definite — so justify-content would centre nothing and
+      // the content would sit at the top of the reserved box.
       '.wrap{display:flex;flex-direction:column;align-items:center;' +
-        'justify-content:center;width:100%;height:100%;' +
+        'justify-content:center;width:100%;min-height:inherit;' +
         'direction:' + locale.dir + ';}' +
       // Typography is inherited, never declared — that is how this speaks the
       // host site's language. Only size, weight and rhythm are ours.
-      '.head{text-align:center;margin:0 0 clamp(16px,3vw,28px);max-width:18ch;}' +
+      '.head{text-align:center;margin:0 0 clamp(16px,3vw,28px);max-width:100%;}' +
       '.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;' +
         'opacity:.75;margin-bottom:10px;color:' + ink + ';}' +
-      '.hl{font-size:clamp(28px,4.4vw,52px);line-height:1.08;margin:0;' +
-        'font-weight:500;letter-spacing:-.02em;color:' + ink + ';}' +
+      // `ch` resolves against the element's OWN font-size, so this measure has to
+      // live on the headline, not on the block around it — on .head it would be
+      // 18ch of the inherited body size (~15px) and a 52px word would overflow it.
+      '.hl{font-size:clamp(28px,4.4vw,52px);line-height:1.08;margin:0 auto;' +
+        'max-width:min(18ch,100%);font-weight:500;letter-spacing:-.02em;' +
+        'color:' + ink + ';}' +
       '.sub{font-size:clamp(13px,1.4vw,17px);line-height:1.5;opacity:.75;' +
         'margin:12px 0 0;color:' + ink + ';}' +
       '.pane{width:100%;max-width:560px;' +
@@ -2393,7 +2405,9 @@
     var b = INLINE.banner;
     var out = '<div class="head">';
     if (b.eyebrow) out += '<div class="eyebrow">' + escapeHtml(b.eyebrow) + '</div>';
-    out += '<h2 class="hl">' + escapeHtml(b.headline) + '</h2>';
+    // Their <h1> was just removed by the replace, so this IS the page's
+    // heading now. Shipping an h2 would leave the page with none.
+    out += '<h1 class="hl">' + escapeHtml(b.headline) + '</h1>';
     if (b.subline) out += '<p class="sub">' + escapeHtml(b.subline) + '</p>';
     return out + '</div>';
   }

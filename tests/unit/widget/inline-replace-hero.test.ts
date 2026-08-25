@@ -20,11 +20,22 @@ import { bootWidget } from './helpers/boot-widget';
  *    and ours would be a second one. In `replace` we just removed theirs, so the
  *    resolved banner headline is what fills the space we took.
  */
+/**
+ * The positioning lives in a <style> block, not an inline `style=` attribute,
+ * on purpose. With inline styles a `target.style.position` implementation would
+ * pass this test and then render nothing on the real page, where those values
+ * come from a stylesheet. This fixture can tell the two apart.
+ */
 const HERO = `
-  <div class="video_home-c" style="position:relative;display:flex;">
+  <style>
+    .video_home-c { position: relative; display: flex; }
+    .content_home-c-hero.auto { position: relative; z-index: 5; height: 576px; }
+    .float-hero { position: absolute; top: 10%; }
+  </style>
+  <div class="video_home-c">
     <video id="bg" autoplay loop muted playsinline></video>
     <div class="overlay_medium"></div>
-    <div class="content_home-c-hero auto" style="position:relative;z-index:5;height:576px;">
+    <div class="content_home-c-hero auto">
       <h1 id="their-headline">We Turn Brands Into Leaders</h1>
       <a class="cta" href="#">בואו נדבר</a>
     </div>
@@ -59,9 +70,12 @@ function root() {
 
 beforeEach(() => { try { sessionStorage.clear(); } catch { /* */ } });
 
+/** The account's own placeholder — replace mode stops reusing the headline. */
+const CFG = { inline: MOUNT, placeholder: 'שאלו אותנו הכל' };
+
 describe('replace mode on a background-video hero', () => {
   it('removes the hero content but leaves the video playing behind', async () => {
-    const w = await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    const w = await bootWidget({ html: HERO, config: CFG });
     expect(w.inlineHost).not.toBeNull();
     expect(document.getElementById('their-headline')).toBeNull();
     expect(document.querySelector('.cta')).toBeNull();
@@ -72,7 +86,7 @@ describe('replace mode on a background-video hero', () => {
   });
 
   it('inherits the replaced element positioning so the video cannot cover us', async () => {
-    const w = await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    const w = await bootWidget({ html: HERO, config: CFG });
     // Without this the host is static, the absolutely-positioned video paints
     // over it, and Bestie is invisible on a hero that looks unchanged.
     expect(w.inlineHost!.style.position).toBe('relative');
@@ -80,12 +94,12 @@ describe('replace mode on a background-video hero', () => {
   });
 
   it('reserves the height the replaced element held, so the hero does not collapse', async () => {
-    const w = await bootWidget({ html: HERO, config: { inline: MOUNT }, viewportWidth: 1440 });
+    const w = await bootWidget({ html: HERO, config: CFG, viewportWidth: 1440 });
     expect(w.inlineHost!.style.minHeight).toBe('576px');
   });
 
   it('renders the banner headline, because we just removed the page its own', async () => {
-    await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    await bootWidget({ html: HERO, config: CFG });
     const text = root().textContent || '';
     expect(root().getElementById('ibot-inline-pill')).not.toBeNull();
     expect(text).toContain('היי! אנחנו לידרס!');
@@ -95,7 +109,7 @@ describe('replace mode on a background-video hero', () => {
   it('does NOT render a headline in into mode — the host page still has one', async () => {
     await bootWidget({
       html: HERO,
-      config: { inline: { ...MOUNT, mode: 'into', reserve: { desktop: 0, mobile: 0 } } },
+      config: { ...CFG, inline: { ...MOUNT, mode: 'into', reserve: { desktop: 0, mobile: 0 } } },
     });
     // Presence first: an empty shadow root would satisfy the absence on its own.
     expect(root().getElementById('ibot-inline-pill')).not.toBeNull();
@@ -108,16 +122,27 @@ describe('replace mode on a background-video hero', () => {
   });
 
   it('does not repeat the headline as the input placeholder', async () => {
-    await bootWidget({ html: HERO, config: { inline: MOUNT } });
+    await bootWidget({ html: HERO, config: CFG });
     const ph = root().querySelector('.ph')!.textContent || '';
     expect(ph).not.toBe('היי! אנחנו לידרס!');
-    expect(ph.length).toBeGreaterThan(0);
+    // Pin the exact copy: "not the headline, and non-empty" is satisfied by any
+    // string at all, including a default nobody chose for this hero.
+    expect(ph).toBe('שאלו אותנו הכל');
+  });
+
+  it('does not inherit absolute positioning — that needs geometry we cannot copy', async () => {
+    const w = await bootWidget({
+      html: HERO.replace('content_home-c-hero auto', 'content_home-c-hero auto float-hero'),
+      config: { ...CFG, inline: { ...MOUNT, selector: '.float-hero' } },
+    });
+    expect(w.inlineHost).not.toBeNull();
+    expect(w.inlineHost!.style.position).toBe('');
   });
 
   it('still refuses an unsafe replace target', async () => {
     const w = await bootWidget({
       html: '<div class="content_home-c-hero">x</div>',
-      config: { inline: { ...MOUNT, selector: 'body' } },
+      config: { ...CFG, inline: { ...MOUNT, selector: 'body' } },
     });
     expect(w.inlineHost).toBeNull();
     expect(document.body.isConnected).toBe(true);
