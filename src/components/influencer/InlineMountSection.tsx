@@ -61,6 +61,8 @@ export default function InlineMountSection({
   onStartPicking,
   picking,
   pendingPick,
+  pickFailed,
+  unrepresentable,
   domain,
 }: {
   value: InlineMountDraft | null;
@@ -70,6 +72,21 @@ export default function InlineMountSection({
   picking: boolean;
   /** A fresh pick just arrived from the preview iframe and hasn't been folded into `value` yet. */
   pendingPick?: PendingInlinePick | null;
+  /**
+   * The last click inside the preview was refused — no id or class chain on
+   * the element (or its nearest ancestors) that the save path would store.
+   * The picker stays armed; this only tells the customer why nothing happened.
+   */
+  pickFailed?: boolean;
+  /**
+   * The account HAS a stored mount, but one this editor cannot represent — a
+   * hand-written combinator selector, an attribute selector, `enabled: false`.
+   * `value` is null in that case, so without this the section shows the same
+   * empty state as an account that never configured anything, and the
+   * customer has no way to know why. See `storedInlineIsUnrepresentable` in
+   * lib/widget/inline-draft for what the save path does about it.
+   */
+  unrepresentable?: boolean;
   /** The account's registered site domain, for the `?bestie=1` preview-link hint. Optional — the hint just degrades without it. */
   domain?: string | null;
 }) {
@@ -98,6 +115,14 @@ export default function InlineMountSection({
     onChange({ ...value, ...next });
   }
 
+  // One notice, two picking branches (nothing configured yet, and re-picking
+  // an existing mount) — the refusal reads the same in both.
+  const pickFailedNotice = pickFailed ? (
+    <p className="text-xs" style={{ color: '#dc2626' }}>
+      לא ניתן לבחור את האלמנט הזה — נסו ללחוץ על האזור שמסביבו.
+    </p>
+  ) : null;
+
   const previewLink = domain
     ? `${domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}/?bestie=1`
     : null;
@@ -114,6 +139,13 @@ export default function InlineMountSection({
         </p>
       </div>
 
+      {!value && unrepresentable ? (
+        <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
+          קיים מיקום שהוגדר עבורכם על ידי הצוות ולא ניתן לעריכה מכאן. שמירה
+          במסך הזה לא תסיר אותו — לפרטים או לשינוי פנו אלינו.
+        </p>
+      ) : null}
+
       {!value ? (
         picking ? (
           <div
@@ -127,6 +159,7 @@ export default function InlineMountSection({
               עברו לתצוגה המקדימה מימין ולחצו על האזור שבו בסטי צריך לשבת. אפשר
               לבטל בכל שלב.
             </p>
+            {pickFailedNotice}
             <button
               type="button"
               onClick={onStartPicking}
@@ -175,14 +208,17 @@ export default function InlineMountSection({
             ) : null}
 
             {picking ? (
-              <button
-                type="button"
-                onClick={onStartPicking}
-                className="mt-1 text-xs font-medium"
-                style={{ color: 'var(--dash-text)' }}
-              >
-                לחצו על האלמנט באתר… (ביטול)
-              </button>
+              <>
+                {pickFailedNotice}
+                <button
+                  type="button"
+                  onClick={onStartPicking}
+                  className="mt-1 text-xs font-medium"
+                  style={{ color: 'var(--dash-text)' }}
+                >
+                  לחצו על האלמנט באתר… (ביטול)
+                </button>
+              </>
             ) : (
               <button
                 type="button"
@@ -229,6 +265,11 @@ export default function InlineMountSection({
           </div>
 
           <div role="radiogroup" aria-label="למי מוצג בסטי במקום הזה" className="space-y-1.5">
+            <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
+              אין צורך במצב &quot;כבוי&quot;: תצוגה מקדימה היא מצב ההשהיה — המקום
+              שבחרתם, העיצוב והמידות נשמרים, ואף מבקר רגיל לא רואה אותם. הסרה
+              לעומת זאת מוחקת את הבחירה לגמרי.
+            </p>
             {ENABLED_OPTIONS.map((opt) => (
               <label key={String(opt.value)} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--dash-text)' }}>
                 <input

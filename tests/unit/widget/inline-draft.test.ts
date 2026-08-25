@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { resolveInlineMount } from '@/lib/widget/inline';
-import { inlineForPost, mountFromPick, type InlineMountDraft } from '@/lib/widget/inline-draft';
+import {
+  inlineForPost,
+  inlineSaveSlice,
+  mountFromPick,
+  storedInlineIsUnrepresentable,
+  type InlineMountDraft,
+} from '@/lib/widget/inline-draft';
 
 /**
  * The widget editor's save-time `widget.inline` construction — the seam
@@ -20,7 +26,7 @@ describe('inlineForPost', () => {
   // resolveInlineMount's own fallback default for that field (see
   // src/lib/widget/inline.ts: mode->'into', preset->'hero', surface->'bare',
   // bubble->'after-scroll', reserve->{0,0}, theme.font->'inherit',
-  // theme.ground->'dark', theme.accent->null, paths->null). A fixture that
+  // theme.ground->'light', theme.accent->null, paths->null). A fixture that
   // happened to match a default would make the round-trip assertion below
   // pass even if inlineForPost silently dropped that field — the resolver's
   // own fallback would quietly stand in for it and the comparison would
@@ -39,7 +45,7 @@ describe('inlineForPost', () => {
     preset: 'bar',
     surface: 'glass',
     reserve: { desktop: 240, mobile: 80 },
-    theme: { font: 'Poppins, sans-serif', accent: '#4c3e5e', radius: 8, ground: 'light' },
+    theme: { font: 'Poppins, sans-serif', accent: '#4c3e5e', radius: 8, ground: 'dark' },
     bubble: 'always',
     paths: ['/vip'],
     // Display-only — must not affect the posted (or resolved) shape.
@@ -157,5 +163,97 @@ describe('mountFromPick', () => {
     expect(next.bubble).toBe('always');
     expect(next.paths).toEqual(['/shop']);
     expect(next.selector).toBe('.hero');
+  });
+});
+
+/**
+ * I1 — the unrepresentable stored mount.
+ *
+ * `resolveInlineMount` returns null both for "no mount configured" and for
+ * "a mount configured by hand that the storable-selector allowlist refuses".
+ * The editor seeded its draft from that single null and posted
+ * `inline: inlineForPost(draft)` unconditionally, so the two cases produced
+ * the same POST body — and for the second one, `inline: null` makes
+ * /api/influencer/settings run `delete updatedConfig.widget.inline`. Editing a
+ * banner headline and pressing שמירה destroyed an operator-configured mount,
+ * with a success message.
+ */
+describe('storedInlineIsUnrepresentable', () => {
+  // Every fixture below is a mount the resolver refuses for a DIFFERENT
+  // reason, so a fix that happens to handle only one of them is visible here
+  // rather than passing on a single lucky shape.
+  const UNREPRESENTABLE: Array<[string, unknown]> = [
+    ['a hand-written combinator selector', { enabled: true, selector: 'section.hero > div' }],
+    ['an attribute selector', { enabled: true, selector: '[data-hero="main"]' }],
+    ['a selector past the length cap', { enabled: true, selector: '.' + 'x'.repeat(400) }],
+    ['a bare tag selector', { enabled: true, selector: 'body' }],
+    ['enabled: false', { enabled: false, selector: '.hero' }],
+    ['four chained classes — one past the grammar', { enabled: true, selector: '.a.b.c.d' }],
+  ];
+
+  it.each(UNREPRESENTABLE)('flags %s', (_label, inline) => {
+    expect(storedInlineIsUnrepresentable({ widget: { inline } })).toBe(true);
+    // Pinning WHY: this is only interesting because the editor's own seed
+    // (resolveInlineMount) comes back null for exactly these.
+    expect(resolveInlineMount({ widget: { inline } })).toBeNull();
+  });
+
+  // The presence half — without these the predicate could return `true`
+  // unconditionally and every case above would still pass.
+  it.each([
+    ['no config at all', undefined],
+    ['an empty config', {}],
+    ['a config with no widget.inline key', { widget: { banner: { headline: 'x' } } }],
+    ['an explicitly null inline', { widget: { inline: null } }],
+    ['a representable mount', { widget: { inline: { enabled: true, selector: '.content_home-c-hero' } } }],
+    ['a representable preview mount with paths and replace mode',
+      { widget: { inline: { enabled: 'preview', selector: '#hero', mode: 'replace', paths: ['/he'] } } }],
+  ])('does not flag %s', (_label, config) => {
+    expect(storedInlineIsUnrepresentable(config)).toBe(false);
+  });
+});
+
+describe('inlineSaveSlice', () => {
+  const draft: InlineMountDraft = {
+    enabled: 'preview',
+    selector: '.content_home-c-hero',
+    mode: 'into',
+    preset: 'hero',
+    surface: 'bare',
+    reserve: { desktop: 0, mobile: 0 },
+    theme: { font: 'inherit', accent: '#4c3e5e', radius: 8, ground: 'light' },
+    bubble: 'after-scroll',
+    paths: null,
+  };
+
+  it('omits the inline key entirely when nothing is drafted and the stored mount is unrepresentable', () => {
+    const slice = inlineSaveSlice(null, true);
+    // `'inline' in body.widget` is exactly what the settings route branches
+    // on, so the key's PRESENCE is the contract — not its value. A slice of
+    // `{ inline: undefined }` would serialise away over the wire but would
+    // still read as present to `in`, so assert both.
+    expect('inline' in slice).toBe(false);
+    expect(slice).toEqual({});
+    // ...and it must survive JSON, which is how it actually travels.
+    expect('inline' in JSON.parse(JSON.stringify({ widget: { banner: {}, ...slice } })).widget).toBe(false);
+  });
+
+  it('still posts inline: null when nothing is drafted and nothing unrepresentable is stored', () => {
+    // Today's behaviour, and what the remove button depends on: an explicit
+    // null is the instruction to delete. Paired with the test above so the
+    // omission cannot silently become unconditional.
+    const slice = inlineSaveSlice(null, false);
+    expect('inline' in slice).toBe(true);
+    expect(slice.inline).toBeNull();
+  });
+
+  it('posts a fresh pick even on top of an unrepresentable stored mount — replacing it is the customer choosing to', () => {
+    const slice = inlineSaveSlice(draft, true);
+    expect('inline' in slice).toBe(true);
+    expect(slice.inline).toEqual(inlineForPost(draft));
+  });
+
+  it('posts a representable draft unchanged', () => {
+    expect(inlineSaveSlice(draft, false)).toEqual({ inline: inlineForPost(draft) });
   });
 });

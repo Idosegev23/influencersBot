@@ -13,6 +13,7 @@
  */
 
 import type { InlinePick } from '@/components/influencer/WidgetDraftPreview';
+import { resolveInlineMount } from './inline';
 import type {
   InlineEnabled,
   InlineMountMode,
@@ -145,4 +146,67 @@ export function inlineForPost(draft: InlineMountDraft | null): Record<string, un
     bubble: draft.bubble,
     paths: draft.paths ?? null,
   };
+}
+
+/**
+ * Does the account have a stored `widget.inline` that this editor cannot
+ * represent?
+ *
+ * `resolveInlineMount` returns null for a mount the storable-selector
+ * allowlist rejects — a hand-written combinator (`section.hero > div`), an
+ * attribute selector, an over-long selector — and for `enabled: false`. The
+ * editor then seeds `inlineDraft` as null and shows its empty state, which is
+ * indistinguishable from an account that never had a mount at all.
+ *
+ * The distinction matters because the two must POST differently. Posting
+ * `inline: null` for a genuinely absent mount is a no-op; posting it for an
+ * unrepresentable one makes /api/influencer/settings run its
+ * `else delete updatedConfig.widget.inline` branch and erase the row. And per
+ * the spec's own "Known gaps", hand-set database config is the ONLY way
+ * `paths`, `mode: 'replace'` and `mode: 'overlay'` exist today — so the mounts
+ * this would destroy are exactly the ones nothing in the product can recreate.
+ * The customer would edit a banner headline, press שמירה, see success, and
+ * have silently deleted an operator-configured mount.
+ *
+ * Truthiness, not `'inline' in config.widget`: a stored `null`/`false`/`0`
+ * carries nothing to lose, so it stays on the "absent" side where posting
+ * `null` is harmless.
+ */
+export function storedInlineIsUnrepresentable(rawConfig: unknown): boolean {
+  const raw = (rawConfig as { widget?: { inline?: unknown } } | null | undefined)?.widget?.inline;
+  if (!raw) return false;
+  return resolveInlineMount(rawConfig) === null;
+}
+
+/**
+ * The `inline` slice of the widget editor's POST body — a spread-in fragment
+ * rather than a value, because the correct thing to send is sometimes *no key
+ * at all*.
+ *
+ * /api/influencer/settings acts on `'inline' in body.widget`, so an omitted
+ * key means "leave whatever is stored alone" while `inline: null` means
+ * "delete it". Those are the two states this function chooses between:
+ *
+ * - a draft (picked, or seeded from a representable stored mount) → post it;
+ * - nothing drafted AND the account has an unrepresentable stored mount →
+ *   omit the key, so an unrelated save cannot destroy it
+ *   (see `storedInlineIsUnrepresentable`);
+ * - nothing drafted and nothing unrepresentable stored → `inline: null`,
+ *   today's behaviour, which is what the remove button relies on.
+ *
+ * The middle case deliberately yields to a fresh draft: a customer who picks
+ * a new spot on top of an unrepresentable mount is choosing to replace it, and
+ * that pick must reach the server.
+ *
+ * This mirrors the guard at the top of `handleSave` (widget-editor/page.tsx)
+ * that refuses to post a config which never loaded over the account's real
+ * one — same failure class, one level finer: a config that loaded but could
+ * not be represented.
+ */
+export function inlineSaveSlice(
+  draft: InlineMountDraft | null,
+  storedUnrepresentable: boolean,
+): { inline?: Record<string, unknown> | null } {
+  if (!draft && storedUnrepresentable) return {};
+  return { inline: inlineForPost(draft) };
 }

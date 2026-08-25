@@ -18,7 +18,11 @@ import {
 import { buildBannerDraft } from '@/lib/widget/banner-draft';
 import { WidgetDraftPreview, type InlinePick } from '@/components/influencer/WidgetDraftPreview';
 import InlineMountSection from '@/components/influencer/InlineMountSection';
-import { inlineForPost, type InlineMountDraft } from '@/lib/widget/inline-draft';
+import {
+  inlineSaveSlice,
+  storedInlineIsUnrepresentable,
+  type InlineMountDraft,
+} from '@/lib/widget/inline-draft';
 import { resolveInlineMount } from '@/lib/widget/inline';
 
 // Caps mirrored from src/lib/widget/banner.ts (not exported there, so kept in
@@ -308,6 +312,14 @@ export default function WidgetEditorPage() {
   // touched this section round-trips through load/save unchanged. null means
   // no inline mount at all — today's corner-bubble-only behavior.
   const [inlineDraft, setInlineDraft] = useState<InlineMountDraft | null>(null);
+  // The account HAS a stored inline mount, but `resolveInlineMount` refused it
+  // — a hand-written combinator selector, an attribute selector, `enabled:
+  // false`. `inlineDraft` is then null and this section shows its empty state,
+  // which without this flag is indistinguishable from "no mount was ever
+  // configured" — and posting `inline: null` for that case makes the settings
+  // route delete a mount only an operator can recreate. See
+  // `storedInlineIsUnrepresentable`/`inlineSaveSlice` in lib/widget/inline-draft.
+  const [inlineUnrepresentable, setInlineUnrepresentable] = useState(false);
   // True while the customer is armed to click an element on their own site
   // inside the preview iframe on the right. Owned here (not inside
   // InlineMountSection) because WidgetDraftPreview also needs it.
@@ -316,6 +328,11 @@ export default function WidgetEditorPage() {
   // inlineDraft yet — InlineMountSection's own effect does that fold and
   // this is cleared right after, in setInlineDraftFromSection below.
   const [pendingPick, setPendingPick] = useState<InlinePick | null>(null);
+  // The last click inside the preview that the picker refused (no storable
+  // selector on the element or any of its ancestors). Without this the refusal
+  // is invisible: the picker stays armed, nothing in the dashboard changes,
+  // and the customer clicks the same dead element again.
+  const [pickFailed, setPickFailed] = useState(false);
   // The view the live preview was showing before picking started ('open'
   // force-opens the chat panel — see WidgetDraftPreview's doc comment — which
   // can cover the very element the customer needs to click). Picking forces
@@ -392,7 +409,12 @@ export default function WidgetEditorPage() {
     // (or none at all) seeds the same "nothing configured" empty state a
     // fresh account gets.
     setInlineDraft(resolveInlineMount(rawConfig));
+    // Same raw config, same validator, one bit more of the answer: a stored
+    // mount the resolver refused is NOT the same as no stored mount, and only
+    // this flag keeps the save path from treating them alike (I1).
+    setInlineUnrepresentable(storedInlineIsUnrepresentable(rawConfig));
     setPendingPick(null);
+    setPickFailed(false);
     setPicking(false);
   }
 
@@ -501,6 +523,9 @@ export default function WidgetEditorPage() {
   // closed and the whole page clickable; whatever view was active before is
   // restored once picking ends (here, on a real pick, or on Escape below).
   function togglePicking() {
+    // A stale "we could not use that element" notice from a previous session
+    // must not greet the customer when they arm the picker again.
+    setPickFailed(false);
     setPicking((was) => {
       const next = !was;
       if (next) {
@@ -520,6 +545,7 @@ export default function WidgetEditorPage() {
   // separately cancel after choosing a spot.
   function handleInlinePick(pick: InlinePick) {
     setPendingPick(pick);
+    setPickFailed(false);
     setPicking(false);
     setPreviewView(priorPreviewView.current);
   }
@@ -545,6 +571,18 @@ export default function WidgetEditorPage() {
   function handleInlineChange(next: InlineMountDraft | null) {
     setInlineDraft(next);
     setPendingPick(null);
+    // A draft the customer just created or edited is representable by
+    // definition, so there is no longer an unrepresentable stored mount for
+    // the save path to protect — and it must not keep withholding the key,
+    // or the new pick would never reach the server.
+    if (next) setInlineUnrepresentable(false);
+  }
+
+  // The picker refused the clicked element (public/widget.js posts
+  // `ibot:pick-failed`). Deliberately does NOT stop picking — the whole point
+  // is that the next click can land somewhere usable.
+  function handleInlinePickFailed() {
+    setPickFailed(true);
   }
 
   // Starter-question editing for one promotion row — same shape, same cap
@@ -727,7 +765,17 @@ export default function WidgetEditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username,
-          widget: { banner: bannerDraft, teaser, tooltip, inline: inlineForPost(inlineDraft) },
+          // `inlineSaveSlice` spreads either `inline: <value>` or NOTHING.
+          // The empty case is load-bearing: /api/influencer/settings acts on
+          // `'inline' in body.widget`, so omitting the key leaves an
+          // operator-configured mount this editor cannot represent alone,
+          // where posting `inline: null` would delete it on an unrelated save.
+          widget: {
+            banner: bannerDraft,
+            teaser,
+            tooltip,
+            ...inlineSaveSlice(inlineDraft, inlineUnrepresentable),
+          },
           // Always sent — `selectedReels` is seeded raw from config.reels at
           // load (same moment as every other field on this page), not from
           // the separate /api/influencer/reels candidate fetch, so there is
@@ -860,6 +908,8 @@ export default function WidgetEditorPage() {
           onStartPicking={togglePicking}
           picking={picking}
           pendingPick={pendingPick}
+          pickFailed={pickFailed}
+          unrepresentable={inlineUnrepresentable}
           domain={config?.widget?.domain || null}
         />
 
@@ -1559,6 +1609,7 @@ export default function WidgetEditorPage() {
                 view={previewView}
                 picking={picking}
                 onPick={handleInlinePick}
+                onPickFailed={handleInlinePickFailed}
               />
             ) : null}
           </div>
