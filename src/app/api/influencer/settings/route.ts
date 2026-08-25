@@ -11,6 +11,7 @@ import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
 import { sanitizeOverrides, MAX_REELS } from '@/lib/widget/banner';
+import { resolveInlineMount } from '@/lib/widget/inline';
 
 const COOKIE_PREFIX = 'influencer_session_';
 
@@ -55,6 +56,16 @@ export async function POST(req: NextRequest) {
         ...(currentConfig.widget || {}),
         ...body.widget,
       };
+
+      // The client may post anything. Store only what the resolver returns —
+      // this route otherwise spreads body.widget verbatim, which would let an
+      // authenticated customer save `{selector:'body', mode:'replace'}` and
+      // delete their own page on the next pageview.
+      if ('inline' in body.widget) {
+        const resolved = resolveInlineMount({ widget: { inline: body.widget.inline } });
+        if (resolved) updatedConfig.widget.inline = resolved;
+        else delete updatedConfig.widget.inline;
+      }
     }
 
     // Account-level, not per-surface: an override applies to whichever

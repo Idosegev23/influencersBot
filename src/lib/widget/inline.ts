@@ -54,6 +54,40 @@ const MAX_RESERVE = 2000;
 const MAX_PATHS = 20;
 const MAX_PATH = 200;
 
+const UNSAFE_TARGETS = /(^|[\s,>+~])(html|body|head)\s*$/i;
+
+/**
+ * A selector we refuse to store at all.
+ *
+ * `mode: "replace"` calls `parentNode.replaceChild`, so a selector resolving
+ * to the document root, `body` or `head` deletes the customer's page — and
+ * our own container with it. The widget refuses these at mount time too;
+ * this stops one ever being saved.
+ */
+export function isUnsafeSelector(sel: string): boolean {
+  const s = (sel || '').trim();
+  if (!s) return true;
+  if (/^(html|body|head)$/i.test(s)) return true;
+  return UNSAFE_TARGETS.test(s);
+}
+
+/**
+ * A selector we are willing to *propose*. The failure guarded against is not
+ * injection but a selector that silently stops matching when the customer
+ * republishes: builder-generated hashes and deep positional chains are
+ * exactly the ones that do.
+ *
+ * This gates what the picker emits, not what the widget accepts — rejecting a
+ * stored selector at read time would kill a mount that was working.
+ */
+export function isStableSelector(sel: string): boolean {
+  if (!sel || sel.length > MAX_SELECTOR) return false;
+  if ((sel.match(/:nth-child/g) || []).length > 1) return false;
+  if (/\.(css|sc|w-node|jsx|emotion)-[0-9a-z]{4,}/i.test(sel)) return false;
+  if (/\.[A-Za-z_-]*[0-9a-f]{8,}/.test(sel)) return false;
+  return true;
+}
+
 const MODES: InlineMountMode[] = ['into', 'replace', 'overlay'];
 const PRESETS: InlinePreset[] = ['hero', 'bar'];
 const TREATMENTS: InlineTreatment[] = ['bare', 'glass', 'solid'];
@@ -121,6 +155,7 @@ export function resolveInlineMount(config: any): ResolvedInlineMount | null {
 
   const selector = typeof raw.selector === 'string' ? raw.selector.trim() : '';
   if (!selector || selector.length > MAX_SELECTOR) return null;
+  if (isUnsafeSelector(selector)) return null;
 
   const theme = raw.theme || {};
   return {
