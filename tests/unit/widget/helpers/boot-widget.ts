@@ -21,6 +21,13 @@ export interface BootOptions {
   search?: string;
   /** Pathname for the fake page, e.g. '/products/shoes'. Defaults to '/'. */
   path?: string;
+  /**
+   * Sets data-preview="true" on the fake script element, which is the single
+   * input to widget.js's PREVIEW_MODE. Only the dashboard's preview route
+   * (/api/widget/preview/[accountId]) injects that attribute, so a test that
+   * omits this boots exactly the script a real visitor gets.
+   */
+  preview?: boolean;
 }
 
 export interface BootedWidget {
@@ -264,6 +271,7 @@ export async function bootWidget(opts: BootOptions = {}): Promise<BootedWidget> 
 
   const script = document.createElement('script');
   script.setAttribute('data-account-id', accountId);
+  if (opts.preview) script.setAttribute('data-preview', 'true');
   // widget.js reads location.search for the preview gate and location.pathname
   // for the inline mount's path scope.
   window.history.replaceState({}, '', (opts.path || '/') + (opts.search || ''));

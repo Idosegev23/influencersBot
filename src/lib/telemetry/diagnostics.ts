@@ -19,6 +19,11 @@ const DIAGNOSTIC_TYPES = new Set([
   // openFromInline()) — same "never silent" requirement for the open path: a
   // thrown error opening the panel, or a chip prefill that found no composer.
   'inline_open_failed', 'inline_prefill_no_composer',
+  // Picker mode (Task 2, public/widget.js, preview only). The customer clicked
+  // a real element and got nothing back: either it carries no id or class we
+  // are willing to store, or the pick threw. Both are invisible in the
+  // dashboard, so the diagnostic is the only trace they leave.
+  'picker_no_stable_selector', 'picker_failed',
 ]);
 const MAX_MESSAGE = 500;
 const MAX_STACK_FRAMES = 3;

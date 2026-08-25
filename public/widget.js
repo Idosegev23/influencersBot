@@ -1463,6 +1463,22 @@
       // editor. Same-origin is what does.
       if (ev.origin !== window.location.origin) return;
       var msg = ev && ev.data;
+      // Picker mode: the dashboard turns it on, the customer clicks one spot on
+      // their own page, one `ibot:picked` goes back up. Rides the draft
+      // channel's origin check above; the PREVIEW_MODE test is redundant with
+      // the block this listener already sits in and is kept as a second lock on
+      // the one path that can reach into a customer's page.
+      //
+      // Wrapped like every other new path: this branch shares its listener with
+      // the draft channel, and a throw here would take the editor's live
+      // preview down with it.
+      if (msg && msg.type === 'ibot:picker' && PREVIEW_MODE) {
+        try {
+          pickerOn = msg.on === true;
+          if (!pickerOn) pickerStop();
+        } catch (e) { report('picker_failed', e); }
+        return;
+      }
       if (!msg || msg.type !== 'ibot:draft' || !msg.config) return;
       try {
         // Applying a draft costs a full render(), so an unchanged one must
@@ -1547,6 +1563,303 @@
         }
       } catch (e) { /* never break the editor */ }
     });
+  }
+
+  // ---- Picker mode (preview only) ------------------------------------------
+  // The customer clicks the spot on their own site where Bestie should sit.
+  // Runs only inside /api/widget/preview/[accountId], which is the dashboard's
+  // iframe; `PREVIEW_MODE` comes from data-preview="true" on the script tag, so
+  // a visitor on the real site can never reach any of this.
+  var pickerOn = false;
+  var pickerOutline = null;
+
+  // The exact grammar STORABLE_SELECTOR accepts in src/lib/widget/inline.ts:
+  // an id, or one to three chained classes, ASCII, no leading digit. A pick
+  // outside it is refused on save with nothing the customer can see — their
+  // click simply does not stick — so the picker must never emit one. This is
+  // that contract's copy on this side of the wire; the two change together or
+  // the seam fails silently.
+  var PICKER_STORABLE = /^(#[A-Za-z_][\w-]*|\.[A-Za-z_][\w-]*(\.[A-Za-z_][\w-]*){0,2})$/;
+
+  function pickerLabel(el) {
+    var tag = (el.tagName || '').toLowerCase();
+    if (el.id) return tag + '#' + el.id;
+    var cls = (el.className && typeof el.className === 'string') ? el.className.split(/\s+/)[0] : '';
+    return cls ? tag + '.' + cls : tag;
+  }
+
+  // Storable AND unambiguous. Both halves matter: a selector the server will
+  // not store is a pick that vanishes, and one matching two elements mounts
+  // Bestie somewhere the customer did not click.
+  function pickerSelectorFits(sel) {
+    if (!PICKER_STORABLE.test(sel)) return false;
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  // One class token PICKER_STORABLE would accept inside a chain. Utility-CSS
+  // frameworks put plenty of tokens on an element that are legal HTML and
+  // illegal CSS idents in this grammar — Tailwind's `md:flex` (colon),
+  // `-mt-4` (leading hyphen), `bg-white/50` (slash) — and a chain containing
+  // one is refused whole. Filtering them out is what lets `.relative.hero-shell`
+  // still be found on `class="relative md:flex -mt-4 hero-shell"`.
+  var PICKER_CLASS_TOKEN = /^[A-Za-z_][\w-]*$/;
+
+  // How many legal tokens we are willing to combine over. The triple loop
+  // below is O(n^3); a Tailwind hero can carry thirty classes, and a click
+  // must not spend a second in querySelectorAll. Ten legal tokens is 120
+  // triples worst case, and the useful class is never the thirtieth.
+  var PICKER_MAX_CLASSES = 10;
+
+  // Prefer an id, then a class that matches exactly one element. Anything less
+  // stable than that is not offered — a selector that stops matching on the
+  // customer's next publish is worse than no mount, because it fails silently.
+  function pickerSelector(el) {
+    try {
+      if (el.id && pickerSelectorFits('#' + el.id)) return '#' + el.id;
+      var raw = (el.className && typeof el.className === 'string')
+        ? el.className.split(/\s+/) : [];
+      var classes = [];
+      for (var c = 0; c < raw.length && classes.length < PICKER_MAX_CLASSES; c++) {
+        if (PICKER_CLASS_TOKEN.test(raw[c])) classes.push(raw[c]);
+      }
+      for (var i = 0; i < classes.length; i++) {
+        if (pickerSelectorFits('.' + classes[i])) return '.' + classes[i];
+      }
+      // Then chains, shortest first, stopping at the three the grammar allows:
+      // a fourth would be refused on save, so it is never worth building.
+      // Combinations, not prefixes: on `class="a b hero"` where `.a.b` is
+      // ambiguous but `.a.hero` is unique, a prefix walk would give up.
+      var a, b, d;
+      for (a = 0; a < classes.length; a++) {
+        for (b = a + 1; b < classes.length; b++) {
+          if (pickerSelectorFits('.' + classes[a] + '.' + classes[b])) {
+            return '.' + classes[a] + '.' + classes[b];
+          }
+        }
+      }
+      for (a = 0; a < classes.length; a++) {
+        for (b = a + 1; b < classes.length; b++) {
+          for (d = b + 1; d < classes.length; d++) {
+            var combo = '.' + classes[a] + '.' + classes[b] + '.' + classes[d];
+            if (pickerSelectorFits(combo)) return combo;
+          }
+        }
+      }
+      return null;
+    } catch (e) { return null; }
+  }
+
+  function pickerUnsafe(el) {
+    if (!el || el.nodeType !== 1) return true;
+    if (el === document.documentElement || el === document.body || el === document.head) return true;
+    // Bestie's own chrome. The floating bubble and the picker's own outline sit
+    // on top of the very hero the customer is aiming at, and "mount Bestie
+    // inside Bestie" is not a spot on their page.
+    try {
+      if (el.closest && el.closest('#ibot-widget-container,[data-bestie-inline],[data-bestie-picker]')) return true;
+    } catch (e) { /* */ }
+    return false;
+  }
+
+  // A computed colour we are willing to use. Returns null for anything that is
+  // not rgb()/rgba() and for a fully transparent one: `rgba(0, 0, 0, 0)` is
+  // what every unstyled element reports, and reading that as black is exactly
+  // how a sampler ends up proposing a black accent on a white page.
+  function pickerRgb(value) {
+    var m = String(value || '').match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:\s*[,\/]\s*([0-9.]+))?/);
+    if (!m) return null;
+    var alpha = m[4] === undefined ? 1 : parseFloat(m[4]);
+    if (!(alpha > 0.05)) return null;
+    return { r: +m[1], g: +m[2], b: +m[3] };
+  }
+
+  function pickerHex(rgb) {
+    var parts = [rgb.r, rgb.g, rgb.b], out = '#';
+    for (var i = 0; i < parts.length; i++) {
+      var h = Math.max(0, Math.min(255, parts[i] | 0)).toString(16);
+      out += h.length === 1 ? '0' + h : h;
+    }
+    return out;
+  }
+
+  // Ordered by how likely a match is to be a real call to action. A flat
+  // 'a,button,.btn' list returns document order instead, which inside a hero
+  // is usually the logo link.
+  var PICKER_CTA_SELECTORS = [
+    'a[class*="btn"]', 'a[class*="button"]', '.btn', '.button', 'button', '[role="button"]', 'a'
+  ];
+
+  // The site's own call to action — where its accent and its shape language
+  // actually live. Candidates are scanned until one has a background of its
+  // own, because the first <a> inside a hero is usually a bare text link and
+  // sampling that yields transparent-black.
+  function pickerFindCta(el) {
+    var scopes = [el, document];
+    for (var s = 0; s < scopes.length; s++) {
+      for (var k = 0; k < PICKER_CTA_SELECTORS.length; k++) {
+        var found;
+        try { found = scopes[s].querySelectorAll(PICKER_CTA_SELECTORS[k]); } catch (e) { continue; }
+        for (var i = 0; i < found.length && i < 20; i++) {
+          if (pickerUnsafe(found[i])) continue;
+          try {
+            if (pickerRgb(window.getComputedStyle(found[i]).backgroundColor)) return found[i];
+          } catch (e2) { /* */ }
+        }
+      }
+    }
+    return null;
+  }
+
+  // Read the page's own visual language. Inherited properties (the font) need
+  // no sampling at all — they cross the shadow boundary on their own. What we
+  // sample is what does not: the ground we sit on, and the shape and accent
+  // the site already uses for its own calls to action.
+  //
+  // Everything here is PROPOSED to the customer for approval and never applied
+  // behind their back, so a near-miss is a poor suggestion rather than a broken
+  // site — which is why this stays a sampler and not a colour engine.
+  function pickerSampleTheme(el) {
+    // 'light' when nothing can be sampled: an unstyled page is white, and a
+    // 'dark' proposal there is light text on white.
+    var ground = 'light', accent = null, radius = null;
+    try {
+      var node = el, rgb = null;
+      // parentElement is null at <html>, so the root's own background — which
+      // is where a great many sites actually set the page colour — is sampled
+      // rather than being the loop's stop condition.
+      while (node && node.nodeType === 1) {
+        rgb = pickerRgb(window.getComputedStyle(node).backgroundColor);
+        if (rgb) break;
+        node = node.parentElement;
+      }
+      if (rgb) {
+        var lum = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+        ground = lum > 0.5 ? 'light' : 'dark';
+      }
+      var cta = pickerFindCta(el);
+      if (cta) {
+        var cs = window.getComputedStyle(cta);
+        var cRgb = pickerRgb(cs.backgroundColor);
+        if (cRgb) accent = pickerHex(cRgb);
+        var r = parseInt(cs.borderTopLeftRadius, 10);
+        // A pill button reports 999px. Carried onto a full-width surface that
+        // reads as a stadium rather than as the site's shape language, so the
+        // sample is capped at the largest radius that still looks like a card.
+        if (!isNaN(r) && r >= 0) radius = Math.min(r, 32);
+      }
+    } catch (e) { /* a sample we cannot take is simply not proposed */ }
+    return { font: 'inherit', accent: accent, radius: radius, ground: ground };
+  }
+
+  function pickerMeasure(el) {
+    try {
+      var r = el.getBoundingClientRect();
+      var h = Math.round(r.height);
+      return { desktop: window.innerWidth >= 640 ? h : 0, mobile: window.innerWidth < 640 ? h : 0 };
+    } catch (e) { return { desktop: 0, mobile: 0 }; }
+  }
+
+  function pickerHighlight(el) {
+    if (!document.body) return;
+    if (!pickerOutline || !pickerOutline.parentNode) {
+      pickerOutline = document.createElement('div');
+      pickerOutline.setAttribute('data-bestie-picker', '1');
+      pickerOutline.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483647;' +
+        'border:2px solid #9334EB;background:rgba(147,52,235,0.12);border-radius:4px;' +
+        'transition:all .08s ease-out;';
+      document.body.appendChild(pickerOutline);
+    }
+    try {
+      var r = el.getBoundingClientRect();
+      pickerOutline.style.top = r.top + 'px';
+      pickerOutline.style.left = r.left + 'px';
+      pickerOutline.style.width = r.width + 'px';
+      pickerOutline.style.height = r.height + 'px';
+      pickerOutline.style.display = 'block';
+    } catch (e) { /* */ }
+  }
+
+  function pickerStop() {
+    pickerOn = false;
+    if (pickerOutline) pickerOutline.style.display = 'none';
+  }
+
+  // The element the click actually resolves to.
+  //
+  // The picker only ever considered `ev.target`, so clicking a hero's <h1> —
+  // the obvious thing to aim at — picked the <h1>, or (much more often) picked
+  // nothing at all, because a heading rarely carries an id or a unique class.
+  // Walking up to three ancestors turns that dead click into the section
+  // around it. Deliberately a FALLBACK and not a preference: the direct target
+  // is still tried first, so a click on an element that is itself storable
+  // picks exactly what was highlighted under the cursor.
+  var PICKER_ANCESTOR_DEPTH = 3;
+
+  function pickerResolve(el) {
+    var node = el;
+    for (var i = 0; i <= PICKER_ANCESTOR_DEPTH && node && node.nodeType === 1; i++) {
+      if (!pickerUnsafe(node)) {
+        var sel = pickerSelector(node);
+        if (sel) return { el: node, selector: sel };
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  if (PREVIEW_MODE) {
+    document.addEventListener('mouseover', function (ev) {
+      if (!pickerOn) return;
+      try { if (!pickerUnsafe(ev.target)) pickerHighlight(ev.target); } catch (e) { /* */ }
+    }, true);
+
+    // Capture phase, and both prevented and stopped: the customer is clicking
+    // their own live site, and a pick must not also follow a link or submit a
+    // form out from under them.
+    document.addEventListener('click', function (ev) {
+      if (!pickerOn) return;
+      try {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var el = ev.target;
+        if (pickerUnsafe(el)) return;
+        var hit = pickerResolve(el);
+        if (!hit) {
+          // Two channels, and both are needed. The diagnostic is our record;
+          // `ibot:pick-failed` is the customer's. Without the second one a
+          // refused pick is a click that does nothing at all — the picker
+          // stays armed, the dashboard shows no change, and they click again.
+          report('picker_no_stable_selector', { message: pickerLabel(el) });
+          try {
+            window.parent.postMessage(
+              { type: 'ibot:pick-failed', label: pickerLabel(el) },
+              window.location.origin,
+            );
+          } catch (e2) { /* no reachable parent — the diagnostic still stands */ }
+          return;
+        }
+        // Everything below measures and samples `hit.el`, which is the element
+        // the selector actually names — not `ev.target`, which may be a
+        // descendant of it (see pickerResolve).
+        el = hit.el;
+        pickerStop();
+        window.parent.postMessage({
+          type: 'ibot:picked',
+          selector: hit.selector,
+          label: pickerLabel(el),
+          mode: 'into',
+          // The TARGET's own height, not Bestie's. mountInline() applies
+          // reserve as host.style.minHeight whatever the mode is (see the
+          // reserve block in mountInline), and `into` — the only mode this
+          // emits — appends the host INSIDE the target, so a 600px hero
+          // approved as-is becomes a 1200px hero. Whoever consumes this
+          // message decides what to do with that; it is not safe to save
+          // unexamined.
+          reserve: pickerMeasure(el),
+          theme: pickerSampleTheme(el)
+        }, window.location.origin);
+      } catch (e) { report('picker_failed', e); }
+    }, true);
   }
 
   // ============================================

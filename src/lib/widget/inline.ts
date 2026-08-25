@@ -54,6 +54,57 @@ const MAX_RESERVE = 2000;
 const MAX_PATHS = 20;
 const MAX_PATH = 200;
 
+/**
+ * What we are willing to store, expressed as what we accept rather than what
+ * we reject.
+ *
+ * A blocklist of dangerous spellings cannot be completed: `body`, `body,.foo`,
+ * `:is(body)`, `:has(> body)`, `:root`, `*` and `body[title="a b"]` all
+ * resolve to `<body>` or `<html>`, and any string-level parser that is not a
+ * real CSS parser will keep missing new spellings — two rounds of patching
+ * individual bypasses is what proved this. The picker (Task 2) emits an id or
+ * a short class chain and nothing else, so that is the whole grammar we need
+ * to allow.
+ *
+ * This is not the safety guarantee — `<body class="page">` plus `.page` would
+ * pass here. The guarantee is `inlineTargetIsSafe` in `public/widget.js`,
+ * which compares element identity against `document.documentElement` / body /
+ * head once a DOM exists — the only place "what does this resolve to" can
+ * actually be answered. This check exists to stop the obviously-wrong thing
+ * from ever being stored, not to replace that one.
+ */
+const STORABLE_SELECTOR = /^(#[A-Za-z_][\w-]*|\.[A-Za-z_][\w-]*(\.[A-Za-z_][\w-]*){0,2})$/;
+
+/**
+ * A selector we refuse to store at all.
+ *
+ * `mode: "replace"` calls `parentNode.replaceChild`, so a selector resolving
+ * to the document root, `body` or `head` deletes the customer's page — and
+ * our own container with it. The widget refuses these at mount time too;
+ * this stops one ever being saved.
+ */
+export function isUnsafeSelector(sel: string): boolean {
+  const s = (sel || '').trim();
+  return !STORABLE_SELECTOR.test(s);
+}
+
+/**
+ * A selector we are willing to *propose*. The failure guarded against is not
+ * injection but a selector that silently stops matching when the customer
+ * republishes: builder-generated hashes and deep positional chains are
+ * exactly the ones that do.
+ *
+ * This gates what the picker emits, not what the widget accepts — rejecting a
+ * stored selector at read time would kill a mount that was working.
+ */
+export function isStableSelector(sel: string): boolean {
+  if (!sel || sel.length > MAX_SELECTOR) return false;
+  if ((sel.match(/:nth-child/g) || []).length > 1) return false;
+  if (/\.(css|sc|w-node|jsx|emotion)-[0-9a-z]{4,}/i.test(sel)) return false;
+  if (/\.[A-Za-z_-]*[0-9a-f]{8,}/.test(sel)) return false;
+  return true;
+}
+
 const MODES: InlineMountMode[] = ['into', 'replace', 'overlay'];
 const PRESETS: InlinePreset[] = ['hero', 'bar'];
 const TREATMENTS: InlineTreatment[] = ['bare', 'glass', 'solid'];
@@ -121,6 +172,7 @@ export function resolveInlineMount(config: any): ResolvedInlineMount | null {
 
   const selector = typeof raw.selector === 'string' ? raw.selector.trim() : '';
   if (!selector || selector.length > MAX_SELECTOR) return null;
+  if (isUnsafeSelector(selector)) return null;
 
   const theme = raw.theme || {};
   return {
@@ -140,7 +192,12 @@ export function resolveInlineMount(config: any): ResolvedInlineMount | null {
       radius: theme.radius === null || theme.radius === undefined
         ? null
         : clampNumber(theme.radius, 0, 999, 0),
-      ground: theme.ground === 'light' ? 'light' : 'dark',
+      // 'light' is the default on purpose, and it must stay the same default
+      // `pickerSampleTheme` in public/widget.js falls back to: an unstyled page
+      // is white, and a 'dark' proposal there is light text on white. Two
+      // halves of one feature disagreeing about the same fallback is a trap
+      // even while every real pick sends an explicit value.
+      ground: theme.ground === 'dark' ? 'dark' : 'light',
     },
     bubble: oneOf(raw.bubble, BUBBLES, 'after-scroll'),
   };
