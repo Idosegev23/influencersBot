@@ -164,12 +164,16 @@
   // changes innerHeight, not innerWidth, but any height-only resize would still
   // reach this check).
   var inlineLastChipBudget = null;
-  // True while the conversation fills the box the inline invitation held rather
-  // than floating in the corner. Only for a `replace` mount on desktop: there
-  // the hero IS Bestie's surface, so a 400px card at the screen edge reads as
-  // an unrelated component — the visitor clicked the middle of the page and
-  // something happened at the corner of it.
-  var inlineAnchored = false;
+  // True once the visitor has engaged a `replace` mount and the hero itself is
+  // holding the conversation — bare messages over the customer's video, the
+  // input where the pill was, no panel anywhere. A `replace` took the hero
+  // over, so the hero IS Bestie's surface: opening the floating panel there
+  // (in the corner, or anchored over the hero's box — both were tried and
+  // rejected) puts a foreign window on top of the very thing we replaced.
+  //
+  // `into` is deliberately excluded. There we are a guest in someone else's
+  // layout and the page is still theirs, so the floating panel stays right.
+  var inlineConversing = false;
   // Set the instant a visitor engages from the inline surface, to the customer's
   // own body.style.overflow value at that moment; null the rest of the time.
   // restoreAfterInline() uses "not null" as its own idempotency guard (safe to
@@ -1979,29 +1983,6 @@
     });
   }
 
-  // Put the floating container exactly over the inline host's box. Page scroll
-  // is already locked while an inline-opened conversation is up, so a fixed box
-  // stays aligned with the hero underneath it.
-  function anchorContainerToInline() {
-    if (!inlineHost) return false;
-    try {
-      var r = inlineHost.getBoundingClientRect();
-      if (!r || !r.width || !r.height) return false;
-      container.style.cssText = 'position:fixed;z-index:2147483647;' +
-        'top:' + Math.round(r.top) + 'px;left:' + Math.round(r.left) + 'px;' +
-        'width:' + Math.round(r.width) + 'px;height:' + Math.round(r.height) + 'px;' +
-        'direction:' + locale.dir + ';';
-      inlineAnchored = true;
-      return true;
-    } catch (e) { return false; }
-  }
-
-  function releaseInlineAnchor() {
-    if (!inlineAnchored) return;
-    inlineAnchored = false;
-    updateContainerPosition();
-  }
-
   function updateContainerPosition() {
     container.style.cssText = 'position:fixed;z-index:2147483647;' +
       (config.position === 'bottom-left'
@@ -2297,13 +2278,29 @@
       if (pill) openFromInline(null);
     }
 
+    // Sending from the hero's own composer. Same delegation reason as above:
+    // renderInlineConversation() can replace the composer's siblings, and a
+    // handler bound to the input itself would not survive a rebuild.
+    function sendFromInline() {
+      try { sendMessage(); } catch (err) { report('inline_send_failed', err); }
+    }
+
     inlineRoot.addEventListener('click', function (e) {
-      try { activate(e.target); } catch (err) { report('inline_open_failed', err); }
+      try {
+        var el = e.target;
+        if (el && el.closest && el.closest('#ibot-inline-send')) { sendFromInline(); return; }
+        activate(el);
+      } catch (err) { report('inline_open_failed', err); }
     });
     inlineRoot.addEventListener('keydown', function (e) {
       try {
-        if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
         var el = e.target;
+        if (e.key === 'Enter' && el && el.closest && el.closest('#ibot-inline-input')) {
+          e.preventDefault();
+          sendFromInline();
+          return;
+        }
+        if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
         var hit = (el && el.closest) ? (el.closest('#ibot-inline-pill') || el.closest('[data-inline-chip]')) : null;
         if (!hit) return;
         e.preventDefault();
@@ -2402,7 +2399,92 @@
         'border:1px solid ' + edge + ';background:' + fill + ';color:' + ink + ';' +
         'min-height:32px;display:inline-flex;align-items:center;}' +
       '@media (max-width:639px){.chip{min-height:44px;}.pill{min-height:52px;}}' +
-      '@media (prefers-reduced-motion:reduce){.pill{transition:none;}}';
+      '@media (prefers-reduced-motion:reduce){.pill{transition:none;}}' +
+      inlineConversationCss(ink, fill, edge, radius, light);
+  }
+
+  // The reserved height this mount is holding open in the customer's layout,
+  // for the current viewport. mountInline() writes the same number as the
+  // host's min-height; the conversation caps itself to it so the messages
+  // scroll inside the hero rather than growing it and reflowing the page.
+  function inlineReserveHeight() {
+    var r = INLINE && INLINE.reserve;
+    if (!r) return 0;
+    return (window.innerWidth < 640 ? r.mobile : r.desktop) || 0;
+  }
+
+  // The engaged state, in the resting state's own language.
+  //
+  // Everything the floating panel brings — a header bar, an opaque background,
+  // an 18px card radius, a close pill, a powered-by footer — is deliberately
+  // absent. What carries over from the invitation is exactly its two materials:
+  // `ink` for text and `fill`/`edge` for the pill. The visitor's own words get
+  // the pill's material (they typed them INTO the pill); Bestie answers as bare
+  // text on the hero, the way the headline was bare a moment earlier.
+  function inlineConversationCss(ink, fill, edge, radius, light) {
+    var reserve = inlineReserveHeight();
+    // No reserve configured (`into`-shaped config on a replace mount, or a row
+    // predating the reserve field): fall back to a height that is still bounded,
+    // because an unbounded message list would grow the customer's layout.
+    var box = reserve > 0 ? reserve + 'px' : 'min(70vh,520px)';
+
+    return (
+      // The invitation gives way rather than snapping out. It stays in the DOM:
+      // a `replace` removed the customer's own <h1>, so ours is the page's only
+      // heading and deleting it would leave the document without one.
+      '.head.away{overflow:hidden;animation:ibot-inline-away .3s ease forwards;}' +
+      '@keyframes ibot-inline-away{from{max-height:260px;opacity:1;}' +
+        'to{max-height:0;opacity:0;margin-bottom:0;}}' +
+      '.conv{display:flex;flex-direction:column;width:100%;max-width:560px;' +
+        'height:' + box + ';max-height:' + box + ';' +
+        'animation:ibot-inline-conv-in .3s ease-out;}' +
+      '@keyframes ibot-inline-conv-in{from{opacity:0;transform:translateY(10px);}' +
+        'to{opacity:1;transform:none;}}' +
+      '@media (prefers-reduced-motion:reduce){' +
+        '.head.away{animation:none;max-height:0;opacity:0;margin-bottom:0;}' +
+        '.conv{animation:none;}}' +
+      // min-height:0 is what lets a flex child actually scroll instead of
+      // growing its parent past the reserve.
+      '.msgs{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;' +
+        '-webkit-overflow-scrolling:touch;padding:4px 2px 12px;' +
+        'display:flex;flex-direction:column;gap:10px;color:' + ink + ';}' +
+      '.row{display:flex;max-width:100%;}' +
+      '.row.bot{justify-content:flex-start;}' +
+      '.row.me{justify-content:flex-end;}' +
+      // Bestie speaks bare. Over a moving video a 15px line needs more help
+      // than a 52px headline does, so a dark ground gets a soft shadow — the
+      // cheapest legibility that adds no box.
+      '.say{max-width:86%;font-size:15px;line-height:1.55;color:' + ink + ';' +
+        'word-break:break-word;' +
+        (light ? '' : 'text-shadow:0 1px 10px rgba(0,0,0,0.55);') + '}' +
+      // The visitor's words keep the pill's material — they were typed into it.
+      '.row.me .say{background:' + fill + ';border:1px solid ' + edge + ';' +
+        'border-radius:' + Math.min(radius, 18) + 'px;padding:8px 13px;text-shadow:none;}' +
+      // formatMessage() hard-codes #000/#fff on list items and the account
+      // colour on links — both invisible against a video. !important in an
+      // author stylesheet is the only thing that outranks an inline style.
+      '.say li,.say ol,.say ul{color:' + ink + ' !important;}' +
+      '.say a{color:' + ink + ' !important;text-decoration:underline;' +
+        'text-underline-offset:2px;}' +
+      '.dots{display:inline-flex;gap:4px;align-items:center;}' +
+      '.dots i{width:6px;height:6px;border-radius:50%;background:' + ink + ';' +
+        'opacity:.55;animation:ibot-inline-dot 1.2s ease-in-out infinite;}' +
+      '.dots i:nth-child(2){animation-delay:.15s;}' +
+      '.dots i:nth-child(3){animation-delay:.3s;}' +
+      '@keyframes ibot-inline-dot{0%,60%,100%{transform:translateY(0);opacity:.4;}' +
+        '30%{transform:translateY(-4px);opacity:.9;}}' +
+      // The input IS the pill, become real: same fill, edge, radius and avatar.
+      '.pill.live{cursor:auto;flex:none;}' +
+      // `font:inherit` names no family — it is what makes a form control, which
+      // otherwise falls back to the UA's own font, speak the host site's type.
+      // font-size comes after so the composer keeps the pill's 15px.
+      '.inp{flex:1;min-width:0;background:transparent;border:none;outline:none;' +
+        'color:' + ink + ';font:inherit;font-size:15px;padding:0;' +
+        'text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';}' +
+      '.inp::placeholder{color:' + ink + ';opacity:.55;}' +
+      '.send{cursor:pointer;border:none;padding:0;}' +
+      '.send[disabled]{opacity:.45;cursor:default;}'
+    );
   }
 
   function inlinePillHtml() {
@@ -2429,10 +2511,12 @@
       INLINE.banner && INLINE.banner.headline);
   }
 
-  function inlineHeadlineHtml() {
+  // `away` collapses the invitation instead of deleting it: the heading stays in
+  // the document (see below), it just stops occupying the conversation's space.
+  function inlineHeadlineHtml(away) {
     if (!inlineShowsHeadline()) return '';
     var b = INLINE.banner;
-    var out = '<div class="head">';
+    var out = '<div class="head' + (away ? ' away' : '') + '">';
     if (b.eyebrow) out += '<div class="eyebrow">' + escapeHtml(b.eyebrow) + '</div>';
     // Their <h1> was just removed by the replace, so this IS the page's
     // heading now. Shipping an h2 would leave the page with none.
@@ -2443,6 +2527,7 @@
 
   function renderInline() {
     if (!inlineRoot || !INLINE) return;
+    if (inlineConversing) { renderInlineConversation(); return; }
 
     var budget = inlineChipCount();
     inlineLastChipBudget = budget;
@@ -2465,8 +2550,116 @@
 
     inlineRoot.innerHTML =
       '<style>' + inlineStylesCss() + '</style>' +
-      '<div class="wrap">' + inlineHeadlineHtml() +
+      '<div class="wrap">' + inlineHeadlineHtml(false) +
       '<div class="pane">' + inlinePillHtml() + chipsHtml + '</div></div>';
+  }
+
+  // ---- The engaged inline surface --------------------------------------------
+  // One instance, one session, two renderers. Nothing here talks to the network
+  // or owns any state: `messages`, `isLoading`, `thinkingText` and sendMessage()
+  // are the same module-level ones the floating panel reads, so a visitor who
+  // talks in the hero and then opens the corner bubble is in the same thread.
+
+  // The composer is the pill, become real — same avatar, fill, edge and arrow,
+  // with an <input> where the placeholder text used to sit.
+  function inlineComposerHtml() {
+    var ph = config.placeholder || '';
+    var sendLabel = wlbl('שליחה', 'Send');
+    return '<div class="pill live">' +
+      '<span class="av">' + avatarHtml(28) + '</span>' +
+      '<input id="ibot-inline-input" class="inp" type="text" autocomplete="off" ' +
+        'placeholder="' + escapeHtml(ph) + '" aria-label="' + escapeHtml(ph) + '" />' +
+      '<button type="button" id="ibot-inline-send" class="go send" ' +
+        'aria-label="' + escapeHtml(sendLabel) + '"' + (isLoading ? ' disabled' : '') + '>' +
+        '&#8593;</button>' +
+      '</div>';
+  }
+
+  // Bare rows — no bubbles for Bestie, no avatar repeated per message, no card.
+  //
+  // Only text turns render here. `cards` and `cs_payload` rows are panel-shaped
+  // objects (product cards, order-status panels, detail forms) with no bare
+  // counterpart designed yet; the pilot account has no catalog and no CS module,
+  // so they cannot occur. Skipping is the safe failure — they remain in
+  // `messages` and appear in full the moment the visitor opens the panel.
+  function inlineMessagesHtml() {
+    var out = '';
+    for (var i = 0; i < messages.length; i++) {
+      var m = messages[i];
+      if (m.role !== 'user' && m.role !== 'assistant') continue;
+      var isUser = m.role === 'user';
+      var isLast = i === messages.length - 1;
+      if (!m.content) {
+        // The empty assistant row sendMessage() pushes ahead of the reply.
+        if (isLoading && isLast) {
+          out += '<div class="row bot"><div class="say">' +
+            (thinkingText
+              ? escapeHtml(thinkingText)
+              : '<span class="dots"><i></i><i></i><i></i></span>') +
+            '</div></div>';
+        }
+        continue;
+      }
+      out += '<div class="row ' + (isUser ? 'me' : 'bot') + '">' +
+        // `false` (not `isUser`): formatMessage's user branch hard-codes white
+        // text, which is for the panel's filled bubble. Here the colour comes
+        // from the stylesheet's ink for both speakers.
+        '<div class="say">' + formatMessage(m.content, false) + '</div></div>';
+    }
+    return out;
+  }
+
+  function renderInlineConversation() {
+    var conv = inlineRoot.getElementById('ibot-inline-conv');
+    if (conv) {
+      // Incremental. The shadow root must NOT be rebuilt while a conversation
+      // is live: that destroys the composer the visitor is typing into and
+      // drops focus on every streamed token.
+      //
+      // The stylesheet is still refreshed, because the reserved height it caps
+      // the conversation to is viewport-dependent (desktop vs mobile reserve)
+      // and a resize across 640px would otherwise leave it stale.
+      var styleEl = inlineRoot.querySelector('style');
+      if (styleEl) styleEl.textContent = inlineStylesCss();
+      var msgsEl = inlineRoot.getElementById('ibot-inline-msgs');
+      if (msgsEl) {
+        msgsEl.innerHTML = inlineMessagesHtml();
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+      }
+      var sendEl = inlineRoot.getElementById('ibot-inline-send');
+      if (sendEl) {
+        if (isLoading) sendEl.setAttribute('disabled', 'disabled');
+        else sendEl.removeAttribute('disabled');
+      }
+      return;
+    }
+
+    inlineRoot.innerHTML =
+      '<style>' + inlineStylesCss() + '</style>' +
+      '<div class="wrap">' + inlineHeadlineHtml(true) +
+      '<div class="conv" id="ibot-inline-conv">' +
+        '<div class="msgs" id="ibot-inline-msgs" role="log" aria-live="polite">' +
+          inlineMessagesHtml() +
+        '</div>' +
+        inlineComposerHtml() +
+      '</div></div>';
+
+    var built = inlineRoot.getElementById('ibot-inline-msgs');
+    if (built) built.scrollTop = built.scrollHeight;
+  }
+
+  // The composer the visitor is actually typing into. An open floating panel
+  // always wins — someone who scrolled past the hero and opened the bubble is
+  // typing there — and otherwise it is the hero's own input. Returns the panel's
+  // composer when neither applies, which is today's behavior unchanged.
+  function activeComposer() {
+    if (!isOpen && inlineConversing && inlineRoot) {
+      try {
+        var el = inlineRoot.getElementById('ibot-inline-input');
+        if (el) return el;
+      } catch (e) { /* fall through to the panel's composer */ }
+    }
+    return document.getElementById('ibot-input');
   }
 
   // The bubble and the inline mount are the same conversation; showing both at
@@ -2986,6 +3179,17 @@
     } catch (e) { /* */ }
     // Master switch (admin toggle): when disabled, render nothing at all.
     if (config.enabled === false) { try { container.innerHTML = ''; } catch (e) { /* */ } return; }
+
+    // One funnel, two renderers. render() is the single place every UI update
+    // passes through — a message sent, a streamed delta, a thinking status, a
+    // reply landing — so hooking the engaged hero in here is what makes all of
+    // it work there for free, with no second message loop to keep in step.
+    // Only while conversing: a resting mount must not be rebuilt (and its
+    // chip entrance animation restarted) by unrelated panel renders.
+    if (inlineConversing) {
+      try { renderInline(); } catch (e) { report('inline_render_failed', e); }
+    }
+
     if (!isOpen) {
       renderClosed();
       return;
@@ -3015,7 +3219,57 @@
   // sessionId/messages — no new session state) in the floating panel, which is
   // what actually renders the overlay. The inline surface itself never grows in
   // place; it hands off to the panel and gets out of the way.
+  // The hero becomes the conversation.
+  //
+  // No scroll lock, no backdrop, no fixed positioning: the conversation is IN
+  // the customer's page rather than over it, so the page stays theirs and stays
+  // scrollable. `isOpen` deliberately stays false — that flag means "the
+  // floating panel is up", and it is not.
+  function beginInlineConversation(prefill) {
+    try {
+      if (!inlineConversing) {
+        inlineConversing = true;
+        // #ibot-tip and #ibot-teaser live on document.body, outside `container`,
+        // so nothing that hides the bubble hides them. A teaser floating in the
+        // corner over a conversation the visitor just started in the hero is the
+        // same "two assistants" problem the bubble suppression exists to avoid.
+        try {
+          markTooltipSeen();
+          var tipNode = document.getElementById('ibot-tip');
+          if (tipNode && tipNode.parentNode) tipNode.parentNode.removeChild(tipNode);
+        } catch (e) { /* */ }
+        try { removeTeaser(); } catch (e) { /* */ }
+        widgetTrack('widget_opened', { surface: 'inline' });
+        trackBannerViewed();
+      }
+
+      renderInline();
+
+      var input = inlineRoot.getElementById('ibot-inline-input');
+      if (!input) { report('inline_prefill_no_composer', { message: 'inline composer not found' }); return; }
+      // Prefill, don't send: a chip puts its question in the composer so the
+      // visitor sees what is about to go out and can edit it — same rule the
+      // banner CTA follows.
+      if (prefill) input.value = prefill;
+      try { input.focus(); } catch (e) { /* */ }
+    } catch (e) {
+      report('inline_open_failed', e);
+    }
+  }
+
   function openFromInline(prefill) {
+    // A mount that TOOK THE HERO OVER converses in the hero. Everything below
+    // this line — the scroll lock, the grow-from-origin panel, the panel's own
+    // chrome — exists to place a floating window over the page, which is the
+    // wrong object entirely once the hero is Bestie's own surface.
+    //
+    // `into` falls through to that path unchanged: there the page is still the
+    // customer's, and a panel on top of it is right.
+    if (INLINE && INLINE.mode === 'replace' && inlineRoot) {
+      beginInlineConversation(prefill);
+      return;
+    }
+
     // Re-entrant guard: the desktop panel has no backdrop and the pill stays
     // visible and clickable underneath it (review finding, Critical #1), so a
     // double-click on the pill — or a pill click followed by a chip click —
@@ -3102,14 +3356,6 @@
       // bubble modes, its own earlier logic) may have hidden this container.
       container.style.display = '';
 
-      // A mount that took the hero over opens IN the hero. A mount that is only
-      // a guest inside someone's layout keeps the corner panel, and mobile keeps
-      // its full-screen sheet — that already is 'in place' on a phone, and a
-      // hero-height box would be a cramped place to hold a conversation.
-      if (INLINE && INLINE.mode === 'replace' && window.innerWidth >= 640) {
-        anchorContainerToInline();
-      }
-
       // panelStyle's slide-up entrance animation only plays when !panelPainted.
       // Forcing it true here means renderOpen() emits no competing `animation`
       // inline style, so the grow-from-origin keyframe below (added to the
@@ -3168,7 +3414,6 @@
   // stays null, so the body/pop-focus/bubble work below is a no-op) — closeWidget()
   // is the one shared close path for every entry point.
   function restoreAfterInline() {
-    releaseInlineAnchor();
     if (inlineScrollLock === null) return;
     document.body.style.overflow = inlineScrollLock;
     inlineScrollLock = null;
@@ -3448,9 +3693,7 @@
     // Panel dimensions per Figma
     var panelStyle = isMobile
       ? mobilePanelStyle()
-      : inlineAnchored
-        ? 'width:100%;height:100%;max-height:none;border-radius:0;position:relative;'
-        : 'width:400px;height:auto;max-height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
+      : 'width:400px;height:auto;max-height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
 
     // Slide the panel up on open only — not on every rebuild.
     var panelAnim = panelPainted ? '' : 'animation:ibot-slide-up 0.35s cubic-bezier(0.34,1.56,0.64,1);';
@@ -3655,7 +3898,10 @@
   // ============================================
 
   function sendMessage() {
-    var inputEl = document.getElementById('ibot-input');
+    // Not document.getElementById: when the hero is holding the conversation
+    // the composer lives inside a shadow root, where document queries cannot
+    // reach it. Same function, same messages, same session — two surfaces.
+    var inputEl = activeComposer();
     var text = inputEl ? inputEl.value.trim() : '';
     if (!text || isLoading) return;
 
@@ -4763,6 +5009,16 @@
         streamingEl.innerHTML = formatMessage(msg.content, false);
         var msgsScroll = document.getElementById('ibot-messages');
         if (msgsScroll) msgsScroll.scrollTop = msgsScroll.scrollHeight;
+        // The hero keeps pace with the panel token by token when both are up.
+        if (inlineConversing) {
+          try { renderInline(); } catch (e) { report('inline_render_failed', e); }
+        }
+      } else if (!streamingEl && inlineConversing) {
+        // No panel is open — the hero owns this conversation. Repaint just its
+        // message list rather than falling through to a full render(), which
+        // would also rebuild the (hidden) floating bubble on every token.
+        thinkingText = null;
+        try { renderInline(); } catch (e) { report('inline_render_failed', e); }
       } else {
         // First paint after thinking dots — full render to swap dot bubble for text bubble.
         thinkingText = null;

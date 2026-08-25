@@ -19,6 +19,10 @@ const DIAGNOSTIC_TYPES = new Set([
   // openFromInline()) — same "never silent" requirement for the open path: a
   // thrown error opening the panel, or a chip prefill that found no composer.
   'inline_open_failed', 'inline_prefill_no_composer',
+  // A send from the hero's own composer threw (beginInlineConversation's
+  // surface owns the message loop's entry point there). Without this the
+  // conversation silently stops accepting input with nothing to see.
+  'inline_send_failed',
   // Picker mode (Task 2, public/widget.js, preview only). The customer clicked
   // a real element and got nothing back: either it carries no id or class we
   // are willing to store, or the pick threw. Both are invisible in the

@@ -64,6 +64,19 @@ describe('sanitizeDiagnostic', () => {
     }
   });
 
+  it('keeps every inline-engagement diagnostic type — the hero conversation has no other trace', () => {
+    // A send that throws inside the hero's composer leaves the conversation
+    // silently unable to accept input; a type missing from the allowlist is
+    // discarded by the route without a word, so this pairs the two.
+    for (const type of ['inline_open_failed', 'inline_prefill_no_composer', 'inline_send_failed']) {
+      const out = sanitizeDiagnostic({ type, message: 'm' });
+      expect(out?.type).toBe(type);
+    }
+    // The paired presence/absence: this allowlist really does reject, so the
+    // assertions above are not satisfied by a sanitizer that accepts anything.
+    expect(sanitizeDiagnostic({ type: 'inline_send_exploded', message: 'm' })).toBeNull();
+  });
+
   it('keeps every picker diagnostic type — an unregistered type is discarded silently', () => {
     for (const type of ['picker_no_stable_selector', 'picker_failed']) {
       const out = sanitizeDiagnostic({ type, message: 'div.hero' });
