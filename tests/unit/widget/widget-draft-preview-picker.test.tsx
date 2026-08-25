@@ -114,6 +114,79 @@ describe('WidgetDraftPreview picker wiring', () => {
     addSpy.mockRestore();
   });
 
+  // ── I3: the refusal channel ─────────────────────────────────────────────
+  //
+  // Before this existed, a pick the widget refused reached only our
+  // diagnostics table. The dashboard showed nothing, the picker stayed armed,
+  // and the click read as a broken UI.
+  const FAILED = { type: 'ibot:pick-failed', label: 'h1' };
+
+  it('hands a refusal to onPickFailed', async () => {
+    const onPickFailed = vi.fn();
+    render(<WidgetDraftPreview accountId="a" draft={{}} picking onPickFailed={onPickFailed} />);
+    window.dispatchEvent(new MessageEvent('message', { data: FAILED, origin: window.location.origin }));
+    await waitFor(() => expect(onPickFailed).toHaveBeenCalledWith({ label: 'h1' }));
+  });
+
+  it('ignores a refusal from another origin', async () => {
+    const onPickFailed = vi.fn();
+    render(<WidgetDraftPreview accountId="a" draft={{}} picking onPickFailed={onPickFailed} />);
+    window.dispatchEvent(new MessageEvent('message', { data: FAILED, origin: 'https://evil.example' }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(onPickFailed).not.toHaveBeenCalled();
+  });
+
+  it('ignores a refusal whose label is not a string, rather than rendering it at the customer', async () => {
+    const onPickFailed = vi.fn();
+    render(<WidgetDraftPreview accountId="a" draft={{}} picking onPickFailed={onPickFailed} />);
+    window.dispatchEvent(new MessageEvent('message', {
+      data: { type: 'ibot:pick-failed', label: { toString: () => 'boom' } },
+      origin: window.location.origin,
+    }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(onPickFailed).not.toHaveBeenCalled();
+  });
+
+  it('accepts a refusal with no label at all, reporting label null', async () => {
+    // Absence of `label` is not a malformed message — the notice reads the
+    // same without it. Paired with the rejection above so neither assertion
+    // can pass on a listener that accepts (or drops) everything.
+    const onPickFailed = vi.fn();
+    render(<WidgetDraftPreview accountId="a" draft={{}} picking onPickFailed={onPickFailed} />);
+    window.dispatchEvent(new MessageEvent('message', {
+      data: { type: 'ibot:pick-failed' }, origin: window.location.origin,
+    }));
+    await waitFor(() => expect(onPickFailed).toHaveBeenCalledWith({ label: null }));
+  });
+
+  it('does not confuse a refusal with a pick, in either direction', async () => {
+    const onPick = vi.fn();
+    const onPickFailed = vi.fn();
+    render(<WidgetDraftPreview accountId="a" draft={{}} picking onPick={onPick} onPickFailed={onPickFailed} />);
+    window.dispatchEvent(new MessageEvent('message', { data: FAILED, origin: window.location.origin }));
+    await waitFor(() => expect(onPickFailed).toHaveBeenCalled());
+    expect(onPick).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new MessageEvent('message', { data: PICK, origin: window.location.origin }));
+    await waitFor(() => expect(onPick).toHaveBeenCalled());
+    expect(onPickFailed).toHaveBeenCalledTimes(1);
+  });
+
+  // ── I5: the preview gate ────────────────────────────────────────────────
+
+  it('asks the preview route for the ?bestie=1 view, so a preview mount renders here at all', async () => {
+    // `inlinePreviewAllowed()` in public/widget.js reads `location.search`
+    // inside the iframe. Without this param a mount stored as `enabled:
+    // "preview"` — which is where EVERY fresh pick lands by design — never
+    // rendered in the dashboard's own preview, while a live one did. The
+    // route itself reads only `path`, so the param is inert server-side.
+    render(<WidgetDraftPreview accountId="acc-7" draft={{}} />);
+    const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+    // Both halves: the right account AND the preview flag. Asserting only
+    // the flag would stay green on a src that lost the account id.
+    expect(iframe.getAttribute('src')).toBe('/api/widget/preview/acc-7?bestie=1');
+  });
+
   // Absence means today's behavior: a caller that never passes `picking` or
   // `onPick` must see no picker traffic at all. This is the sibling
   // assertion to the two "not called" tests above — proving the negative for

@@ -192,7 +192,12 @@ export function resolveInlineMount(config: any): ResolvedInlineMount | null {
       radius: theme.radius === null || theme.radius === undefined
         ? null
         : clampNumber(theme.radius, 0, 999, 0),
-      ground: theme.ground === 'light' ? 'light' : 'dark',
+      // 'light' is the default on purpose, and it must stay the same default
+      // `pickerSampleTheme` in public/widget.js falls back to: an unstyled page
+      // is white, and a 'dark' proposal there is light text on white. Two
+      // halves of one feature disagreeing about the same fallback is a trap
+      // even while every real pick sends an explicit value.
+      ground: theme.ground === 'dark' ? 'dark' : 'light',
     },
     bubble: oneOf(raw.bubble, BUBBLES, 'after-scroll'),
   };

@@ -90,6 +90,29 @@ describe('resolveInlineMount', () => {
     expect(r.bubble).toBe('after-scroll');
     expect(r.theme.font).toBe('inherit');
     expect(r.reserve).toEqual({ desktop: 0, mobile: 0 });
+    // Same fallback `pickerSampleTheme` in public/widget.js uses when it can
+    // sample nothing ("'light' when nothing can be sampled: an unstyled page
+    // is white, and a 'dark' proposal there is light text on white"), and the
+    // same one the spec states. The resolver defaulted to 'dark' for a while:
+    // harmless only for as long as every writer sends an explicit value, which
+    // is not a property anything enforces. Paired with the explicit-'dark'
+    // assertion below so this cannot pass on a resolver that hardcodes
+    // 'light' and ignores the stored value.
+    expect(r.theme.ground).toBe('light');
+  });
+
+  it('keeps an explicitly stored dark ground — the default is a fallback, not an override', () => {
+    const r = resolveInlineMount({
+      widget: { inline: { enabled: true, selector: '#x', theme: { ground: 'dark' } } },
+    })!;
+    expect(r.theme.ground).toBe('dark');
+  });
+
+  it('falls back to light for a ground value that is neither light nor dark', () => {
+    const r = resolveInlineMount({
+      widget: { inline: { enabled: true, selector: '#x', theme: { ground: 'sepia' } } },
+    })!;
+    expect(r.theme.ground).toBe('light');
   });
 
   it('rejects unknown enum values rather than passing them to the browser', () => {

@@ -59,6 +59,7 @@ export function WidgetDraftPreview({
   view = 'open',
   picking,
   onPick,
+  onPickFailed,
 }: {
   accountId: string;
   draft: unknown;
@@ -67,6 +68,17 @@ export function WidgetDraftPreview({
   picking?: boolean;
   /** Called with a validated pick once the customer clicks an element. */
   onPick?: (pick: InlinePick) => void;
+  /**
+   * Called when the widget refuses a clicked element (`ibot:pick-failed`) —
+   * no id or class chain on it, or on any of its ancestors, that the save path
+   * would store. Carries the human label of what was clicked ("h1", "div.x")
+   * or null when the message omitted one.
+   *
+   * Without this the refusal reaches nothing but our diagnostics table: the
+   * picker stays armed, the dashboard shows no change, and the click reads as
+   * a broken UI.
+   */
+  onPickFailed?: (info: { label: string | null }) => void;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [ready, setReady] = useState(false);
@@ -81,6 +93,8 @@ export function WidgetDraftPreview({
   // the `window` listener on nearly every keystroke.
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
+  const onPickFailedRef = useRef(onPickFailed);
+  onPickFailedRef.current = onPickFailed;
 
   // The widget posts `ibot:preview-ready` once its config request resolves.
   // Before this existed the editor could only guess, so it re-sent the same
@@ -175,10 +189,35 @@ export function WidgetDraftPreview({
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  // Receive a refusal. Validated exactly like `ibot:picked` above and for the
+  // same reason — this listener is on `window`, so anything on the page can
+  // post to it — and subscribed once, reading the callback out of a ref.
+  useEffect(() => {
+    const handler = (ev: MessageEvent) => {
+      if (!onPickFailedRef.current) return;
+      if (ev.origin !== window.location.origin) return;
+      const d = ev.data;
+      if (!d || d.type !== 'ibot:pick-failed') return;
+      // `label` is display copy. Absent is fine (the notice reads the same
+      // without it); a non-string is a message we did not send, so drop it
+      // rather than rendering `[object Object]` at the customer.
+      if (d.label !== undefined && typeof d.label !== 'string') return;
+      onPickFailedRef.current({ label: typeof d.label === 'string' ? d.label : null });
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   return (
     <iframe
       ref={ref}
-      src={`/api/widget/preview/${accountId}`}
+      // `?bestie=1` is inert server-side — /api/widget/preview/[accountId]
+      // reads only `path` — but inside the iframe it is what
+      // `inlinePreviewAllowed()` in public/widget.js checks. Without it a
+      // mount stored as `enabled: 'preview'` never rendered in the dashboard's
+      // own preview, which is exactly where every fresh pick lands by design:
+      // a LIVE mount was visible here and a PREVIEW one was not, backwards.
+      src={`/api/widget/preview/${accountId}?bestie=1`}
       className="h-[720px] w-full rounded-2xl border border-[#e5e5ea]"
       title="תצוגה מקדימה"
     />
