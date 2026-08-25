@@ -3,6 +3,30 @@
 import { useEffect, useRef, useState } from 'react';
 
 /**
+ * A validated `ibot:picked` message, handed to `onPick` once it has passed
+ * origin and shape checks.
+ *
+ * `reserve` is what `mountInline()` in `public/widget.js` actually applies as
+ * `host.style.minHeight`. The picker's raw measurement is the picked
+ * element's OWN height — and since the picker only ever emits `mode: 'into'`
+ * (Bestie mounted INSIDE the target), applying that raw height as `reserve`
+ * would double the element's height (a 600px hero becomes 1200px). So for
+ * `mode: 'into'` this component zeroes `reserve` before handing the pick
+ * onward — a value that is wrong by construction should not travel as if it
+ * were right — and carries the untouched measurement in `measured` so a
+ * consumer can still show "this element is 480px tall" without it being
+ * mistaken for something safe to save as-is.
+ */
+export interface InlinePick {
+  selector: string;
+  label: string;
+  mode: 'into' | 'replace' | 'overlay';
+  reserve: { desktop: number; mobile: number };
+  measured: { desktop: number; mobile: number };
+  theme: { font: string; accent: string | null; radius: number | null; ground: 'light' | 'dark' };
+}
+
+/**
  * The real widget, running in an iframe, driven by unsaved edits.
  *
  * Deliberately not a React re-implementation of the widget chrome. One of
@@ -33,10 +57,16 @@ export function WidgetDraftPreview({
   accountId,
   draft,
   view = 'open',
+  picking,
+  onPick,
 }: {
   accountId: string;
   draft: unknown;
   view?: 'open' | 'teaser' | 'tooltip';
+  /** Puts the iframe's widget into picker mode (Task 2's `ibot:picker`). */
+  picking?: boolean;
+  /** Called with a validated pick once the customer clicks an element. */
+  onPick?: (pick: InlinePick) => void;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [ready, setReady] = useState(false);
@@ -84,6 +114,56 @@ export function WidgetDraftPreview({
   // which can resolve before `load` fires on a page with slow images, and
   // resetting after the announcement would strand the preview forever.
   useEffect(() => { setReady(false); }, [accountId]);
+
+  // Tell the widget inside the iframe to enter or leave picker mode. Sent on
+  // every change of `picking` once the frame has announced itself, the same
+  // readiness gate the draft messages already use. `picking === undefined`
+  // means the caller never opted into the picker at all — stay silent then,
+  // so a caller that passes neither new prop sees no picker traffic and
+  // behaves exactly as this component does today.
+  useEffect(() => {
+    if (!ready || picking === undefined) return;
+    ref.current?.contentWindow?.postMessage(
+      { type: 'ibot:picker', on: !!picking },
+      window.location.origin,
+    );
+  }, [picking, ready]);
+
+  // Receive the pick. Validated here rather than trusted: this listener is on
+  // `window`, so anything on the page — not just the preview iframe — can
+  // post to it.
+  useEffect(() => {
+    if (!onPick) return;
+    const handler = (ev: MessageEvent) => {
+      if (ev.origin !== window.location.origin) return;
+      const d = ev.data;
+      if (!d || d.type !== 'ibot:picked') return;
+      if (typeof d.selector !== 'string' || !d.selector) return;
+      const mode: InlinePick['mode'] =
+        d.mode === 'replace' || d.mode === 'overlay' ? d.mode : 'into';
+      const measured = {
+        desktop: Number(d.reserve?.desktop) || 0,
+        mobile: Number(d.reserve?.mobile) || 0,
+      };
+      onPick({
+        selector: d.selector,
+        label: typeof d.label === 'string' ? d.label : d.selector,
+        mode,
+        // See the InlinePick doc comment: `into` appends inside the target,
+        // so applying its own measured height as reserve would double it.
+        reserve: mode === 'into' ? { desktop: 0, mobile: 0 } : measured,
+        measured,
+        theme: {
+          font: 'inherit',
+          accent: typeof d.theme?.accent === 'string' ? d.theme.accent : null,
+          radius: Number.isFinite(d.theme?.radius) ? d.theme.radius : null,
+          ground: d.theme?.ground === 'light' ? 'light' : 'dark',
+        },
+      });
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [onPick]);
 
   return (
     <iframe
