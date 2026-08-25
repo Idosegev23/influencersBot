@@ -39,10 +39,18 @@ describe('InlineMountSection', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ enabled: 'preview' }));
   });
 
-  it('lets the customer switch between the three states', () => {
+  it('lets the customer switch between preview and live', () => {
     const onChange = vi.fn();
     render(<InlineMountSection value={{ ...PICK, enabled: 'preview', preset: 'hero', surface: 'bare', bubble: 'after-scroll' }}
       onChange={onChange} onStartPicking={() => {}} picking={false} />);
+    // There are only two live states — the stored schema has no "picked but
+    // off" value (resolveInlineMount only accepts true | 'preview'; absence
+    // IS off), so a third "כבוי" radio would show the customer a state the
+    // next save cannot actually keep. This absence assertion is paired with
+    // presence assertions below so it can't pass on a component that failed
+    // to render anything at all.
+    expect(screen.queryByRole('radio', { name: /כבוי/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /תצוגה מקדימה/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('radio', { name: /פעיל לכל המבקרים/ }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ enabled: true }));
   });

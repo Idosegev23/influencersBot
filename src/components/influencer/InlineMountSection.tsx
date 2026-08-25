@@ -1,94 +1,21 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { InlinePick } from './WidgetDraftPreview';
-import type {
-  InlineEnabled,
-  InlineMountMode,
-  InlinePreset,
-  InlineTreatment,
-  InlineBubble,
-  ResolvedInlineTheme,
-} from '@/lib/widget/inline';
+import {
+  mountFromPick,
+  type InlineMountDraft,
+  type PendingInlinePick,
+} from '@/lib/widget/inline-draft';
+import type { InlineEnabled, InlinePreset, InlineTreatment } from '@/lib/widget/inline';
 
-/**
- * The editable shape this section hands back through `onChange`.
- *
- * Mirrors `ResolvedInlineMount` (src/lib/widget/inline.ts) — the same
- * enabled/selector/mode/preset/surface/reserve/theme/bubble fields — plus two
- * fields that are display-only and never leave the browser as-is:
- *
- * - `label`: the human-readable selector the picker showed ("div.hero"),
- *   carried along so the "what did I pick" summary keeps working across a
- *   preset/surface edit without re-reading it off `selector`.
- * - `measured`: the picked element's real height, for the same "so the
- *   customer can trust it chose the right thing" reason `InlinePick` carries
- *   it (see that type's doc comment in WidgetDraftPreview.tsx). NOT the same
- *   number as `reserve` — do not conflate them here either.
- *
- * `enabled` also allows `false` here, which `ResolvedInlineMount` cannot:
- * the stored schema has no "picked but off" state — off IS absence (the
- * settings route deletes `widget.inline` outright once `resolveInlineMount`
- * returns null). Allowing `false` in this in-session draft lets a customer
- * flip the mount off without losing the selector/theme they just picked, so
- * turning it back on doesn't force a re-pick. widget-editor/page.tsx is
- * responsible for collapsing `enabled: false` (and `label`/`measured`) away
- * before POSTing — see `inlineForPost` there.
- */
-/**
- * What this section actually needs from a pick — `InlinePick`
- * (WidgetDraftPreview.tsx) with `measured` loosened to optional.
- *
- * A real pick from the preview iframe always carries `measured` (it's
- * required on `InlinePick` itself), so this stays fully compatible with what
- * `WidgetDraftPreview`'s `onPick` actually delivers. Loosening it here is
- * about this component being honest about its own dependency, not about
- * accepting a lesser pick: `measured` is display-only in `mountFromPick`
- * below (see `InlineMountDraft`'s doc comment), so its absence just means
- * "no height to show," never a broken pick.
- */
-export type PendingInlinePick = Omit<InlinePick, 'measured'> & { measured?: InlinePick['measured'] };
+// Re-exported so existing imports of these two types from this file (the
+// component used to be their only source) keep working — the shapes
+// themselves now live in src/lib/widget/inline-draft.ts, alongside
+// `inlineForPost`, so the save-time contract has a test surface that doesn't
+// require rendering a component (see inline-draft.ts's file header).
+export type { InlineMountDraft, PendingInlinePick };
 
-export interface InlineMountDraft {
-  enabled: InlineEnabled | false;
-  selector: string;
-  mode: InlineMountMode;
-  preset: InlinePreset;
-  surface: InlineTreatment;
-  reserve: { desktop: number; mobile: number };
-  theme: ResolvedInlineTheme;
-  bubble: InlineBubble;
-  label?: string;
-  measured?: { desktop: number; mobile: number };
-}
-
-/**
- * Turns a fresh pick from the preview iframe into a draft, preserving
- * whatever preset/surface/bubble/enabled the customer already had set on an
- * existing mount (re-picking a spot is not the same as starting over).
- *
- * `enabled` is the one field that does NOT carry over from `base` when there
- * is no base — a brand-new mount (picking for the first time, `base` null)
- * always lands on `'preview'`. Going live is a deliberate second act, never
- * the side effect of picking a spot.
- */
-function mountFromPick(pick: PendingInlinePick, base: InlineMountDraft | null): InlineMountDraft {
-  return {
-    enabled: base?.enabled ?? 'preview',
-    selector: pick.selector,
-    mode: pick.mode,
-    preset: base?.preset ?? 'hero',
-    surface: base?.surface ?? 'bare',
-    reserve: pick.reserve,
-    theme: pick.theme,
-    bubble: base?.bubble ?? 'after-scroll',
-    label: pick.label,
-    measured: pick.measured,
-  };
-}
-
-const ENABLED_OPTIONS: { value: InlineEnabled | false; label: string }[] = [
-  { value: false, label: 'כבוי' },
+const ENABLED_OPTIONS: { value: InlineEnabled; label: string }[] = [
   { value: 'preview', label: 'תצוגה מקדימה (רק עם קישור)' },
   { value: true, label: 'פעיל לכל המבקרים' },
 ];
@@ -119,8 +46,9 @@ const selectStyle = {
  * "Where does Bestie sit on the site" — the customer picks a real element on
  * their own live page (via the picker mode in `WidgetDraftPreview`) and this
  * section turns that pick into a draft, lets them adjust how it's dressed
- * (preset/surface), decide who sees it (the enabled tri-state), and remove
- * it entirely.
+ * (preset/surface), decide who sees it (preview-only vs. every visitor —
+ * see inline-draft.ts's `InlineMountDraft` doc comment for why there is no
+ * third "off but remembered" option here), and remove it entirely.
  *
  * Deliberately does not own `picking` — the page does, because it's also
  * what `WidgetDraftPreview` needs (see widget-editor/page.tsx). This

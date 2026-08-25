@@ -17,7 +17,8 @@ import {
 } from '@/lib/widget/banner';
 import { buildBannerDraft } from '@/lib/widget/banner-draft';
 import { WidgetDraftPreview, type InlinePick } from '@/components/influencer/WidgetDraftPreview';
-import InlineMountSection, { type InlineMountDraft } from '@/components/influencer/InlineMountSection';
+import InlineMountSection from '@/components/influencer/InlineMountSection';
+import { inlineForPost, type InlineMountDraft } from '@/lib/widget/inline-draft';
 import { resolveInlineMount } from '@/lib/widget/inline';
 
 // Caps mirrored from src/lib/widget/banner.ts (not exported there, so kept in
@@ -208,33 +209,6 @@ function makeOverrideId(): string {
  */
 function withStableIds(rows: BannerOverride[]): BannerOverride[] {
   return rows.map((r) => (r.id ? r : { ...r, id: makeOverrideId() }));
-}
-
-/**
- * What actually gets POSTed for `widget.inline` — the resolved field set
- * only (`enabled`/`selector`/`mode`/`preset`/`surface`/`reserve`/`theme`/
- * `bubble`), never `label` or `measured` (display-only, see
- * InlineMountSection's doc comment on InlineMountDraft) and never a raw
- * shape /api/influencer/settings' resolveInlineMount might silently drop.
- *
- * `enabled: false` (this section's in-session "picked but off" state, which
- * has no persisted equivalent — see InlineMountSection) and `draft === null`
- * both collapse to `null` here, which the settings route treats as "delete
- * whatever inline mount is stored" (resolveInlineMount returns null for a
- * null/non-object raw value).
- */
-function inlineForPost(draft: InlineMountDraft | null) {
-  if (!draft || draft.enabled === false) return null;
-  return {
-    enabled: draft.enabled,
-    selector: draft.selector,
-    mode: draft.mode,
-    preset: draft.preset,
-    surface: draft.surface,
-    reserve: draft.reserve,
-    theme: draft.theme,
-    bubble: draft.bubble,
-  };
 }
 
 export default function WidgetEditorPage() {
