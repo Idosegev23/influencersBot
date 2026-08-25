@@ -74,6 +74,13 @@ export function WidgetDraftPreview({
   // moment the widget reports in, without re-subscribing on every keystroke.
   const latest = useRef<{ draft: unknown; view: string }>({ draft, view });
   latest.current = { draft, view };
+  // Same reasoning as `latest` above, for `onPick`: Task 4 passes an inline
+  // arrow, a new function identity on every render, and this component
+  // re-renders on a 180ms debounce throughout an editing session. Without
+  // this ref, a dependency array of `[onPick]` would tear down and re-add
+  // the `window` listener on nearly every keystroke.
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
 
   // The widget posts `ibot:preview-ready` once its config request resolves.
   // Before this existed the editor could only guess, so it re-sent the same
@@ -131,10 +138,13 @@ export function WidgetDraftPreview({
 
   // Receive the pick. Validated here rather than trusted: this listener is on
   // `window`, so anything on the page — not just the preview iframe — can
-  // post to it.
+  // post to it. Subscribed once (empty deps) and reads `onPickRef.current`
+  // rather than closing over `onPick` directly, for the reason in the
+  // `onPickRef` comment above — an inline `onPick` arrow must not cause a
+  // teardown/re-add of this listener on every render.
   useEffect(() => {
-    if (!onPick) return;
     const handler = (ev: MessageEvent) => {
+      if (!onPickRef.current) return;
       if (ev.origin !== window.location.origin) return;
       const d = ev.data;
       if (!d || d.type !== 'ibot:picked') return;
@@ -145,7 +155,7 @@ export function WidgetDraftPreview({
         desktop: Number(d.reserve?.desktop) || 0,
         mobile: Number(d.reserve?.mobile) || 0,
       };
-      onPick({
+      onPickRef.current({
         selector: d.selector,
         label: typeof d.label === 'string' ? d.label : d.selector,
         mode,
@@ -163,7 +173,7 @@ export function WidgetDraftPreview({
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [onPick]);
+  }, []);
 
   return (
     <iframe
