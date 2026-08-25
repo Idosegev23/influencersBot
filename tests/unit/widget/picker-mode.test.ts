@@ -165,6 +165,213 @@ describe('picker mode', () => {
     expect(navigated).toBe(false);
   });
 
+  // ── I2: the class-chain builder on a utility-CSS page ────────────────────
+  //
+  // The chain loop used to take a PREFIX of the raw class list and never
+  // filter it, while the single-class loop above it correctly filtered
+  // through pickerSelectorFits. On any Tailwind-shaped page that made every
+  // chain unbuildable — one illegal token near the front poisons the whole
+  // prefix — and the picker returned null for elements carrying a perfectly
+  // storable pair of classes.
+  it('builds a chain from the grammar-legal classes on a Tailwind-shaped element', async () => {
+    // `md:flex` (colon) and `-mt-4` (leading hyphen) are legal HTML classes
+    // and illegal in the storable grammar. `.relative` and `.hero-shell` are
+    // each ambiguous on their own — the decoys below see to that — so the
+    // ONLY answer is the chain `.relative.hero-shell`, which cannot be built
+    // at all unless the illegal tokens are filtered out first.
+    await bootWidget({
+      html: '<section class="relative md:flex -mt-4 hero-shell"><h1>hero</h1></section>' +
+            '<div class="relative">decoy a</div><div class="hero-shell">decoy b</div>',
+      config: { inline: null }, preview: true,
+    });
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    (document.querySelector('section.hero-shell') as HTMLElement).click();
+    const picked = up.find((m) => m?.type === 'ibot:picked');
+    expect(picked).toBeTruthy();
+    expect(picked.selector).toBe('.relative.hero-shell');
+    // And it is storable by the real server-side predicate, not just by shape.
+    expect(isUnsafeSelector(picked.selector)).toBe(false);
+  });
+
+  it('combines classes rather than only taking a prefix of them', async () => {
+    // `.a.b` is ambiguous; `.a.hero` is unique. A prefix-only walk would skip
+    // straight past the two-class answer to the three-class `.a.b.hero`,
+    // which is a longer selector with more ways to stop matching. Asserting
+    // the exact selector — not merely that SOMETHING was picked — is what
+    // makes this test distinguish combinations from prefixes.
+    await bootWidget({
+      html: '<div class="a b hero">1</div><div class="a b">2</div>' +
+            '<div class="a">3</div><div class="hero">4</div>',
+      config: { inline: null }, preview: true,
+    });
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    (document.querySelector('.a.b.hero') as HTMLElement).click();
+    expect(up.find((m) => m?.type === 'ibot:picked').selector).toBe('.a.hero');
+  });
+
+  it('does not spend its class budget on tokens the grammar cannot use', async () => {
+    // The combination search is capped (PICKER_MAX_CLASSES) so a click never
+    // spends a second in querySelectorAll. Counting ILLEGAL tokens against
+    // that budget is how a real Tailwind element — utilities first, semantic
+    // classes last — exhausts it before reaching anything storable. Eleven
+    // illegal tokens here, more than the cap, then the only two that matter.
+    await bootWidget({
+      html: '<section class="md:flex lg:grid -mt-1 -mt-2 -mt-3 -mt-4 -mt-5 -mt-6 -mt-7 -mt-8 -mt-9 relative hero-shell">' +
+            '<h1>hero</h1></section>' +
+            '<div class="relative">decoy a</div><div class="hero-shell">decoy b</div>',
+      config: { inline: null }, preview: true,
+    });
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    (document.querySelector('section.hero-shell') as HTMLElement).click();
+    expect(up.find((m) => m?.type === 'ibot:picked')?.selector).toBe('.relative.hero-shell');
+  });
+
+  it('still prefers a single unique class over any chain', async () => {
+    // Presence sibling to the two chain tests: filtering and combining must
+    // not have moved the cheapest, most stable answer out of first place.
+    await bootWidget({
+      html: '<section class="relative md:flex hero-shell"><h1>hero</h1></section>' +
+            '<div class="relative">decoy</div>',
+      config: { inline: null }, preview: true,
+    });
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    (document.querySelector('section.hero-shell') as HTMLElement).click();
+    expect(up.find((m) => m?.type === 'ibot:picked').selector).toBe('.hero-shell');
+  });
+
+  // ── I3: a refused pick is visible, and a dead click walks up ─────────────
+
+  it('walks up to a storable ancestor instead of dropping a click on a bare child', async () => {
+    // Clicking the headline is the obvious thing to aim at, and an <h1>
+    // almost never carries an id or a unique class. Before the walk, this
+    // click produced nothing at all.
+    await bootWidget({
+      html: '<section class="picker-outer"><h1>We Turn Brands Into Leaders</h1></section>',
+      config: { inline: null }, preview: true,
+    });
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    (document.querySelector('.picker-outer h1') as HTMLElement).click();
+    const picked = up.find((m) => m?.type === 'ibot:picked');
+    expect(picked).toBeTruthy();
+    expect(picked.selector).toBe('.picker-outer');
+    // The label must name what was actually picked, not what was clicked —
+    // otherwise the dashboard summary tells the customer "h1" while the
+    // stored selector is the section around it.
+    expect(picked.label).toContain('picker-outer');
+    expect(up.filter((m) => m?.type === 'ibot:pick-failed')).toHaveLength(0);
+  });
+
+  it('picks the clicked element itself when that element is storable', async () => {
+    // Presence sibling to the walk: the ancestor search is a FALLBACK. A
+    // click on a storable element must still pick exactly what the outline
+    // was drawn around, never its parent.
+    await bootWidget({
+      html: '<section class="picker-outer"><div class="picker-inner">x</div></section>',
+      config: { inline: null }, preview: true,
+    });
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    (document.querySelector('.picker-inner') as HTMLElement).click();
+    expect(up.find((m) => m?.type === 'ibot:picked').selector).toBe('.picker-inner');
+  });
+
+  it('gives up after three ancestors rather than picking half the page', async () => {
+    // Four bare wrappers between the click and the only storable element:
+    // one more than the walk is willing to cross. The three-deep sibling
+    // below proves the limit is a limit and not a broken walk.
+    await bootWidget({
+      html: '<section class="picker-outer"><div><div><div><span>x</span></div></div></div></section>',
+      config: { inline: null }, preview: true,
+    });
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    (document.querySelector('.picker-outer span') as HTMLElement).click();
+    expect(up.filter((m) => m?.type === 'ibot:picked')).toHaveLength(0);
+    expect(up.filter((m) => m?.type === 'ibot:pick-failed')).toHaveLength(1);
+  });
+
+  it('reaches a storable element exactly three ancestors up', async () => {
+    await bootWidget({
+      html: '<section class="picker-outer"><div><div><span>x</span></div></div></section>',
+      config: { inline: null }, preview: true,
+    });
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    (document.querySelector('.picker-outer span') as HTMLElement).click();
+    expect(up.find((m) => m?.type === 'ibot:picked').selector).toBe('.picker-outer');
+  });
+
+  it('tells the dashboard when it refuses a pick, not only the diagnostics table', async () => {
+    // Same Hebrew-class fixture as the storability test above — the class is
+    // outside the ASCII grammar and <body> is the only ancestor, so the walk
+    // has nowhere to go. The diagnostic alone left the customer with a click
+    // that did nothing: the picker stays armed and the dashboard never
+    // changed, so they click the same dead element again.
+    const w = await bootWidget({ html: '<div class="כותרת">x</div>', config: { inline: null }, preview: true });
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    (document.querySelector('.כותרת') as HTMLElement).click();
+    const failed = up.find((m) => m?.type === 'ibot:pick-failed');
+    expect(failed).toBeTruthy();
+    expect(failed.label).toContain('div');
+    expect(up.filter((m) => m?.type === 'ibot:picked')).toHaveLength(0);
+    // Both channels, not one instead of the other: the diagnostic is still
+    // our record of it.
+    expect(w.reports.map((r) => r.type)).toContain('picker_no_stable_selector');
+  });
+
+  it('stays armed after a refusal so the next click can land', async () => {
+    await bootWidget({
+      html: '<div class="כותרת">x</div><div class="picker-outer">y</div>',
+      config: { inline: null }, preview: true,
+    });
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    (document.querySelector('.כותרת') as HTMLElement).click();
+    expect(up.filter((m) => m?.type === 'ibot:pick-failed')).toHaveLength(1);
+    (document.querySelector('.picker-outer') as HTMLElement).click();
+    expect(up.find((m) => m?.type === 'ibot:picked').selector).toBe('.picker-outer');
+  });
+
+  // ── I5: the preview mount is present while picking ───────────────────────
+
+  it('refuses to pick the inline mount it has already rendered into the hero', async () => {
+    // The dashboard iframe now loads with ?bestie=1, so an `enabled:
+    // "preview"` mount is IN the page while the customer picks. Bestie's own
+    // surface must not be a pickable spot, and the rest of the hero must
+    // still be.
+    await bootWidget({
+      html: '<section><div class="content_home-c-hero"><h1>LDRS</h1></div></section>',
+      config: {
+        inline: {
+          enabled: 'preview', selector: '.content_home-c-hero', mode: 'into', preset: 'hero',
+          surface: 'bare', reserve: { desktop: 0, mobile: 0 },
+          theme: { font: 'inherit', accent: '#4c3e5e', radius: 8, ground: 'light' },
+          bubble: 'after-scroll', banner: null, paths: null,
+        },
+      },
+      preview: true, search: '?bestie=1',
+    });
+    const host = document.querySelector('[data-bestie-inline]') as HTMLElement;
+    // Fixture guard: without a mounted host this test would assert nothing.
+    expect(host).toBeTruthy();
+
+    const up = captureUp();
+    post({ type: 'ibot:picker', on: true });
+    host.click();
+    expect(up.filter((m) => m?.type === 'ibot:picked')).toHaveLength(0);
+
+    // ...and `into` appends INSIDE the target, so the hero itself is
+    // untouched and still pickable.
+    (document.querySelector('.content_home-c-hero') as HTMLElement).click();
+    expect(up.find((m) => m?.type === 'ibot:picked').selector).toBe('.content_home-c-hero');
+  });
+
   it('stops picking when told to, and clicks behave normally again', async () => {
     await bootWidget({ html: HERO, config: { inline: null }, preview: true });
     const up = captureUp();

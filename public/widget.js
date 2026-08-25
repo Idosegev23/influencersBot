@@ -1596,22 +1596,54 @@
     try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
   }
 
+  // One class token PICKER_STORABLE would accept inside a chain. Utility-CSS
+  // frameworks put plenty of tokens on an element that are legal HTML and
+  // illegal CSS idents in this grammar — Tailwind's `md:flex` (colon),
+  // `-mt-4` (leading hyphen), `bg-white/50` (slash) — and a chain containing
+  // one is refused whole. Filtering them out is what lets `.relative.hero-shell`
+  // still be found on `class="relative md:flex -mt-4 hero-shell"`.
+  var PICKER_CLASS_TOKEN = /^[A-Za-z_][\w-]*$/;
+
+  // How many legal tokens we are willing to combine over. The triple loop
+  // below is O(n^3); a Tailwind hero can carry thirty classes, and a click
+  // must not spend a second in querySelectorAll. Ten legal tokens is 120
+  // triples worst case, and the useful class is never the thirtieth.
+  var PICKER_MAX_CLASSES = 10;
+
   // Prefer an id, then a class that matches exactly one element. Anything less
   // stable than that is not offered — a selector that stops matching on the
   // customer's next publish is worse than no mount, because it fails silently.
   function pickerSelector(el) {
     try {
       if (el.id && pickerSelectorFits('#' + el.id)) return '#' + el.id;
-      var classes = (el.className && typeof el.className === 'string')
-        ? el.className.split(/\s+/).filter(Boolean) : [];
+      var raw = (el.className && typeof el.className === 'string')
+        ? el.className.split(/\s+/) : [];
+      var classes = [];
+      for (var c = 0; c < raw.length && classes.length < PICKER_MAX_CLASSES; c++) {
+        if (PICKER_CLASS_TOKEN.test(raw[c])) classes.push(raw[c]);
+      }
       for (var i = 0; i < classes.length; i++) {
         if (pickerSelectorFits('.' + classes[i])) return '.' + classes[i];
       }
       // Then chains, shortest first, stopping at the three the grammar allows:
       // a fourth would be refused on save, so it is never worth building.
-      for (var n = 2; n <= 3 && n <= classes.length; n++) {
-        var combo = '.' + classes.slice(0, n).join('.');
-        if (pickerSelectorFits(combo)) return combo;
+      // Combinations, not prefixes: on `class="a b hero"` where `.a.b` is
+      // ambiguous but `.a.hero` is unique, a prefix walk would give up.
+      var a, b, d;
+      for (a = 0; a < classes.length; a++) {
+        for (b = a + 1; b < classes.length; b++) {
+          if (pickerSelectorFits('.' + classes[a] + '.' + classes[b])) {
+            return '.' + classes[a] + '.' + classes[b];
+          }
+        }
+      }
+      for (a = 0; a < classes.length; a++) {
+        for (b = a + 1; b < classes.length; b++) {
+          for (d = b + 1; d < classes.length; d++) {
+            var combo = '.' + classes[a] + '.' + classes[b] + '.' + classes[d];
+            if (pickerSelectorFits(combo)) return combo;
+          }
+        }
       }
       return null;
     } catch (e) { return null; }
@@ -1752,6 +1784,29 @@
     if (pickerOutline) pickerOutline.style.display = 'none';
   }
 
+  // The element the click actually resolves to.
+  //
+  // The picker only ever considered `ev.target`, so clicking a hero's <h1> —
+  // the obvious thing to aim at — picked the <h1>, or (much more often) picked
+  // nothing at all, because a heading rarely carries an id or a unique class.
+  // Walking up to three ancestors turns that dead click into the section
+  // around it. Deliberately a FALLBACK and not a preference: the direct target
+  // is still tried first, so a click on an element that is itself storable
+  // picks exactly what was highlighted under the cursor.
+  var PICKER_ANCESTOR_DEPTH = 3;
+
+  function pickerResolve(el) {
+    var node = el;
+    for (var i = 0; i <= PICKER_ANCESTOR_DEPTH && node && node.nodeType === 1; i++) {
+      if (!pickerUnsafe(node)) {
+        var sel = pickerSelector(node);
+        if (sel) return { el: node, selector: sel };
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
   if (PREVIEW_MODE) {
     document.addEventListener('mouseover', function (ev) {
       if (!pickerOn) return;
@@ -1768,12 +1823,29 @@
         ev.stopPropagation();
         var el = ev.target;
         if (pickerUnsafe(el)) return;
-        var selector = pickerSelector(el);
-        if (!selector) { report('picker_no_stable_selector', { message: pickerLabel(el) }); return; }
+        var hit = pickerResolve(el);
+        if (!hit) {
+          // Two channels, and both are needed. The diagnostic is our record;
+          // `ibot:pick-failed` is the customer's. Without the second one a
+          // refused pick is a click that does nothing at all — the picker
+          // stays armed, the dashboard shows no change, and they click again.
+          report('picker_no_stable_selector', { message: pickerLabel(el) });
+          try {
+            window.parent.postMessage(
+              { type: 'ibot:pick-failed', label: pickerLabel(el) },
+              window.location.origin,
+            );
+          } catch (e2) { /* no reachable parent — the diagnostic still stands */ }
+          return;
+        }
+        // Everything below measures and samples `hit.el`, which is the element
+        // the selector actually names — not `ev.target`, which may be a
+        // descendant of it (see pickerResolve).
+        el = hit.el;
         pickerStop();
         window.parent.postMessage({
           type: 'ibot:picked',
-          selector: selector,
+          selector: hit.selector,
           label: pickerLabel(el),
           mode: 'into',
           // The TARGET's own height, not Bestie's. mountInline() applies
