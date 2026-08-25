@@ -1463,6 +1463,16 @@
       // editor. Same-origin is what does.
       if (ev.origin !== window.location.origin) return;
       var msg = ev && ev.data;
+      // Picker mode: the dashboard turns it on, the customer clicks one spot on
+      // their own page, one `ibot:picked` goes back up. Rides the draft
+      // channel's origin check above; the PREVIEW_MODE test is redundant with
+      // the block this listener already sits in and is kept as a second lock on
+      // the one path that can reach into a customer's page.
+      if (msg && msg.type === 'ibot:picker' && PREVIEW_MODE) {
+        pickerOn = msg.on === true;
+        if (!pickerOn) pickerStop();
+        return;
+      }
       if (!msg || msg.type !== 'ibot:draft' || !msg.config) return;
       try {
         // Applying a draft costs a full render(), so an unchanged one must
@@ -1547,6 +1557,224 @@
         }
       } catch (e) { /* never break the editor */ }
     });
+  }
+
+  // ---- Picker mode (preview only) ------------------------------------------
+  // The customer clicks the spot on their own site where Bestie should sit.
+  // Runs only inside /api/widget/preview/[accountId], which is the dashboard's
+  // iframe; `PREVIEW_MODE` comes from data-preview="true" on the script tag, so
+  // a visitor on the real site can never reach any of this.
+  var pickerOn = false;
+  var pickerOutline = null;
+
+  // The exact grammar STORABLE_SELECTOR accepts in src/lib/widget/inline.ts:
+  // an id, or one to three chained classes, ASCII, no leading digit. A pick
+  // outside it is refused on save with nothing the customer can see — their
+  // click simply does not stick — so the picker must never emit one. This is
+  // that contract's copy on this side of the wire; the two change together or
+  // the seam fails silently.
+  var PICKER_STORABLE = /^(#[A-Za-z_][\w-]*|\.[A-Za-z_][\w-]*(\.[A-Za-z_][\w-]*){0,2})$/;
+
+  function pickerLabel(el) {
+    var tag = (el.tagName || '').toLowerCase();
+    if (el.id) return tag + '#' + el.id;
+    var cls = (el.className && typeof el.className === 'string') ? el.className.split(/\s+/)[0] : '';
+    return cls ? tag + '.' + cls : tag;
+  }
+
+  // Storable AND unambiguous. Both halves matter: a selector the server will
+  // not store is a pick that vanishes, and one matching two elements mounts
+  // Bestie somewhere the customer did not click.
+  function pickerSelectorFits(sel) {
+    if (!PICKER_STORABLE.test(sel)) return false;
+    try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; }
+  }
+
+  // Prefer an id, then a class that matches exactly one element. Anything less
+  // stable than that is not offered — a selector that stops matching on the
+  // customer's next publish is worse than no mount, because it fails silently.
+  function pickerSelector(el) {
+    try {
+      if (el.id && pickerSelectorFits('#' + el.id)) return '#' + el.id;
+      var classes = (el.className && typeof el.className === 'string')
+        ? el.className.split(/\s+/).filter(Boolean) : [];
+      for (var i = 0; i < classes.length; i++) {
+        if (pickerSelectorFits('.' + classes[i])) return '.' + classes[i];
+      }
+      // Then chains, shortest first, stopping at the three the grammar allows:
+      // a fourth would be refused on save, so it is never worth building.
+      for (var n = 2; n <= 3 && n <= classes.length; n++) {
+        var combo = '.' + classes.slice(0, n).join('.');
+        if (pickerSelectorFits(combo)) return combo;
+      }
+      return null;
+    } catch (e) { return null; }
+  }
+
+  function pickerUnsafe(el) {
+    if (!el || el.nodeType !== 1) return true;
+    if (el === document.documentElement || el === document.body || el === document.head) return true;
+    // Bestie's own chrome. The floating bubble and the picker's own outline sit
+    // on top of the very hero the customer is aiming at, and "mount Bestie
+    // inside Bestie" is not a spot on their page.
+    try {
+      if (el.closest && el.closest('#ibot-widget-container,[data-bestie-inline],[data-bestie-picker]')) return true;
+    } catch (e) { /* */ }
+    return false;
+  }
+
+  // A computed colour we are willing to use. Returns null for anything that is
+  // not rgb()/rgba() and for a fully transparent one: `rgba(0, 0, 0, 0)` is
+  // what every unstyled element reports, and reading that as black is exactly
+  // how a sampler ends up proposing a black accent on a white page.
+  function pickerRgb(value) {
+    var m = String(value || '').match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:\s*[,\/]\s*([0-9.]+))?/);
+    if (!m) return null;
+    var alpha = m[4] === undefined ? 1 : parseFloat(m[4]);
+    if (!(alpha > 0.05)) return null;
+    return { r: +m[1], g: +m[2], b: +m[3] };
+  }
+
+  function pickerHex(rgb) {
+    var parts = [rgb.r, rgb.g, rgb.b], out = '#';
+    for (var i = 0; i < parts.length; i++) {
+      var h = Math.max(0, Math.min(255, parts[i] | 0)).toString(16);
+      out += h.length === 1 ? '0' + h : h;
+    }
+    return out;
+  }
+
+  // Ordered by how likely a match is to be a real call to action. A flat
+  // 'a,button,.btn' list returns document order instead, which inside a hero
+  // is usually the logo link.
+  var PICKER_CTA_SELECTORS = [
+    'a[class*="btn"]', 'a[class*="button"]', '.btn', '.button', 'button', '[role="button"]', 'a'
+  ];
+
+  // The site's own call to action — where its accent and its shape language
+  // actually live. Candidates are scanned until one has a background of its
+  // own, because the first <a> inside a hero is usually a bare text link and
+  // sampling that yields transparent-black.
+  function pickerFindCta(el) {
+    var scopes = [el, document];
+    for (var s = 0; s < scopes.length; s++) {
+      for (var k = 0; k < PICKER_CTA_SELECTORS.length; k++) {
+        var found;
+        try { found = scopes[s].querySelectorAll(PICKER_CTA_SELECTORS[k]); } catch (e) { continue; }
+        for (var i = 0; i < found.length && i < 20; i++) {
+          if (pickerUnsafe(found[i])) continue;
+          try {
+            if (pickerRgb(window.getComputedStyle(found[i]).backgroundColor)) return found[i];
+          } catch (e2) { /* */ }
+        }
+      }
+    }
+    return null;
+  }
+
+  // Read the page's own visual language. Inherited properties (the font) need
+  // no sampling at all — they cross the shadow boundary on their own. What we
+  // sample is what does not: the ground we sit on, and the shape and accent
+  // the site already uses for its own calls to action.
+  //
+  // Everything here is PROPOSED to the customer for approval and never applied
+  // behind their back, so a near-miss is a poor suggestion rather than a broken
+  // site — which is why this stays a sampler and not a colour engine.
+  function pickerSampleTheme(el) {
+    // 'light' when nothing can be sampled: an unstyled page is white, and a
+    // 'dark' proposal there is light text on white.
+    var ground = 'light', accent = null, radius = null;
+    try {
+      var node = el, rgb = null;
+      // parentElement is null at <html>, so the root's own background — which
+      // is where a great many sites actually set the page colour — is sampled
+      // rather than being the loop's stop condition.
+      while (node && node.nodeType === 1) {
+        rgb = pickerRgb(window.getComputedStyle(node).backgroundColor);
+        if (rgb) break;
+        node = node.parentElement;
+      }
+      if (rgb) {
+        var lum = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+        ground = lum > 0.5 ? 'light' : 'dark';
+      }
+      var cta = pickerFindCta(el);
+      if (cta) {
+        var cs = window.getComputedStyle(cta);
+        var cRgb = pickerRgb(cs.backgroundColor);
+        if (cRgb) accent = pickerHex(cRgb);
+        var r = parseInt(cs.borderTopLeftRadius, 10);
+        // A pill button reports 999px. Carried onto a full-width surface that
+        // reads as a stadium rather than as the site's shape language, so the
+        // sample is capped at the largest radius that still looks like a card.
+        if (!isNaN(r) && r >= 0) radius = Math.min(r, 32);
+      }
+    } catch (e) { /* a sample we cannot take is simply not proposed */ }
+    return { font: 'inherit', accent: accent, radius: radius, ground: ground };
+  }
+
+  function pickerMeasure(el) {
+    try {
+      var r = el.getBoundingClientRect();
+      var h = Math.round(r.height);
+      return { desktop: window.innerWidth >= 640 ? h : 0, mobile: window.innerWidth < 640 ? h : 0 };
+    } catch (e) { return { desktop: 0, mobile: 0 }; }
+  }
+
+  function pickerHighlight(el) {
+    if (!document.body) return;
+    if (!pickerOutline || !pickerOutline.parentNode) {
+      pickerOutline = document.createElement('div');
+      pickerOutline.setAttribute('data-bestie-picker', '1');
+      pickerOutline.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483647;' +
+        'border:2px solid #9334EB;background:rgba(147,52,235,0.12);border-radius:4px;' +
+        'transition:all .08s ease-out;';
+      document.body.appendChild(pickerOutline);
+    }
+    try {
+      var r = el.getBoundingClientRect();
+      pickerOutline.style.top = r.top + 'px';
+      pickerOutline.style.left = r.left + 'px';
+      pickerOutline.style.width = r.width + 'px';
+      pickerOutline.style.height = r.height + 'px';
+      pickerOutline.style.display = 'block';
+    } catch (e) { /* */ }
+  }
+
+  function pickerStop() {
+    pickerOn = false;
+    if (pickerOutline) pickerOutline.style.display = 'none';
+  }
+
+  if (PREVIEW_MODE) {
+    document.addEventListener('mouseover', function (ev) {
+      if (!pickerOn) return;
+      try { if (!pickerUnsafe(ev.target)) pickerHighlight(ev.target); } catch (e) { /* */ }
+    }, true);
+
+    // Capture phase, and both prevented and stopped: the customer is clicking
+    // their own live site, and a pick must not also follow a link or submit a
+    // form out from under them.
+    document.addEventListener('click', function (ev) {
+      if (!pickerOn) return;
+      try {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var el = ev.target;
+        if (pickerUnsafe(el)) return;
+        var selector = pickerSelector(el);
+        if (!selector) { report('picker_no_stable_selector', { message: pickerLabel(el) }); return; }
+        pickerStop();
+        window.parent.postMessage({
+          type: 'ibot:picked',
+          selector: selector,
+          label: pickerLabel(el),
+          mode: 'into',
+          reserve: pickerMeasure(el),
+          theme: pickerSampleTheme(el)
+        }, window.location.origin);
+      } catch (e) { report('picker_failed', e); }
+    }, true);
   }
 
   // ============================================

@@ -64,6 +64,13 @@ describe('sanitizeDiagnostic', () => {
     }
   });
 
+  it('keeps every picker diagnostic type — an unregistered type is discarded silently', () => {
+    for (const type of ['picker_no_stable_selector', 'picker_failed']) {
+      const out = sanitizeDiagnostic({ type, message: 'div.hero' });
+      expect(out?.type).toBe(type);
+    }
+  });
+
   it('rejects a report with no message', () => {
     expect(sanitizeDiagnostic({ type: 'client_error' })).toBeNull();
   });
