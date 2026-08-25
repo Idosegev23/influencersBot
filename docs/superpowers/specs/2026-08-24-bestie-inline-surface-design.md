@@ -97,8 +97,11 @@ No existing account changes.
 | `replace` | Take over the target's box | An existing search input |
 | `overlay` | Absolutely position over the target | The target has no content layer of its own |
 
-`into` is the default the picker proposes when the target is a flex or grid
-container. `overlay` is the only mode that mutates the host element (it sets
+**As built, the picker always proposes `into`** — there is no flex/grid
+detection deciding between modes; `replace` and `overlay` exist as stored
+values `resolveInlineMount` accepts, but nothing in the customer-facing flow
+offers them yet (operator-set only, by hand in the database — see "Out of
+scope" below). `overlay` is the only mode that mutates the host element (it sets
 `position: relative` when the computed position is `static`); the other two do
 not touch host styles at all.
 
@@ -157,23 +160,33 @@ host page for free — provided we stop setting it, which today's
 `updateContainerPosition()` does unconditionally — while the host's layout,
 spacing and color rules stay out.
 
-### The site sampler
+### The site sampler — built
 
-At mount time, read from the host page via `getComputedStyle`:
+Runs once, at pick time, inside the picker (`pickerSampleTheme()` in
+`public/widget.js`) — not on every real visitor's page load. A real visitor's
+browser never samples anything; `mountInline()` only ever applies the
+`theme` object already resolved from `config.widget.inline`, whatever that
+was the last time someone approved a pick.
 
-| Token | Source |
+| Token | How it's read |
 | --- | --- |
-| `font` | not set — inherited across the shadow boundary |
-| `ground` (light/dark) | effective background of the mount target and its ancestors |
-| `text` | computed `color` at the mount point |
-| `radius` | `border-radius` of the nearest button/CTA |
-| `accent` | `background-color` of the nearest primary button |
+| `font` | never sampled — always `'inherit'`. Inherited CSS properties cross the shadow boundary on their own, so the honest answer is to set no `font-family` at all and let the host's cascade through. |
+| `ground` (`light`/`dark`) | walk from the clicked element up through its ancestors reading `getComputedStyle(node).backgroundColor`; the first non-transparent one wins. Defaults to `light` if nothing on the way up has a background — an unstyled page is white. |
+| `accent` | `background-color` of the site's own call-to-action, found by scanning ordered candidate selectors (`a[class*="btn"]`, `a[class*="button"]`, `.btn`, `.button`, `button`, `[role="button"]`, `a`) inside the picked element first, then the whole document, taking the first candidate that actually has a background of its own. This is selector-likelihood order, not proximity — it exists because the first `<a>` inside a hero is usually a bare text link, and sampling that yields transparent-black. |
+| `radius` | `border-top-left-radius` of that same CTA, capped at 32px so a pill-shaped button (which computes near 999px) doesn't turn a full-width surface into a stadium. |
 
-**Sampled values are proposed in the picker and saved to
-`config.widget.inline.theme` after the customer approves them.** They are never
-applied blind at runtime. A rule that flatters one account's palette can be
-wrong on the next one; the same over-generalisation from a single account cost
-us two rollbacks on the reel banner work.
+There is no `text`/foreground-color token — an earlier version of this design
+proposed sampling one; it was never built, and nothing reads a `text` field
+today (`ResolvedInlineTheme` has exactly `font`/`accent`/`radius`/`ground`).
+
+**Sampled values are proposed, never applied blind.** The picker posts them
+in the `ibot:picked` message (see "The picker" below); the dashboard shows
+them and only writes to `config.widget.inline.theme` once the customer saves.
+A sample that cannot be read (no CTA found, everything transparent) is simply
+not proposed — `theme.accent`/`radius` come back `null` rather than a guess.
+A rule that flatters one account's palette can be wrong on the next one; the
+same over-generalisation from a single account cost us two rollbacks on the
+reel banner work.
 
 ### Presets
 
@@ -233,24 +246,87 @@ measures the rendered box and stores `reserve.{desktop,mobile}`; widget.js
 applies the reserve as a `min-height` skeleton before config resolves, and
 caches it in `localStorage` so a repeat visit paints immediately.
 
-## The picker
+## The picker — built
 
 Runs inside `/api/widget/preview/[accountId]`, which already fetches the
 customer's real site server-side, strips `X-Frame-Options` and CSP
-`frame-ancestors`, and injects `widget.js` into an admin iframe. Adding
-`data-picker="true"` puts widget.js into a mode where hovering highlights
-candidate elements and a click generates a stable selector and posts it to the
-dashboard over `postMessage`.
+`frame-ancestors`, and injects `widget.js` into an admin iframe
+(`WidgetDraftPreview.tsx`). Picker mode rides the same `window.postMessage`
+channel that already carries `ibot:preview-ready` (widget → dashboard, frame
+booted) and `ibot:draft` (dashboard → widget, live-edit payload), rather than
+a new attribute or channel:
 
-The dashboard then shows the proposed mode, preset, sampled theme and measured
+- **`ibot:picker` (dashboard → widget)** — `{ type: 'ibot:picker', on: boolean }`.
+  Turns picker mode on/off inside the iframe. While on, hovering highlights
+  the element under the cursor and a click is captured instead of followed.
+- **`ibot:picked` (widget → dashboard)** — posted once, on click:
+  `{ type: 'ibot:picked', selector, label, mode: 'into', reserve: {desktop, mobile}, theme }`.
+  `reserve` here is the clicked element's *own* measured height, not yet
+  zeroed — `WidgetDraftPreview.tsx`'s listener is what zeroes it for
+  `mode: 'into'` (appending inside the target would otherwise double the
+  element) while keeping the raw number as `measured`, purely for the "this
+  is 748px tall" summary. The picker itself only ever proposes `mode: 'into'`;
+  `replace` and `overlay` are not offered from a click today (see "Out of
+  scope" below).
+
+**Selector rule, as actually implemented:** prefer an `id`, then the first
+single class that matches exactly one element on the page, then the shortest
+class chain (two classes, then three) that does. Nothing else is ever
+proposed — no descendant combinators, no `:nth-child`, no attribute
+selectors. The grammar this allows is exactly `#id` or
+`.a[.b[.c]]` (regex: `^(#[A-Za-z_][\w-]*|\.[A-Za-z_][\w-]*(\.[A-Za-z_][\w-]*){0,2})$`),
+kept as two hand-written copies — `PICKER_STORABLE` in `public/widget.js`
+(gates what the picker will even attempt to emit) and `STORABLE_SELECTOR`
+behind `isUnsafeSelector` in `src/lib/widget/inline.ts` (gates what
+`resolveInlineMount` will store) — pinned against each other by a shared
+corpus test (`picker-mode.test.ts`) so the two cannot silently drift apart.
+Anything outside that shape is refused at save time, whatever produced it.
+
+**Why an allowlist, not a blocklist.** The first version refused selectors by
+pattern-matching for `html`/`body`/`head`. Two rounds of patching individual
+bypasses — `body,.foo` (a selector *list* resolves to the first
+document-order match across every member), `body:not(.x)` (a pseudo-class
+narrows a match without retargeting it), then `*`, `:root`, `:is(body)`,
+`:where(body)`, `:has(body)`, `:has(> body)`, `:is(body,.foo)`,
+`body[title="a b"]` — proved a blocklist of dangerous spellings is
+unwinnable: deciding what a selector *resolves to* is a parsing problem, and
+`:is()`/`:where()`/`:has()`/`:not()` hide arbitrary content from any
+string-level parser that isn't a real CSS engine. The fix was to stop trying
+to enumerate what to refuse and instead enumerate the one shape the picker
+actually needs to emit — an id or a short class chain — and refuse
+everything else, including every spelling above and every one nobody has
+thought of yet.
+
+**The save-time grammar is not the safety guarantee.** `<body class="page">`
+with a saved selector of `.page` passes `STORABLE_SELECTOR` — a class that
+merely sits on `<body>` is indistinguishable from an ordinary content class
+at the string level, and no grammar fixes that. The actual guarantee is
+`inlineTargetIsSafe()` in `public/widget.js`, called from `mountInline()` on
+every real page load: it compares the *resolved element* against
+`document.documentElement`/`body`/`head` and against Bestie's own container,
+by identity, once a DOM exists to ask — the only place that question can
+honestly be answered. A selector that clears the save-time grammar but
+resolves to `<body>` on some page still gets refused there, falls back to the
+floating bubble, and reports `inline_mount_missing`. The grammar's job is
+narrower: stop the obviously-wrong thing from ever being *stored*, not
+replace the runtime check.
+
+(`isStableSelector()` also exists in `src/lib/widget/inline.ts` — a second,
+looser heuristic that flags builder-generated hash classes and deep
+`:nth-child` chains as *unstable* rather than unsafe. It is exported and
+unit-tested but not yet called from the save path or the picker; today
+nothing acts on it.)
+
+The dashboard shows the proposed mode, preset, sampled theme and measured
 reserve, renders a live preview on the customer's own page, and saves to
-`config.widget.inline` on approval.
-
-**Selector stability rule:** prefer an `id`, then a single class that matches
-exactly one element, then a short structural path. Never emit a selector
-containing a Webflow-generated hash or an `:nth-child` chain deeper than two —
-those break on the customer's next publish, and outcome 2 above is a fallback,
-not a plan.
+`config.widget.inline` on approval (`mountFromPick` → `inlineForPost` →
+`/api/influencer/settings` → `resolveInlineMount`). A pick against a
+brand-new mount (no existing `config.widget.inline`) always saves with
+`enabled: 'preview'`, never straight to live — going live is a separate,
+deliberate toggle in the dashboard, not a side effect of picking a spot.
+Re-picking a spot on an *existing* mount preserves whatever
+`enabled`/`preset`/`surface`/`bubble`/`paths` it already had; only the
+selector, mode, reserve and theme come from the new pick.
 
 ## Analytics
 
@@ -297,14 +373,46 @@ actually in the page and carrying `mount_preset`. `mount_preset` stays on
   Sharon); the inline surface feeds them from the first second of the visit
   instead of from a form.
 
+## Known gaps
+
+Two places where what shipped is thinner than the config schema suggests:
+
+- **No "pause but keep the pick" state.** `config.widget.inline.enabled` is a
+  two-value tri-state (`true` | `'preview'`) — there is no stored "off, but
+  remember the selector/theme/reserve for later." An earlier draft of the
+  editor UI offered an in-session `enabled: false` that looked like a pause
+  button, but it lied: the summary still showed the picked spot as configured
+  while the next save actually deleted `config.widget.inline` outright (same
+  outcome as pressing remove, just not labelled as destructive). It was taken
+  back out. Today, off means gone — the customer re-picks from scratch to turn
+  a mount back on. A real pause state would need to become a third stored
+  value in `ResolvedInlineMount`/`resolveInlineMount` first; nothing in the
+  editor should invent one client-side again.
+- **`paths` has no editor UI.** `resolveInlineMount` and every save-path
+  function (`inlineForPost`, `mountFromPick`) carry an existing `paths` value
+  through untouched — dropping it would silently reintroduce a document-wide
+  `MutationObserver` on every pageview plus a false `inline_mount_missing`
+  report on every page the selector never existed on (see "Mount resolution"
+  above). But nothing in `InlineMountSection` lets a customer set or change
+  it. Today it can only be set by hand in the database; the picker always
+  proposes a mount with `paths: null` (every page) unless one already existed
+  on the mount being re-picked.
+
 ## Testing
 
-- Unit: mount resolution (found / missing / late), selector generation and the
-  stability rule, `art: "host"` enforcement in `resolveBanner`, sampler token
-  extraction from a fixture computed-style, the mobile chip-drop rule.
+- Unit: mount resolution (found / missing / late), the save-time selector
+  grammar (`isUnsafeSelector`) pinned against the picker's own copy
+  (`picker-mode.test.ts`), `art: "host"` enforcement in `resolveBanner`, the
+  mobile chip-drop rule.
 - Unit: config absence produces today's behavior byte-for-byte.
 - Unit: `enabled: "preview"` mounts only with `?bestie=1` / the sessionStorage
   flag, and its events carry `preview: true`.
+- Unit: the whole picked-to-stored chain in one test
+  (`tests/unit/widget/picker-round-trip.test.ts`) — the real `ibot:picked`
+  message a booted `public/widget.js` posts for a real click, through the
+  real `WidgetDraftPreview` → `mountFromPick` → `inlineForPost` →
+  `resolveInlineMount`, rather than each stage's own test asserting only
+  against a hand-typed fixture of the stage before it.
 - Manual on the pilot: the host video still plays during and after the overlay;
   page height unchanged with the mount present; bubble appears only after the
   mount scrolls out; session continues across both mounts; keyboard on iOS
@@ -313,9 +421,11 @@ actually in the page and carrying `mount_preset`. `mount_preset` stays on
 ## Out of scope
 
 Shopify/WordPress app blocks, an npm React package, auto-detecting a site's
-search input, `bar` preset go-to-market, extracting `@bestie/core`, and any
-change to the floating widget's own appearance. Each is a separate decision that
-should follow evidence from the pilot.
+search input, `bar` preset go-to-market, extracting `@bestie/core`, mount
+`mode` selection by the customer (the picker always proposes `into`; `replace`
+and `overlay` stay operator-set), and any change to the floating widget's own
+appearance. Each is a separate decision that should follow evidence from the
+pilot.
 
 ## Open questions
 
