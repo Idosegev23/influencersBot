@@ -2193,6 +2193,21 @@
     try {
       if (INLINE.mode === 'replace') {
         if (!target.parentNode) throw new Error('replace target has no parent');
+        // We are taking this element's place, so we take its stacking context
+        // with it. The pilot's hero content layer carries position:relative and
+        // z-index:5, which is the only reason the copy sat above an absolutely
+        // positioned background video. Our host is static by default, and a
+        // positioned element paints above a static one — so without this the
+        // video covers Bestie entirely and the hero looks simply unchanged.
+        try {
+          var replacedStyle = window.getComputedStyle(target);
+          var replacedPos = replacedStyle.position;
+          if (replacedPos && replacedPos !== 'static') {
+            host.style.position = replacedPos;
+            var replacedZ = replacedStyle.zIndex;
+            if (replacedZ && replacedZ !== 'auto') host.style.zIndex = replacedZ;
+          }
+        } catch (e) { /* a context we cannot read is simply not inherited */ }
         target.parentNode.replaceChild(host, target);
         replaced = target;
       } else if (INLINE.mode === 'overlay') {
@@ -2294,8 +2309,18 @@
 
     return ':host{display:block;width:100%;}' +
       '*{box-sizing:border-box;}' +
-      '.wrap{display:flex;flex-direction:column;align-items:center;width:100%;' +
+      '.wrap{display:flex;flex-direction:column;align-items:center;' +
+        'justify-content:center;width:100%;height:100%;' +
         'direction:' + locale.dir + ';}' +
+      // Typography is inherited, never declared — that is how this speaks the
+      // host site's language. Only size, weight and rhythm are ours.
+      '.head{text-align:center;margin:0 0 clamp(16px,3vw,28px);max-width:18ch;}' +
+      '.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;' +
+        'opacity:.75;margin-bottom:10px;color:' + ink + ';}' +
+      '.hl{font-size:clamp(28px,4.4vw,52px);line-height:1.08;margin:0;' +
+        'font-weight:500;letter-spacing:-.02em;color:' + ink + ';}' +
+      '.sub{font-size:clamp(13px,1.4vw,17px);line-height:1.5;opacity:.75;' +
+        'margin:12px 0 0;color:' + ink + ';}' +
       '.pane{width:100%;max-width:560px;' +
         (glass
           ? 'background:' + fill + ';border:1px solid ' + edge + ';border-radius:22px;padding:16px;' +
@@ -2340,13 +2365,37 @@
   }
 
   function inlinePillHtml() {
-    var ph = (INLINE.banner && INLINE.banner.headline) || config.placeholder;
+    // When the headline renders on its own (replace mode), repeating it inside
+    // the input reads as a stutter — fall back to the account's placeholder.
+    var ph = inlineShowsHeadline()
+      ? config.placeholder
+      : ((INLINE.banner && INLINE.banner.headline) || config.placeholder);
     return '<div class="pill" id="ibot-inline-pill" role="button" tabindex="0" ' +
       'aria-label="' + escapeHtml(ph) + '">' +
       '<span class="av">' + avatarHtml(28) + '</span>' +
       '<span class="ph">' + escapeHtml(ph) + '</span>' +
       '<span class="go" aria-hidden="true">&#8593;</span>' +
       '</div>';
+  }
+
+  // Whose headline is the visitor looking at?
+  //
+  // In `into` we are a guest inside the customer's own hero and their headline
+  // is still on screen; ours would be a second one. In `replace` we just removed
+  // theirs, so the resolved banner headline is what fills the space we took.
+  function inlineShowsHeadline() {
+    return !!(INLINE && INLINE.mode === 'replace' && INLINE.preset === 'hero' &&
+      INLINE.banner && INLINE.banner.headline);
+  }
+
+  function inlineHeadlineHtml() {
+    if (!inlineShowsHeadline()) return '';
+    var b = INLINE.banner;
+    var out = '<div class="head">';
+    if (b.eyebrow) out += '<div class="eyebrow">' + escapeHtml(b.eyebrow) + '</div>';
+    out += '<h2 class="hl">' + escapeHtml(b.headline) + '</h2>';
+    if (b.subline) out += '<p class="sub">' + escapeHtml(b.subline) + '</p>';
+    return out + '</div>';
   }
 
   function renderInline() {
@@ -2373,7 +2422,8 @@
 
     inlineRoot.innerHTML =
       '<style>' + inlineStylesCss() + '</style>' +
-      '<div class="wrap"><div class="pane">' + inlinePillHtml() + chipsHtml + '</div></div>';
+      '<div class="wrap">' + inlineHeadlineHtml() +
+      '<div class="pane">' + inlinePillHtml() + chipsHtml + '</div></div>';
   }
 
   // The bubble and the inline mount are the same conversation; showing both at
