@@ -2439,6 +2439,13 @@
     // See `.row.me .say` below: the pill's own fill is far too weak to carry a
     // whole column of 15px text over a playing video.
     var meFill = light ? 'rgba(20,20,19,0.16)' : 'rgba(245,244,241,0.28)';
+    // Bestie's own bubble sits lighter than the visitor's — the blur behind it
+    // is doing most of the separating.
+    var botFill = light ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.13)';
+    // What the bubbles become when the material is unavailable or unwanted:
+    // opaque enough to read without any backdrop at all.
+    var solidSay = light ? 'rgba(255,255,255,0.94)' : 'rgba(18,18,20,0.88)';
+    var solidMe = light ? 'rgba(236,235,232,0.96)' : 'rgba(52,52,58,0.94)';
     var reserve = inlineReserveHeight();
     // No reserve configured (`into`-shaped config on a replace mount, or a row
     // predating the reserve field): fall back to a height that is still bounded,
@@ -2483,17 +2490,57 @@
       // Bestie speaks bare. Over a moving video a 15px line needs more help
       // than a 52px headline does, so a dark ground gets a soft shadow — the
       // cheapest legibility that adds no box.
+      // ---- The glass ----------------------------------------------------
+      // Apple's Liquid Glass simulates a refracting slab: real edge lensing,
+      // specular highlights that track the gyroscope, and luminance sampling
+      // behind the pane so text contrast adapts to whatever is underneath.
+      // A browser has none of that. `backdrop-filter` snapshots the region
+      // and blurs it, full stop — so the tint and the text-shadow here are
+      // calibrated by hand for exactly the job Apple's material does by
+      // itself. The SVG displacement-map trick that fakes the refraction was
+      // deliberately left out: it re-rasterises on every frame of a playing
+      // video, and its own reference implementation disables itself on Safari
+      // and Firefox, where most of this pilot's mobile traffic lives.
+      //
+      // The blur earns its place beyond looks: it strips the high-frequency
+      // detail behind a 15px line, so the same tint strength reads better over
+      // moving video than the flat fill it replaces.
       '.say{max-width:86%;font-size:15px;line-height:1.55;color:' + ink + ';' +
-        'word-break:break-word;' +
+        'word-break:break-word;border-radius:' + Math.min(radius, 18) + 'px;' +
+        'padding:8px 13px;background:' + botFill + ';' +
+        'backdrop-filter:blur(16px) saturate(1.6);' +
+        '-webkit-backdrop-filter:blur(16px) saturate(1.6);' +
+        // A lit top edge and a shaded bottom are what make a flat blur read as
+        // a slab with thickness rather than a frosted rectangle.
+        'box-shadow:inset 0 1px 0 ' + (light ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.28)') + ',' +
+          'inset 0 -1px 0 rgba(0,0,0,0.16),' +
+          '0 6px 22px rgba(0,0,0,0.18);' +
+        'border:1px solid ' + edge + ';' +
         (light ? '' : 'text-shadow:0 1px 10px rgba(0,0,0,0.55);') + '}' +
+      // Where the material is unavailable the bubble becomes a plain readable
+      // one rather than a prettier unreadable one. Same for a visitor who has
+      // asked the system for less transparency — that is an accessibility
+      // request, not a style preference.
+      '@supports not (backdrop-filter:blur(2px)){' +
+        '.say{background:' + solidSay + ';}}' +
+      '@media (prefers-reduced-transparency:reduce){' +
+        '.say{background:' + solidSay + ';backdrop-filter:none;' +
+        '-webkit-backdrop-filter:none;}}' +
       // The visitor's words keep the pill's material — but not the pill's
       // strength. The resting state exposes ONE 15px line of it beside a 52px
       // headline; a conversation is a much larger surface of much smaller type,
       // and an 11% wash over a bright video frame (sky, a white shirt, a light
       // cut) is near-white on near-white. So this rule gets its own heavier
       // fill, and it KEEPS the text-shadow every other line has.
-      '.row.me .say{background:' + meFill + ';border:1px solid ' + edge + ';' +
-        'border-radius:' + Math.min(radius, 18) + 'px;padding:8px 13px;}' +
+      // The visitor's own words keep the heavier tint: an 11% wash over a bright
+      // video frame is near-white on near-white, and this is the rule that was
+      // found to be the least legible thing on the surface. The glass above
+      // supplies the material; this supplies the contrast.
+      '.row.me .say{background:' + meFill + ';}' +
+      '@supports not (backdrop-filter:blur(2px)){' +
+        '.row.me .say{background:' + solidMe + ';}}' +
+      '@media (prefers-reduced-transparency:reduce){' +
+        '.row.me .say{background:' + solidMe + ';}}' +
       // formatMessage() hard-codes #000/#fff on list items and the account
       // colour on links — both invisible against a video. !important in an
       // author stylesheet is the only thing that outranks an inline style.

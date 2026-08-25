@@ -256,19 +256,26 @@ describe('a replace mount converses in the hero', () => {
     };
 
     // The conversation container and the message list are bare: the customer's
-    // video shows through both.
-    for (const sel of ['.conv', '.msgs', '.say']) {
+    // video shows through both, and nothing wraps the thread in a card.
+    //
+    // `.say` used to be on this list — Bestie spoke with no material at all.
+    // That changed deliberately when the bubbles became glass; what this test
+    // protects is the absence of PANEL chrome around the conversation, not the
+    // absence of material on an individual bubble.
+    for (const sel of ['.conv', '.msgs']) {
       const body = rule(sel);
       expect(body, sel + ' must not paint a panel').not.toContain('background');
       expect(body, sel + ' must not be a card').not.toContain('border-radius');
       expect(body, sel + ' must not be a card').not.toContain('box-shadow');
     }
     // Paired presence — the same reader DOES find a fill and a radius on the
-    // one rule that is supposed to have them, so the absences above are
+    // rules that are supposed to have them, so the absences above are
     // discriminating rather than a broken selector lookup.
+    const say = rule('.say');
+    expect(say).toContain('background');
+    expect(say).toContain('backdrop-filter');
     const me = rule('.row.me .say');
     expect(me).toContain('background');
-    expect(me).toContain('border-radius');
   });
 
   it('keeps the visitor\'s own words legible over a bright video frame', async () => {
