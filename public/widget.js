@@ -1839,7 +1839,7 @@
           try {
             window.parent.postMessage(
               { type: 'ibot:pick-failed', label: pickerLabel(el) },
-              window.location.origin,
+              window.location.origin
             );
           } catch (e2) { /* no reachable parent — the diagnostic still stands */ }
           return;
@@ -4242,7 +4242,7 @@
           if (typeStr.indexOf('product') !== -1) {
             var offers = node.offers && (Array.isArray(node.offers) ? node.offers[0] : node.offers) || {};
             ctx.product = {
-              name: node.name || ctx.product?.name || ogTitle || null,
+              name: node.name || (ctx.product && ctx.product.name) || ogTitle || null,
               image: (Array.isArray(node.image) ? node.image[0] : node.image) || ogImage || null,
               price: offers.price ? parseFloat(offers.price) : (ogPrice ? parseFloat(ogPrice) : null),
               currency: offers.priceCurrency || ogCurr || null,
@@ -5059,7 +5059,7 @@
     // notification flow. The `source` field segments them in the admin queue.
     var pc = pageContext || extractPageContext();
     var msg = leadForm.interest.trim() || '(no message)';
-    if (pc.product?.name) msg += '\n\nViewing: ' + pc.product.name;
+    if (pc.product && pc.product.name) msg += '\n\nViewing: ' + pc.product.name;
     if (pc.url) msg += '\nPage: ' + pc.url;
 
     fetch(BASE_URL + '/api/support', {
@@ -5074,7 +5074,7 @@
         sessionId: sessionId || null,
         source: 'widget_lead',
         refSource: pc.url || null,
-        metadata: { widget_version: '4.1', page_url: pc.url || null, product_name: pc.product?.name || null },
+        metadata: { widget_version: '4.1', page_url: pc.url || null, product_name: (pc.product && pc.product.name) || null },
       }),
     })
       .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || 'submit failed'); }); })
@@ -5238,7 +5238,7 @@
         orderForm.submitting = false;
         orderForm.result = data || { found: false };
         view = 'order_result';
-        widgetTrack('widget_order_lookup_result', { found: !!data?.found });
+        widgetTrack('widget_order_lookup_result', { found: !!(data && data.found) });
         render();
       })
       .catch(function (err) {
