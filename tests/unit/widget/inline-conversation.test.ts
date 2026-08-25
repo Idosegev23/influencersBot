@@ -180,7 +180,13 @@ describe('a replace mount converses in the hero', () => {
     engage();
     const host = document.querySelector('[data-bestie-inline]') as HTMLElement;
     const video = document.getElementById('bg')!;
-    expect(document.getElementById('theirs')).toBeNull();   // their <h1> is gone
+    // Their <h1> is NOT gone — it is adopted into our host and shown through a
+    // slot, so the page keeps its heading in the light DOM. This line used to
+    // assert the opposite; deleting the customer's brand statement was the old
+    // design, and it was changed because it silently altered their homepage SEO.
+    const theirH1 = document.getElementById('theirs')!;
+    expect(theirH1).not.toBeNull();
+    expect((document.querySelector('[data-bestie-inline]') as HTMLElement).contains(theirH1)).toBe(true);
     expect(host).not.toBeNull();
     expect(host.parentElement).toBe(video.parentElement);   // we stand where it stood
     expect(shadow().getElementById('ibot-inline-conv')).not.toBeNull();
@@ -203,9 +209,12 @@ describe('a replace mount converses in the hero', () => {
 
     engage();
 
-    // The h1 stays — a `replace` removed the customer's own, so ours is the
-    // page's only heading and deleting it would leave the document with none.
-    expect(shadow().querySelector('h1.hl')).not.toBeNull();
+    // The heading stays in the document — but it is the customer's own now,
+    // adopted into our host and shown through a slot rather than written by us.
+    // Collapsing must move it out of the conversation's way without removing
+    // it, or a `replace` would silently cost the page its h1.
+    expect(shadow().querySelector('slot[name="ibot-heading"]')).not.toBeNull();
+    expect(document.getElementById('theirs')).not.toBeNull();
     // …but it gives way rather than staying in the conversation's space.
     expect(shadow().querySelector('.head.away')).not.toBeNull();
     expect(shadow().querySelectorAll('.chip').length).toBe(0);

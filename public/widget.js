@@ -174,6 +174,11 @@
   // `into` is deliberately excluded. There we are a guest in someone else's
   // layout and the page is still theirs, so the floating panel stays right.
   var inlineConversing = false;
+  // The page's own <h1>, moved into our host and displayed through a slot.
+  // Adopting it rather than replacing it keeps the heading in the light DOM —
+  // its text, its element and its indexability all untouched — and saves us
+  // writing a headline to stand where the customer's brand statement stood.
+  var inlineAdoptedHeading = null;
   // Set the instant a visitor engages from the inline surface, to the customer's
   // own body.style.overflow value at that moment; null the rest of the time.
   // restoreAfterInline() uses "not null" as its own idempotency guard (safe to
@@ -2242,6 +2247,25 @@
         target.appendChild(host);
       }
 
+      // Adopt the page's heading LAST, once the swap has already succeeded.
+      // Doing it earlier would mean a later throw rolls `replaced` back into
+      // the page with its <h1> already moved out — restoring the customer's
+      // hero minus its headline, which is worse than not mounting at all.
+      if (INLINE.mode === 'replace' && replaced) {
+        try {
+          var pageHeading = replaced.querySelector('h1');
+          if (pageHeading) {
+            pageHeading.setAttribute('slot', 'ibot-heading');
+            host.appendChild(pageHeading);
+            inlineAdoptedHeading = pageHeading;
+            renderInline();   // re-render now that there is a slot to fill
+          }
+        } catch (e2) {
+          // A heading we cannot adopt is a heading we write ourselves.
+          inlineAdoptedHeading = null;
+        }
+      }
+
       watchInlineVisibility(target);
     } catch (e) {
       // Put the page back exactly as we found it, then stand down.
@@ -2368,6 +2392,9 @@
       // `ch` resolves against the element's OWN font-size, so this measure has to
       // live on the headline, not on the block around it — on .head it would be
       // 18ch of the inherited body size (~15px) and a 52px word would overflow it.
+      // The adopted heading keeps the host page's own type entirely — we only
+      // clear the margins it carried inside their layout so it sits in ours.
+      '::slotted(h1){margin:0 auto !important;max-width:min(18ch,100%);}' +
       '.hl{font-size:clamp(28px,4.4vw,52px);line-height:1.08;margin:0 auto;' +
         'max-width:min(18ch,100%);font-weight:500;letter-spacing:-.02em;' +
         'color:' + ink + ';}' +
@@ -2588,8 +2615,9 @@
   // is still on screen; ours would be a second one. In `replace` we just removed
   // theirs, so the resolved banner headline is what fills the space we took.
   function inlineShowsHeadline() {
-    return !!(INLINE && INLINE.mode === 'replace' && INLINE.preset === 'hero' &&
-      INLINE.banner && INLINE.banner.headline);
+    if (!INLINE || INLINE.mode !== 'replace' || INLINE.preset !== 'hero') return false;
+    // Either we adopted the page's own heading, or we have one to write.
+    return !!(inlineAdoptedHeading || (INLINE.banner && INLINE.banner.headline));
   }
 
   // `away` collapses the invitation instead of deleting it: the heading stays in
@@ -2598,11 +2626,19 @@
     if (!inlineShowsHeadline()) return '';
     var b = INLINE.banner;
     var out = '<div class="head' + (away ? ' away' : '') + '">';
-    if (b.eyebrow) out += '<div class="eyebrow">' + escapeHtml(b.eyebrow) + '</div>';
-    // Their <h1> was just removed by the replace, so this IS the page's
-    // heading now. Shipping an h2 would leave the page with none.
-    out += '<h1 class="hl">' + escapeHtml(b.headline) + '</h1>';
-    if (b.subline) out += '<p class="sub">' + escapeHtml(b.subline) + '</p>';
+    if (b && b.eyebrow) out += '<div class="eyebrow">' + escapeHtml(b.eyebrow) + '</div>';
+    if (inlineAdoptedHeading) {
+      // Their own <h1>, still a light-DOM node, shown through here. We write no
+      // heading text at all — the page keeps its brand statement verbatim, and
+      // its own stylesheet keeps painting it, because every rule that does so
+      // is a class selector rather than a descendant of what we replaced.
+      out += '<slot name="ibot-heading"></slot>';
+    } else {
+      // Nothing to adopt: this IS the page's heading now, so it is an h1.
+      // Shipping an h2 would leave the page without one.
+      out += '<h1 class="hl">' + escapeHtml(b.headline) + '</h1>';
+    }
+    if (b && b.subline) out += '<p class="sub">' + escapeHtml(b.subline) + '</p>';
     return out + '</div>';
   }
 

@@ -77,7 +77,11 @@ describe('replace mode on a background-video hero', () => {
   it('removes the hero content but leaves the video playing behind', async () => {
     const w = await bootWidget({ html: HERO, config: CFG });
     expect(w.inlineHost).not.toBeNull();
-    expect(document.getElementById('their-headline')).toBeNull();
+    // The heading survives: adopted into our host, still a light-DOM node.
+    // What gives way is everything else in the hero.
+    const kept = document.getElementById('their-headline')!;
+    expect(kept).not.toBeNull();
+    expect(w.inlineHost!.contains(kept)).toBe(true);
     expect(document.querySelector('.cta')).toBeNull();
     // The video is a sibling of what we replaced, so it must survive untouched.
     const video = document.getElementById('bg');
@@ -98,12 +102,14 @@ describe('replace mode on a background-video hero', () => {
     expect(w.inlineHost!.style.minHeight).toBe('576px');
   });
 
-  it('renders the banner headline, because we just removed the page its own', async () => {
+  it('shows the page its own heading through a slot, not one of ours', async () => {
     await bootWidget({ html: HERO, config: CFG });
     const text = root().textContent || '';
     expect(root().getElementById('ibot-inline-pill')).not.toBeNull();
-    expect(text).toContain('היי! אנחנו לידרס!');
+    // The eyebrow is ours to write; the heading is theirs to keep.
     expect(text).toContain('אנחנו פה לכל שאלה');
+    expect(root().querySelector('slot[name="ibot-heading"]')).not.toBeNull();
+    expect(text).not.toContain('היי! אנחנו לידרס!');
   });
 
   it('does NOT render a headline in into mode — the host page still has one', async () => {
