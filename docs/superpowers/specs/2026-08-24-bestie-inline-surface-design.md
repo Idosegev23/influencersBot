@@ -65,6 +65,12 @@ proven sale, not precede it).
   "inline": {
     "enabled": true,                       // true | false | "preview"
     "selector": ".content_home-c-hero",   // produced by the picker
+    // Path PREFIXES the mount is allowed on. Absent/null = every page.
+    // The embed is site-wide but every real selector is page-specific: without
+    // a scope, every non-home pageview runs a document-wide MutationObserver
+    // for 5s and then files an `inline_mount_missing` diagnostic for something
+    // that is not a fault. Prefixes only — no regex or glob from config.
+    "paths": ["/he", "/en"],
     "mode": "into",                        // into | replace | overlay
     "preset": "hero",                      // hero | bar
     "surface": "bare",                     // bare | glass | solid
@@ -125,6 +131,17 @@ while in preview mode carry `preview: true` and are excluded from the
 
 A `report()` for outcome 2 is a hard requirement, not a nicety. `report()` is
 capped and deduped already, so a repeated miss cannot flood.
+
+A **fourth**, silent outcome sits before all three: a page outside
+`inline.paths`. Nothing is resolved, no observer is created, and nothing is
+reported — the mount was never meant to be there. This is what keeps outcome 2
+a signal rather than a per-pageview stream.
+
+The mount also refuses a target that is `<html>`, `<body>`, `<head>`, or an
+ancestor of the widget's own container, whatever the selector says. `mode:
+"replace"` on `body` would otherwise run `html.replaceChild(div, body)` and
+delete the customer's page. A refusal reports `inline_mount_missing` with a
+message that distinguishes it from a plain miss, and falls back to the bubble.
 
 ## Rendering
 
@@ -239,9 +256,18 @@ not a plan.
 
 `widget_loaded` is the only signal that proves a customer installed anything,
 and `/admin/health` is built on it. `widgetTrack` takes a free-form payload, so
-add `surface: 'inline' | 'floating'` and `mount_preset` to `widget_loaded` and
-to the funnel events. Without this, inline installs are indistinguishable from
-floating ones at exactly the moment the distinction starts to matter.
+add `surface: 'inline' | 'floating'` and `mount_preset` to the funnel events.
+Without this, inline installs are indistinguishable from floating ones at
+exactly the moment the distinction starts to matter.
+
+`widget_loaded` itself always reports `surface: 'floating'`, deliberately: it
+fires before mount resolution finishes and long before the 5s late-mount
+deadline, so an `'inline'` claim there means only "the config carried a mount"
+— which is equally true of a selector the customer's theme renamed and of every
+page the mount is not scoped to. The honest signal is a separate
+`widget_inline_mounted` event, emitted from `mountInline()` once the surface is
+actually in the page and carrying `mount_preset`. `mount_preset` stays on
+`widget_loaded` as the "a mount was configured for this pageview" dimension.
 
 ## LDRS pilot
 

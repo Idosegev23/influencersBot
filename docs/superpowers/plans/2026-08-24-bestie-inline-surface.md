@@ -154,7 +154,6 @@ git commit -m "feat(widget): add inline banner surface with host art mode"
   - `type InlineTreatment = 'bare' | 'glass' | 'solid'`
   - `interface ResolvedInlineMount { enabled: InlineEnabled; selector: string; mode: InlineMountMode; preset: InlinePreset; surface: InlineTreatment; reserve: { desktop: number; mobile: number }; theme: { font: string; accent: string | null; radius: number | null; ground: 'light' | 'dark' }; bubble: 'after-scroll' | 'always' | 'never' }`
   - `function resolveInlineMount(config: any): ResolvedInlineMount | null`
-  - `function isStableSelector(sel: string): boolean`
   - `function chipBudget(viewportWidth: number): number`
 
 - [ ] **Step 1: Write the failing test**
@@ -163,7 +162,7 @@ Create `tests/unit/widget/inline-resolve.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { resolveInlineMount, isStableSelector, chipBudget } from '@/lib/widget/inline';
+import { resolveInlineMount, chipBudget } from '@/lib/widget/inline';
 
 const LDRS = {
   widget: {
@@ -236,22 +235,6 @@ describe('resolveInlineMount', () => {
   it('refuses a selector long enough to be a payload', () => {
     const cfg = { widget: { inline: { enabled: true, selector: '#a'.repeat(300) } } };
     expect(resolveInlineMount(cfg)).toBeNull();
-  });
-});
-
-describe('isStableSelector', () => {
-  it('accepts an id and a single readable class', () => {
-    expect(isStableSelector('#hero-search')).toBe(true);
-    expect(isStableSelector('.content_home-c-hero')).toBe(true);
-  });
-
-  it('rejects a deep nth-child chain — it breaks on the next publish', () => {
-    expect(isStableSelector('div > div:nth-child(2) > div:nth-child(4) > span')).toBe(false);
-  });
-
-  it('rejects a builder-generated hash class', () => {
-    expect(isStableSelector('.css-1x9f3ab')).toBe(false);
-    expect(isStableSelector('.w-node-a1b2c3d4e5f6-7a8b9c0d')).toBe(false);
   });
 });
 
@@ -334,24 +317,6 @@ function hex(value: unknown): string | null {
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
   const n = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
   return Math.min(max, Math.max(min, n));
-}
-
-/**
- * A selector we are willing to store. The failure we are guarding against is
- * not injection — it is a selector that silently stops matching when the
- * customer republishes their site. Builder-generated hashes and deep
- * positional chains are exactly the ones that do.
- */
-export function isStableSelector(sel: string): boolean {
-  if (!sel || sel.length > MAX_SELECTOR) return false;
-  if ((sel.match(/:nth-child/g) || []).length > 1) return false;
-  // Known builder prefixes, whatever they generate after the dash. Matching on
-  // hex alone misses emotion's base36 (`.css-1x9f3ab`), which is exactly the
-  // kind of class that changes on the customer's next build.
-  if (/\.(css|sc|w-node|jsx|emotion)-[0-9a-z]{4,}/i.test(sel)) return false;
-  // A bare generated hash with no prefix.
-  if (/\.[A-Za-z_-]*[0-9a-f]{8,}/.test(sel)) return false;
-  return true;
 }
 
 /**
@@ -1671,6 +1636,8 @@ Before the picker is built, note whether an automatic sampler *would* have deriv
 ## Not in this plan
 
 The **visual picker** — picker mode in `/api/widget/preview/[accountId]`, element highlighting, selector generation from a click, and the dashboard UI that saves `config.widget.inline` — is a separate subsystem and gets its own plan. It is not on the pilot's critical path: LDRS's selector is already known and set by hand in Task 9.
+
+The **selector-stability rule** goes with it too. The spec puts it at generation time — the picker refuses to emit a builder hash or a deep `:nth-child` chain — not at read time, where rejecting a stored selector would silently kill a mount that was working. Shipping the check now would mean a tested function nothing calls.
 
 The **site sampler** goes with it. The spec has the sampler deriving `ground`, `text`, `radius` and `accent` from the host page via `getComputedStyle` — but its output is a *proposal a customer approves in the picker*, never something applied at runtime. Without the picker there is nowhere for that proposal to be seen or accepted, so building the sampler now would either strand it or push it into exactly the blind auto-theming the spec forbids. In this plan the theme is read from `config.widget.inline.theme`, set by hand for the pilot; Task 9 Step 8 gathers the evidence that decides how much the sampler can be trusted when it is built.
 

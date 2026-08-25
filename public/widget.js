@@ -127,6 +127,34 @@
   var lastTopic = null;
   try { lastTopic = localStorage.getItem('ibot_last_topic_' + ACCOUNT_ID); } catch (e) { /* */ }
 
+  // ---- Inline surface -------------------------------------------------------
+  // Resolved by /api/widget/config; null for every account that has not opted
+  // in, which is the state that reproduces today's behavior exactly.
+  var INLINE = null;
+  var inlineHost = null;      // the <div> we create inside the customer's page
+  var inlineRoot = null;      // its shadow root (Task 6)
+  var inlineVisible = false;  // is the mount currently on screen?
+  // Chip budget as of the last renderInline() call. The resize listener uses
+  // this to skip rebuilding the shadow root's innerHTML — and thereby dropping
+  // any delegated listener bound to it — when a resize did not actually cross
+  // an inlineChipCount() breakpoint (e.g. iOS collapsing its URL bar mid-scroll
+  // changes innerHeight, not innerWidth, but any height-only resize would still
+  // reach this check).
+  var inlineLastChipBudget = null;
+  // Set the instant a visitor engages from the inline surface, to the customer's
+  // own body.style.overflow value at that moment; null the rest of the time.
+  // restoreAfterInline() uses "not null" as its own idempotency guard (safe to
+  // call from anywhere, including a failed open's recovery path), so it must
+  // be cleared — not just restored — once consumed. The re-entrancy guard
+  // against a double-click re-opening (and re-locking, re-tracking) is
+  // openFromInline()'s own `if (isOpen) return;` at its top — isOpen is set
+  // true, and this lock taken, only once per open.
+  var inlineScrollLock = null;
+  // The customer's own body.style.paddingRight at lock time, restored alongside
+  // inlineScrollLock. Scrollbar-compensation padding (Important #4) is added on
+  // top of it, never replaces it outright.
+  var inlineBodyPaddingLock = null;
+
   // ---- View state (Phase: concierge) ----
   // The widget is no longer a chat-only surface. `view` switches the panel
   // between chat, the inline support-ticket form, and the post-submit
@@ -615,6 +643,10 @@
       widget_version: WIDGET_VERSION,
       attribution: WIDGET_ATTRIBUTION,
     };
+    // Preview traffic is the account owner looking at their own site. Counting
+    // it as an install would make /admin/health claim a customer deployed
+    // something they are still deciding about.
+    if (INLINE && INLINE.enabled === 'preview') enriched.preview = true;
     for (var k in params) enriched[k] = params[k];
     // Dual-write funnel events into the new /api/widget/events pipeline too
     // (transition period — see Behavioral Events block below). MUST run before
@@ -1061,6 +1093,17 @@
     styleEl.textContent =
       vars +
       '@keyframes ibot-slide-up{from{opacity:0;transform:translateY(20px) scale(0.95);}to{opacity:1;transform:translateY(0) scale(1);}}' +
+      // A panel opened from the inline surface grows out of the box the
+      // visitor clicked (--ibot-origin-x/-y, set by openFromInline) instead of
+      // sliding up from the launcher corner — the resting invitation and the
+      // conversation it opens must read as the same object. openFromInline()
+      // also forces panelPainted=true before this markup is built, so no
+      // competing `animation:ibot-slide-up` ends up in the SAME inline style
+      // attribute (which would otherwise win over this stylesheet rule).
+      '#ibot-widget-container #ibot-panel[data-from-inline]{transform-origin:var(--ibot-origin-x) var(--ibot-origin-y);' +
+        'animation:ibot-inline-grow 0.26s cubic-bezier(.16,1,.3,1);}' +
+      '@keyframes ibot-inline-grow{from{opacity:0;transform:scale(0.94);}to{opacity:1;transform:scale(1);}}' +
+      '@media (prefers-reduced-motion:reduce){#ibot-widget-container #ibot-panel[data-from-inline]{animation:none;}}' +
       // Rises from the launcher rather than fading in place, so the bubble
       // reads as something the button said.
       '@keyframes ibot-teaser-in{from{opacity:0;transform:translateY(12px) scale(0.94);}to{opacity:1;transform:translateY(0) scale(1);}}' +
@@ -1238,8 +1281,36 @@
         };
       }
       updateContainerPosition();
+      // After updateContainerPosition(), which rewrites container.style.cssText
+      // wholesale and would wipe the display:none the inline mount may set.
+      // config.enabled is the account kill switch (set 25 lines up, honoured by
+      // render()). It has to gate the inline mount too: the server emits
+      // `inline` and `enabled` independently, so a switched-off account with a
+      // configured mount would otherwise still have us write into their page —
+      // and in `replace` mode that means deleting their hero element.
+      if (config.enabled !== false && data.inline && data.inline.selector) {
+        INLINE = data.inline;
+        // On a throw INLINE must not stay assigned: it gates the `preview` flag
+        // on every event and the mount_preset dimension, so a failed setup
+        // would otherwise keep telemetry describing an inline surface that
+        // does not exist.
+        try { setupInline(); } catch (e) { INLINE = null; report('inline_setup_failed', e); }
+      }
       messages = [{ role: 'assistant', content: config.welcomeMessage }];
-      widgetTrack('widget_loaded', { modules: modules, widget_version: WIDGET_VERSION });
+      widgetTrack('widget_loaded', {
+        modules: modules,
+        widget_version: WIDGET_VERSION,
+        // Always 'floating' here, and deliberately so: this fires before the
+        // mount is resolved and long before the 5s late-mount deadline, so an
+        // 'inline' claim at this point would only mean "the config carried a
+        // mount" — true for a broken selector and for every page the mount is
+        // not scoped to. `widget_inline_mounted` (emitted from mountInline()
+        // once the surface is actually in the page) is the honest signal.
+        surface: 'floating',
+        // Kept as the "an inline mount was configured for this pageview"
+        // dimension. It is not a claim that one happened.
+        mount_preset: INLINE ? INLINE.preset : null,
+      });
       // Fire chip fetch in parallel — non-blocking; widget renders without chips
       // first, chips populate when ready (≈400ms on cache miss).
       fetchChips('initial');
@@ -1529,6 +1600,43 @@
     }, { passive: true });
   }
 
+  // Re-render the inline mount on resize so the chip budget (inlineChipCount)
+  // follows the viewport — a visitor who rotates a phone or resizes a window
+  // should not get stuck with a stale chip count.
+  if (!window.__ibotInlineResizeBound) {
+    window.__ibotInlineResizeBound = true;
+    var inlineResizeTimer = null;
+    window.addEventListener('resize', function () {
+      if (!inlineRoot) return;
+      if (inlineResizeTimer) clearTimeout(inlineResizeTimer);
+      inlineResizeTimer = setTimeout(function () {
+        try {
+          // renderInline() replaces the shadow root's innerHTML wholesale —
+          // rebuilding on every resize (including height-only ones, e.g. iOS
+          // collapsing its URL bar mid-scroll) would drop any delegated
+          // listener needlessly. Only rebuild when the chip budget itself
+          // actually crossed a breakpoint.
+          if (inlineChipCount() === inlineLastChipBudget) return;
+          renderInline();
+        } catch (e) { report('inline_render_failed', e); }
+      }, 150);
+    });
+  }
+
+  // Escape closes the panel — but only the session the inline surface opened.
+  // The floating bubble's own open/close already has no Escape-to-close today,
+  // and adding one for it is outside this task's scope; `inlineScrollLock` (set
+  // only by openFromInline, cleared only by restoreAfterInline) is the signal
+  // that this particular open came from the inline pill/chip.
+  if (!window.__ibotInlineEscBound) {
+    window.__ibotInlineEscBound = true;
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' && e.key !== 'Esc') return;
+      if (!isOpen || inlineScrollLock === null) return;
+      try { closeWidget(); } catch (err) { /* never break the host page */ }
+    });
+  }
+
   function updateContainerPosition() {
     container.style.cssText = 'position:fixed;z-index:2147483647;' +
       (config.position === 'bottom-left'
@@ -1537,11 +1645,493 @@
       'font-family:"' + locale.font + '",system-ui,sans-serif;direction:' + locale.dir + ';';
   }
 
+  // ============================================
+  // Inline surface — mount resolution
+  // ============================================
+
+  // Resolve the customer's chosen element. Deliberately tolerant: a selector
+  // that no longer matches is a fallback, never an exception.
+  function resolveInlineTarget() {
+    try {
+      return document.querySelector(INLINE.selector);
+    } catch (e) {
+      report('inline_selector_invalid', { message: INLINE.selector });
+      return null;
+    }
+  }
+
+  // One inline mount per page, enforced across separate copies of widget.js.
+  // A customer who pastes the embed into BOTH <head> and the body — a common
+  // builder mistake — would otherwise get two invitations in the same hero.
+  // First copy to get here owns the surface; every later copy stands down
+  // before it resolves anything. `ownsInlineSurface` is re-checked inside
+  // mountInline because the deferred paths (MutationObserver, late mount) can
+  // fire long after ownership was decided.
+  var inlineToken = {};
+  var inlineLatched = false;   // did we actually manage to write the shared latch?
+
+  function claimInlineSurface() {
+    try {
+      if (window.__ibotInlineGen) return false;
+      window.__ibotInlineGen = inlineToken;
+      inlineLatched = true;
+    } catch (e) { /* no shared latch reachable — behave as the only copy */ }
+    return true;
+  }
+
+  function ownsInlineSurface() {
+    // Never latched (a locked-down window) means there is nothing to lose the
+    // claim to. Latched-but-no-longer-ours means another copy superseded us,
+    // and we must not paint a second invitation into the page.
+    if (!inlineLatched) return true;
+    try { return window.__ibotInlineGen === inlineToken; } catch (e) { return true; }
+  }
+
+  var INLINE_PREVIEW_KEY = 'ibot_inline_preview_' + ACCOUNT_ID;
+
+  // `enabled: 'preview'` shows the inline surface only to someone who asked
+  // for it with ?bestie=1, remembered for the rest of the browsing session so
+  // it survives navigation. Every other visitor sees today's widget. This is
+  // how a customer tries the feature on their own live site with no deploy.
+  function inlinePreviewAllowed() {
+    try {
+      if (location.search.indexOf('bestie=1') !== -1) {
+        sessionStorage.setItem(INLINE_PREVIEW_KEY, '1');
+        return true;
+      }
+      return sessionStorage.getItem(INLINE_PREVIEW_KEY) === '1';
+    } catch (e) {
+      // Private mode / storage disabled: the query string alone still works.
+      return location.search.indexOf('bestie=1') !== -1;
+    }
+  }
+
+  // The embed is site-wide; every real mount selector is page-specific. LDRS's
+  // `.content_home-c-hero` exists on the home page and nowhere else, so without
+  // a path scope every other pageview would run a childList+subtree
+  // MutationObserver over the whole document for 5 seconds — on a Webflow site
+  // that mutates continuously — and then file an `inline_mount_missing`
+  // diagnostic into a 90-day table for a condition that is not a fault. That is
+  // how you lose the signal the spec calls a hard requirement.
+  //
+  // Prefix match, deliberately: no regex or glob arrives from account config.
+  // A null/absent `paths` means every page, which is exactly what any already
+  // configured account has today.
+  function inlinePathAllowed() {
+    try {
+      var paths = INLINE.paths;
+      if (!paths || !paths.length) return true;
+      var here = location.pathname || '/';
+      for (var i = 0; i < paths.length; i++) {
+        if (typeof paths[i] === 'string' && paths[i] && here.indexOf(paths[i]) === 0) return true;
+      }
+      return false;
+    } catch (e) { return true; }   // never let the scope check itself suppress a mount
+  }
+
+  function setupInline() {
+    // Not a failure — an explicit decision by the account. No report().
+    // Runs BEFORE the path gate so that a ?bestie=1 link landing on a page the
+    // mount is not scoped to still records the session flag, and the preview
+    // then works when the visitor navigates to a page that IS in scope.
+    if (INLINE.enabled === 'preview' && !inlinePreviewAllowed()) { INLINE = null; return; }
+    // Also not a failure, and it must happen before anything resolves a target
+    // or creates an observer: on an out-of-scope page there is nothing to find
+    // and nothing to report.
+    if (!inlinePathAllowed()) { INLINE = null; return; }
+    if (!claimInlineSurface()) return;
+
+    var target = resolveInlineTarget();
+    if (target) { mountInline(target); return; }
+
+    // Not there right now — but that is not the same as absent. SPA routing,
+    // lazy hydration, and head-embedded scripts on builders that paint the hero
+    // after first paint all land here on a page where the mount then succeeds.
+    // So: watch briefly, mount late if it turns up, and only report as missing
+    // once the deadline passes with nothing found. Reporting on entry would
+    // make a hero that hydrates 200ms late indistinguishable from a selector
+    // the customer's theme renamed.
+    var settled = false;
+    var mo = null;
+    function stop() {
+      settled = true;
+      try { if (mo) mo.disconnect(); } catch (e) { /* */ }
+    }
+    if (window.MutationObserver) {
+      mo = new MutationObserver(function () {
+        try {
+          if (settled) return;
+          if (!ownsInlineSurface()) { stop(); return; }
+          var el = resolveInlineTarget();
+          if (!el) return;
+          stop();
+          mountInline(el);
+        } catch (e) { stop(); report('inline_setup_failed', e); }
+      });
+      try { mo.observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { /* */ }
+    }
+    setTimeout(function () {
+      if (settled) return;
+      stop();
+      // Falls through to the floating bubble, which is already mounted.
+      report('inline_mount_missing', { message: INLINE.selector });
+    }, 5000);
+  }
+
+  // Elements we must never mount into, replace, or position-mutate. `replace`
+  // on <body> executes html.replaceChild(div, body): the customer's entire page
+  // — and our own floating `container` inside it — is deleted, with no way back.
+  // Nothing upstream rejects such a selector (the picker's stability rule moved
+  // to a later plan), so the last line of defence is here, before the first
+  // mutation of the host page.
+  function inlineTargetIsSafe(target) {
+    try {
+      if (!target || target.nodeType !== 1) return false;
+      if (target === document.documentElement || target === document.body || target === document.head) return false;
+      // Our own floating widget must never be inside what we replace or empty.
+      if (container && (target === container || (target.contains && target.contains(container)))) return false;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function mountInline(target) {
+    // Covers both the synchronous path and every deferred one.
+    if (!ownsInlineSurface()) return;
+
+    if (!inlineTargetIsSafe(target)) {
+      // Distinct message from the plain miss: this selector DID resolve, we
+      // refused it. Falls through to the floating bubble, already mounted.
+      report('inline_mount_missing', { message: 'unsafe mount target for selector: ' + INLINE.selector });
+      return;
+    }
+
+    // Everything below happens on a DETACHED node. The host page is mutated
+    // only once the shadow root exists and has rendered — otherwise a throw in
+    // attachShadow() (no shadow support, an element that refuses one) or in
+    // renderInline() leaves an empty <div> sitting in the customer's hero, and
+    // in `replace` mode leaves their element deleted with the reference gone.
+    var host = document.createElement('div');
+    host.setAttribute('data-bestie-inline', INLINE.preset || 'hero');
+    // The host box carries no font-family of its own: inherited properties
+    // cross the shadow boundary, and that inheritance IS how we speak the
+    // site's type.
+    host.style.cssText = 'all:initial;display:block;width:100%;font:inherit;color:inherit;';
+
+    var reserve = 0;
+    if (INLINE.reserve) {
+      reserve = (window.innerWidth < 640 ? INLINE.reserve.mobile : INLINE.reserve.desktop) || 0;
+    }
+    if (reserve > 0) host.style.minHeight = reserve + 'px';
+
+    // renderInline()/bindInlineDelegatedHandlers() read the module-level
+    // inlineHost/inlineRoot, so they are published before the render and rolled
+    // back to null if it throws — a half-built mount must never be visible to
+    // the rest of the file (inlineOriginRect, watchInlineVisibility, the resize
+    // listener, the telemetry surface).
+    var prevHost = inlineHost;
+    var prevRoot = inlineRoot;
+    inlineHost = host;
+    try {
+      inlineRoot = host.attachShadow({ mode: 'open' });
+      // Task 7: renderInline() replaces inlineRoot.innerHTML wholesale, and the
+      // resize listener above can call it again after a chip-budget-crossing
+      // resize. A listener bound directly to #ibot-inline-pill (or a chip) would
+      // be silently detached the next time that happens. So there is exactly ONE
+      // delegated listener per event type, bound to inlineRoot itself — which is
+      // never replaced, only its innerHTML — registered here, once, and never
+      // re-registered by renderInline().
+      bindInlineDelegatedHandlers();
+      renderInline();               // Task 6 supplies this
+    } catch (e) {
+      inlineHost = prevHost;
+      inlineRoot = prevRoot;
+      report('inline_render_failed', e);
+      return;                       // host page never touched
+    }
+
+    // From here on the customer's DOM changes. `replace` keeps the element it
+    // took out so an exception can put it back — dropping that reference is
+    // what made the failure unrecoverable.
+    var replaced = null;
+    var positionSet = false;
+    try {
+      if (INLINE.mode === 'replace') {
+        if (!target.parentNode) throw new Error('replace target has no parent');
+        target.parentNode.replaceChild(host, target);
+        replaced = target;
+      } else if (INLINE.mode === 'overlay') {
+        // The only mode that touches the customer's styles, and only when the
+        // element gives us no positioning context of its own.
+        // `|| 'static'` normalizes environments whose computed style is empty
+        // for an unstyled element (jsdom does this; browsers always return one
+        // of the position keywords). Empty means "no positioning context", which
+        // is exactly the case we are here to fix.
+        var pos = 'static';
+        try { pos = window.getComputedStyle(target).position || 'static'; } catch (e) { /* */ }
+        if (pos === 'static') { target.style.position = 'relative'; positionSet = true; }
+        host.style.position = 'absolute';
+        host.style.inset = '0';
+        host.style.zIndex = '5';
+        target.appendChild(host);
+      } else {
+        target.appendChild(host);
+      }
+
+      watchInlineVisibility(target);
+    } catch (e) {
+      // Put the page back exactly as we found it, then stand down.
+      try {
+        if (replaced && host.parentNode) host.parentNode.replaceChild(replaced, host);
+        else if (host.parentNode) host.parentNode.removeChild(host);
+        if (positionSet) target.style.position = '';
+      } catch (e2) { /* */ }
+      inlineHost = prevHost;
+      inlineRoot = prevRoot;
+      report('inline_mount_failed', e);
+      return;
+    }
+
+    // `surface: 'inline'` on widget_loaded could only ever mean "config carried
+    // a mount" — it is emitted before resolution finishes and before the 5s
+    // late-mount window closes. THIS is the event that means a mount actually
+    // happened, which is the distinction /admin/health needs.
+    try { widgetTrack('widget_inline_mounted', { mount_preset: INLINE.preset || null, mount_mode: INLINE.mode || null }); } catch (e) { /* */ }
+  }
+
+  // The one click listener and the one keydown listener for the entire inline
+  // surface, for the lifetime of the mount. Delegation (rather than binding to
+  // #ibot-inline-pill / each [data-inline-chip] directly) is what survives
+  // renderInline() rebuilding the shadow root's innerHTML on a resize — see the
+  // comment above this call for why per-element handlers would go silently dead.
+  function bindInlineDelegatedHandlers() {
+    if (!inlineRoot) return;
+
+    function activate(el) {
+      var chip = el && el.closest ? el.closest('[data-inline-chip]') : null;
+      if (chip) { openFromInline(chip.textContent || ''); return; }
+      var pill = el && el.closest ? el.closest('#ibot-inline-pill') : null;
+      if (pill) openFromInline(null);
+    }
+
+    inlineRoot.addEventListener('click', function (e) {
+      try { activate(e.target); } catch (err) { report('inline_open_failed', err); }
+    });
+    inlineRoot.addEventListener('keydown', function (e) {
+      try {
+        if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+        var el = e.target;
+        var hit = (el && el.closest) ? (el.closest('#ibot-inline-pill') || el.closest('[data-inline-chip]')) : null;
+        if (!hit) return;
+        e.preventDefault();
+        activate(el);
+      } catch (err) { report('inline_open_failed', err); }
+    });
+  }
+
+  // How many starter chips fit without pushing the pill below the fold. Mirrors
+  // chipBudget() in src/lib/widget/inline.ts — widget.js cannot import it, so
+  // both copies carry their own test.
+  function inlineChipCount() {
+    var w = window.innerWidth;
+    if (w >= 640) return 3;
+    if (w >= 360) return 2;
+    return 0;
+  }
+
+  // Styles for the shadow root. Deliberately omits font-family: inherited
+  // properties cross the shadow boundary, so the host page's type comes to us
+  // for free and the widget looks native without any configuration.
+  function inlineStylesCss() {
+    // `|| {}` because a hand-edited config row can carry an inline block with
+    // no theme at all, and an unguarded dereference here throws INSIDE
+    // mountInline — the one place a throw used to leave the customer's page
+    // mutated (or, in `replace` mode, their hero deleted).
+    var t = INLINE.theme || {};
+    var light = t.ground === 'light';
+    var ink = light ? '#141413' : '#f5f4f1';
+    var fill = light ? 'rgba(20,20,19,0.06)' : 'rgba(245,244,241,0.11)';
+    var edge = light ? 'rgba(20,20,19,0.18)' : 'rgba(245,244,241,0.26)';
+    var glass = INLINE.surface === 'glass';
+    var solid = INLINE.surface === 'solid';
+    var solidBg = light ? '#ffffff' : '#141413';
+    var radius = (t.radius === null || t.radius === undefined) ? 999 : t.radius;
+
+    return ':host{display:block;width:100%;}' +
+      '*{box-sizing:border-box;}' +
+      '.wrap{display:flex;flex-direction:column;align-items:center;width:100%;' +
+        'direction:' + locale.dir + ';}' +
+      '.pane{width:100%;max-width:560px;' +
+        (glass
+          ? 'background:' + fill + ';border:1px solid ' + edge + ';border-radius:22px;padding:16px;' +
+            'backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);'
+          : solid
+            ? 'background:' + solidBg + ';border:1px solid ' + edge + ';border-radius:22px;padding:16px;' +
+              'box-shadow:0 10px 30px rgba(0,0,0,0.18);'
+            : '') + '}' +
+      // No backdrop-filter support, or a visitor who asked for less
+      // transparency: fall back to a FULLY opaque panel — the host's
+      // autoplaying video must not bleed through at all, not just less.
+      // Reset BOTH the unprefixed and -webkit- prefixed property: Safari/
+      // WebKit only honours the prefixed one, so resetting just the
+      // unprefixed form leaves the blur active there.
+      (glass
+        ? '@supports not (backdrop-filter:blur(2px)){.pane{background:' +
+            (light ? '#f5f4f1' : '#0c0c0e') + ';}}' +
+          '@media (prefers-reduced-transparency:reduce){.pane{background:' +
+            (light ? '#f5f4f1' : '#0c0c0e') + ';backdrop-filter:none;-webkit-backdrop-filter:none;}}'
+        : '') +
+      '.pill{display:flex;align-items:center;gap:10px;width:100%;cursor:text;' +
+        // Logical padding, not physical: the pilot is RTL, and physical
+        // left/right would put the 6px against the wrong side once direction
+        // flips (avatar should hug the leading edge, arrow the trailing one).
+        'padding:12px;padding-inline-start:6px;padding-inline-end:14px;border-radius:' + radius + 'px;' +
+        'background:' + fill + ';border:1px solid ' + edge + ';color:' + ink + ';' +
+        'transition:border-color .18s ease,transform .18s ease;}' +
+      '.pill:hover,.pill:focus-visible{border-color:' + (light ? 'rgba(20,20,19,0.4)' : 'rgba(245,244,241,0.5)') + ';}' +
+      '.pill:active{transform:scale(0.995);}' +
+      '.pill:focus-visible{outline:2px solid ' + (t.accent || ink) + ';outline-offset:2px;}' +
+      '.ph{flex:1;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';opacity:.62;font-size:15px;}' +
+      '.av{width:28px;height:28px;border-radius:999px;flex:none;display:grid;place-items:center;' +
+        'overflow:hidden;background:' + (t.accent || '#9334EB') + ';color:#fff;font-size:11px;font-weight:700;}' +
+      '.go{width:34px;height:34px;border-radius:999px;flex:none;display:grid;place-items:center;' +
+        'background:' + ink + ';color:' + (light ? '#f5f4f1' : '#141413') + ';font-size:15px;}' +
+      '.chips{display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap;}' +
+      '.chip{font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer;' +
+        'border:1px solid ' + edge + ';background:' + fill + ';color:' + ink + ';' +
+        'min-height:32px;display:inline-flex;align-items:center;}' +
+      '@media (max-width:639px){.chip{min-height:44px;}.pill{min-height:52px;}}' +
+      '@media (prefers-reduced-motion:reduce){.pill{transition:none;}}';
+  }
+
+  function inlinePillHtml() {
+    var ph = (INLINE.banner && INLINE.banner.headline) || config.placeholder;
+    return '<div class="pill" id="ibot-inline-pill" role="button" tabindex="0" ' +
+      'aria-label="' + escapeHtml(ph) + '">' +
+      '<span class="av">' + avatarHtml(28) + '</span>' +
+      '<span class="ph">' + escapeHtml(ph) + '</span>' +
+      '<span class="go" aria-hidden="true">&#8593;</span>' +
+      '</div>';
+  }
+
+  function renderInline() {
+    if (!inlineRoot || !INLINE) return;
+
+    var budget = inlineChipCount();
+    inlineLastChipBudget = budget;
+
+    // NOT `chips` — that is the module-level array of fetched starter chips,
+    // which a `var chips` here shadows for the whole function.
+    var chipsHtml = '';
+    if (INLINE.preset === 'hero') {
+      var items = (INLINE.banner && INLINE.banner.starters && INLINE.banner.starters.items) || [];
+      var shown = items.slice(0, budget);
+      if (shown.length) {
+        chipsHtml = '<div class="chips">';
+        for (var i = 0; i < shown.length; i++) {
+          chipsHtml += '<button type="button" class="chip" data-inline-chip="' + i + '">' +
+            escapeHtml(shown[i]) + '</button>';
+        }
+        chipsHtml += '</div>';
+      }
+    }
+
+    inlineRoot.innerHTML =
+      '<style>' + inlineStylesCss() + '</style>' +
+      '<div class="wrap"><div class="pane">' + inlinePillHtml() + chipsHtml + '</div></div>';
+  }
+
+  // The bubble and the inline mount are the same conversation; showing both at
+  // once reads as two assistants. While the mount is on screen the bubble
+  // stands down, and it returns once the mount is fully out of view.
+  // Is the mount still in the document at all? A host framework can remove or
+  // replace our node at any time — an SPA route change, a hero A/B swap, a page
+  // builder re-rendering the section. Whether a final non-intersecting entry
+  // arrives in that case is engine-dependent, so the bubble's suppression is
+  // never keyed on the observer alone.
+  function inlineMountAlive() {
+    try { return !!(inlineHost && inlineHost.isConnected); } catch (e) { return false; }
+  }
+
+  // Watch for the host framework taking our node out, and give the bubble back
+  // when it does. Used for bubble:'never', which has no IntersectionObserver to
+  // notice anything: without this, `container.style.display` stays 'none' with
+  // no inline surface left, and the visitor cannot reach the chat by any route.
+  function watchInlineRemoval(onGone) {
+    var done = false;
+    function fire() {
+      if (done || inlineMountAlive()) return;
+      done = true;
+      try { if (mo) mo.disconnect(); } catch (e) { /* */ }
+      if (poll) { clearInterval(poll); poll = null; }
+      try { onGone(); } catch (e) { /* */ }
+    }
+    var mo = null;
+    if (window.MutationObserver && inlineHost && inlineHost.parentNode) {
+      try {
+        mo = new MutationObserver(function () { try { fire(); } catch (e) { /* */ } });
+        mo.observe(inlineHost.parentNode, { childList: true });
+      } catch (e) { mo = null; }
+    }
+    // Cheap backstop for the cases a parent-scoped childList observer misses —
+    // an ancestor higher up being swapped out wholesale.
+    var poll = setInterval(function () { try { fire(); } catch (e) { /* */ } }, 2000);
+  }
+
+  function watchInlineVisibility(target) {
+    if (INLINE.bubble === 'always') return;
+    if (INLINE.bubble === 'never') {
+      container.style.display = 'none';
+      watchInlineRemoval(function () { container.style.display = ''; });
+      return;
+    }
+
+    var apply = function (onScreen) {
+      // A mount that is no longer in the document is not on screen, whatever
+      // the last IntersectionObserver entry said.
+      if (!inlineMountAlive()) onScreen = false;
+      inlineVisible = onScreen;
+      // Never hide the bubble while the visitor has the panel open.
+      container.style.display = onScreen && !isOpen ? 'none' : '';
+    };
+    apply(true);
+
+    watchInlineRemoval(function () { apply(false); });
+
+    if (!window.IntersectionObserver) return;   // no observer -> bubble stays hidden, mount is present
+    var io = new IntersectionObserver(function (entries) {
+      try {
+        for (var i = 0; i < entries.length; i++) apply(entries[i].isIntersecting);
+      } catch (e) { /* */ }
+    }, { threshold: 0 });
+    io.observe(inlineHost);
+  }
+
   // Mobile open-state = clean full-screen (not a bottom sheet). Full dynamic
-  // viewport, safe-area aware, slides up. z-index:1 keeps it under the backdrop-less stack.
+  // viewport, safe-area aware, slides up on first paint only. z-index:1 keeps
+  // it under the backdrop-less stack.
+  //
+  // Respects panelPainted the same way renderOpen()'s own `panelAnim` does on
+  // desktop (":2695") — this used to be unconditional, which both replayed the
+  // slide-up on every mobile re-render (contradicting the "on open only" intent
+  // that panelAnim already documents) and, when appended alongside panelAnim in
+  // the SAME inline style attribute, meant renderOpen()'s mobile panel briefly
+  // declared `animation` twice; the second declaration always won, which is
+  // exactly what made the inline-surface's grow-from-origin animation
+  // impossible to see on mobile: mobilePanelStyle()'s bake-in ran regardless of
+  // openFromInline() forcing panelPainted=true, so the stylesheet's
+  // `[data-from-inline]` rule never got a turn.
   function mobilePanelStyle() {
+    // Narrowed to an inline-originated open only. `inlineScrollLock !== null`
+    // is that open's signature (set by openFromInline, cleared by
+    // restoreAfterInline), and it is the ONLY case where the baked-in
+    // `animation` collides with the stylesheet's `[data-from-inline]` grow.
+    // Gating on panelPainted alone also changed every existing customer's
+    // mobile widget — today the panel replays the slide-up on each render()
+    // (send, thinking→text swap, toast, chip refresh) — and "any change to the
+    // floating widget's own appearance" is out of scope for this branch.
+    var anim = (panelPainted && inlineScrollLock !== null) ? '' : 'animation:ibot-slide-up 0.28s ease-out;';
     return 'position:fixed;inset:0;width:100%;height:100dvh;max-height:100dvh;' +
-      'border-radius:0;z-index:1;animation:ibot-slide-up 0.28s ease-out;';
+      'border-radius:0;z-index:1;' + anim;
   }
 
   // Full-screen mobile has no backdrop — the panel fills the viewport.
@@ -1983,10 +2573,198 @@
     attachSheetBehaviors();
   }
 
+  // Where the panel should appear to grow from. The inline pill is centred in
+  // the customer's hero, so the panel scales out of it — a corner pop would
+  // read as a different, unrelated component that has nothing to do with what
+  // the visitor just clicked.
+  function inlineOriginRect() {
+    if (!inlineHost) return null;
+    try { return inlineHost.getBoundingClientRect(); } catch (e) { return null; }
+  }
+
+  // Engaging from the inline surface: opens the SAME conversation (existing
+  // sessionId/messages — no new session state) in the floating panel, which is
+  // what actually renders the overlay. The inline surface itself never grows in
+  // place; it hands off to the panel and gets out of the way.
+  function openFromInline(prefill) {
+    // Re-entrant guard: the desktop panel has no backdrop and the pill stays
+    // visible and clickable underneath it (review finding, Critical #1), so a
+    // double-click on the pill — or a pill click followed by a chip click —
+    // calls openFromInline() twice before the first close. Scoping the guard
+    // to the scroll lock alone (the first fix pass) stopped the page-freeze
+    // but left `widget_opened` firing twice per double-click, inflating the
+    // inline surface's own open-rate telemetry (review round 2). So the WHOLE
+    // engage is now guarded on isOpen, not just the lock — except the prefill:
+    // a chip click while the panel is already open (e.g. the visitor opened
+    // via the pill, then also clicked a chip before the panel repainted) must
+    // still fill the composer, it just skips re-opening/re-tracking.
+    if (isOpen) {
+      // Only the chat view has a composer. In a form view (support / lead /
+      // booking / order lookup) `input,textarea` is that FORM's first field —
+      // reachable because the desktop panel has no backdrop, so the inline pill
+      // and chips stay visible and clickable underneath it — and writing a
+      // starter question into someone's name or order-number box is worse than
+      // doing nothing. Ignore the click instead.
+      if (prefill && view === 'chat') {
+        var alreadyOpenInput = container.querySelector('input,textarea');
+        if (alreadyOpenInput) { alreadyOpenInput.value = prefill; alreadyOpenInput.focus(); }
+        else report('inline_prefill_no_composer', { message: 'composer not found' });
+      }
+      return;
+    }
+    try {
+      isOpen = true;
+      inputTouched = false;
+      // #ibot-tip and #ibot-teaser are appended to document.body, OUTSIDE
+      // `container`, so nothing that hides the bubble hides them. A teaser left
+      // floating in the corner over a panel the visitor just opened from the
+      // hero is the same "two assistants" problem the bubble suppression exists
+      // to avoid.
+      try {
+        markTooltipSeen();
+        var tipNode = document.getElementById('ibot-tip');
+        if (tipNode && tipNode.parentNode) tipNode.parentNode.removeChild(tipNode);
+      } catch (e) { /* */ }
+      try { removeTeaser(); } catch (e) { /* */ }
+      widgetTrack('widget_opened', { surface: 'inline' });
+      trackBannerViewed();
+
+      // Lock the page behind the overlay, remembering exactly what we replaced
+      // so restoreAfterInline() puts back the customer's own value rather than
+      // clearing it. inlineScrollLock !== null is also this open's signature —
+      // it is how the Escape handler and restoreAfterInline() know this session
+      // was opened from the inline surface rather than the floating bubble.
+      inlineScrollLock = document.body.style.overflow;
+      inlineBodyPaddingLock = document.body.style.paddingRight;
+      // Locking overflow removes the desktop scrollbar, which on a page with
+      // html at its default overflow:visible shifts the whole viewport ~15px
+      // and reflows every fixed-width centred element on the host page —
+      // exactly what "the host layout never reflows" rules out (review
+      // finding, Important #4). Compensate by reserving that width as padding,
+      // restored alongside overflow in restoreAfterInline().
+      //
+      // Measure the ACTUAL delta the lock causes, not window.innerWidth minus
+      // clientWidth beforehand: that gap assumes locking removes a scrollbar,
+      // which is only true when html is at overflow:visible. A host with
+      // `html{overflow-y:scroll}` or `scrollbar-gutter:stable` already
+      // reserves the gutter, so clientWidth would not move and the old
+      // formula added compensation for a shift that was never going to happen
+      // — introducing exactly the jump it existed to prevent, on those hosts
+      // (review round 2, new Important). Measuring before/after the actual
+      // `overflow:hidden` write is correct regardless of which case a given
+      // host is in.
+      try {
+        var beforeW = document.documentElement.clientWidth;
+        document.body.style.overflow = 'hidden';
+        var delta = document.documentElement.clientWidth - beforeW;
+        if (delta > 0) {
+          var existingPad = parseFloat(window.getComputedStyle(document.body).paddingRight) || 0;
+          document.body.style.paddingRight = (existingPad + delta) + 'px';
+        }
+      } catch (e) {
+        // Best-effort: missing compensation is cosmetic. But the lock itself
+        // is not — make sure `overflow:hidden` still lands even if the
+        // measurement above threw partway through.
+        document.body.style.overflow = 'hidden';
+      }
+
+      // The floating panel is where the overlay actually lives — the resize
+      // listener's inline-surface bookkeeping (and, on the 'never'/'after-scroll'
+      // bubble modes, its own earlier logic) may have hidden this container.
+      container.style.display = '';
+
+      // panelStyle's slide-up entrance animation only plays when !panelPainted.
+      // Forcing it true here means renderOpen() emits no competing `animation`
+      // inline style, so the grow-from-origin keyframe below (added to the
+      // stylesheet, lower specificity than an inline style) is free to run
+      // instead of losing to ibot-slide-up. (Deviation from the brief, which
+      // did not address this collision — see the task report.) mobilePanelStyle()
+      // now honours the same flag for the same reason on mobile.
+      panelPainted = true;
+      render();
+
+      var panel = document.getElementById('ibot-panel');
+      var rect = inlineOriginRect();
+      if (panel && rect) {
+        // transform-origin is measured from the PANEL's own border box, not the
+        // viewport — rect (inlineHost's viewport position) has to be expressed
+        // relative to the panel's own top-left, or the origin lands wherever
+        // the hero happens to sit on screen instead of on the pill (review
+        // finding, Important #3 — my bug: the brief's formula used raw
+        // viewport coordinates verbatim).
+        var panelRect = panel.getBoundingClientRect();
+        panel.style.setProperty('--ibot-origin-x', Math.round((rect.left + rect.width / 2) - panelRect.left) + 'px');
+        panel.style.setProperty('--ibot-origin-y', Math.round((rect.top + rect.height / 2) - panelRect.top) + 'px');
+        panel.setAttribute('data-from-inline', '1');
+      }
+
+      if (prefill) {
+        // Grab the composer structurally — its id has changed before, and a
+        // chip click's prefill silently becoming a no-op is exactly the kind of
+        // failure that must not happen without at least a diagnostic.
+        var input = container.querySelector('input,textarea');
+        if (input) { input.value = prefill; input.focus(); }
+        else report('inline_prefill_no_composer', { message: 'composer not found' });
+      }
+    } catch (e) {
+      // A throw anywhere between taking the lock and finishing the open must
+      // not leave the host page stuck at overflow:hidden with no panel and no
+      // close affordance to escape it — restoreAfterInline() is a no-op unless
+      // inlineScrollLock is set, so it is always safe to call here (review
+      // round 2, Important: the lock is taken before render(), so a throw in
+      // render() or the prefill lookup previously left the visitor stranded).
+      try { restoreAfterInline(); } catch (e2) { /* */ }
+      // Also undo the `isOpen = true` set at the top of this function: without
+      // this, a failed open leaves isOpen permanently true, which trips the
+      // re-entrant guard at the top of this function (added this round) on
+      // every later click — the visitor's page would scroll again, but the
+      // pill itself would stay dead until reload. Not explicitly requested by
+      // the review, but the same "no way out" failure class as the scroll
+      // lock, in the same recovery path, at negligible risk.
+      isOpen = false;
+      report('inline_open_failed', e);
+    }
+  }
+
+  // Close returns the page and the focus to where the visitor left them. Runs
+  // even when this open did NOT come from the inline surface (inlineScrollLock
+  // stays null, so the body/pop-focus/bubble work below is a no-op) — closeWidget()
+  // is the one shared close path for every entry point.
+  function restoreAfterInline() {
+    if (inlineScrollLock === null) return;
+    document.body.style.overflow = inlineScrollLock;
+    inlineScrollLock = null;
+    document.body.style.paddingRight = inlineBodyPaddingLock;
+    inlineBodyPaddingLock = null;
+
+    var pill = inlineRoot && inlineRoot.getElementById('ibot-inline-pill');
+    if (pill) { try { pill.focus(); } catch (e) { /* */ } }
+
+    // Undo the open-time `container.style.display = ''` override so the bubble
+    // goes back to whatever its own bubble mode implies, rather than staying
+    // forced visible forever after the first inline-triggered open. This is the
+    // "natural owner" call site flagged for watchInlineVisibility's apply(): it
+    // is deliberately NOT re-invoking that closure (apply()'s onScreen-driven
+    // formula is only correct for 'after-scroll' — feeding it a bubble mode of
+    // 'never' would make it show the bubble again the moment the mount scrolls
+    // off-screen, which is exactly what 'never' promises will not happen).
+    // 'always' needs no action: watchInlineVisibility() returns before ever
+    // touching container.style.display for that mode, so the container was
+    // already visible the whole time.
+    // Both branches also require the mount to still BE there: a host framework
+    // that removed our node while the panel was open must not leave the bubble
+    // re-hidden against nothing (the "no route to the chat" failure).
+    if (INLINE && inlineMountAlive()) {
+      if (INLINE.bubble === 'never') container.style.display = 'none';
+      else if (INLINE.bubble === 'after-scroll' && inlineVisible) container.style.display = 'none';
+    }
+  }
+
   // Shared close: used by the backdrop tap (and available to later tasks'
   // drag/keyboard-close behaviors). Mirrors the inline isOpen/track/render
   // sequence the close buttons already use.
   function closeWidget() {
+    restoreAfterInline();
     isOpen = false;
     view = 'chat';
     widgetTrack('widget_closed', { msg_count: messages.length });
@@ -2056,6 +2834,11 @@
         || '';
       if (!text) return;
       if (isOpen) return;
+      // The inline mount stood the bubble down, but this tip is appended to
+      // document.body — OUTSIDE `container` — so container.style.display='none'
+      // never reached it. Unguarded, 2.5s after load a tooltip points at a
+      // launcher that is not on the page.
+      if (container.style.display === 'none') return;
       // The "seen once already" guard is for real visitors only — skipped in
       // preview mode so a dismissed-once cookie in this browser can't blank
       // the account owner's own preview.
@@ -2337,24 +3120,20 @@
     if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
 
     // Event listeners
+    // Both routed through the shared closeWidget() (not a duplicated
+    // isOpen/track/render sequence) so restoreAfterInline() always runs — a
+    // session opened from the inline surface must unlock scroll and return
+    // focus no matter which of the two close buttons the visitor uses.
     var closeEl = document.getElementById('ibot-close');
     if (closeEl) {
-      closeEl.onclick = function () {
-        isOpen = false;
-        widgetTrack('widget_closed', { msg_count: messages.length });
-        render();
-      };
+      closeEl.onclick = closeWidget;
       closeEl.onmouseover = function () { this.style.transform = 'scale(1.08)'; };
       closeEl.onmouseout = function () { this.style.transform = 'scale(1)'; };
     }
 
     var closeMobileEl = document.getElementById('ibot-close-mobile');
     if (closeMobileEl) {
-      closeMobileEl.onclick = function () {
-        isOpen = false;
-        widgetTrack('widget_closed', { msg_count: messages.length });
-        render();
-      };
+      closeMobileEl.onclick = closeWidget;
       closeMobileEl.onmouseover = function () { this.style.background = 'rgba(255,255,255,0.25)'; };
       closeMobileEl.onmouseout = function () { this.style.background = 'rgba(255,255,255,0.15)'; };
     }
@@ -3332,7 +4111,11 @@
     var sub = document.getElementById('ibot-sf-submit');
     if (sub) sub.onclick = submitSupportTicket;
     var closeBtn = document.getElementById('ibot-close');
-    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+    // closeWidget() (not a duplicated isOpen/view/render sequence): whatever
+    // opened this session — including the inline surface — needs its
+    // restoreAfterInline() cleanup (scroll unlock, focus return) to run no
+    // matter which view the visitor closes from.
+    if (closeBtn) closeBtn.onclick = closeWidget;
     // File picker — uploads on selection so the visitor sees ✓ before submitting.
     var fileInput = document.getElementById('ibot-sf-file');
     if (fileInput) {
@@ -3401,7 +4184,11 @@
     var back = document.getElementById('ibot-ss-back');
     if (back) back.onclick = closeSupportForm;
     var closeBtn = document.getElementById('ibot-close');
-    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+    // closeWidget() (not a duplicated isOpen/view/render sequence): whatever
+    // opened this session — including the inline surface — needs its
+    // restoreAfterInline() cleanup (scroll unlock, focus return) to run no
+    // matter which view the visitor closes from.
+    if (closeBtn) closeBtn.onclick = closeWidget;
   }
 
   // Inline action card — rendered inside the chat after the bot proposes
@@ -3792,7 +4579,11 @@
     var back = document.getElementById('ibot-form-back');
     if (back) back.onclick = function () { view = 'chat'; render(); };
     var closeBtn = document.getElementById('ibot-close');
-    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+    // closeWidget() (not a duplicated isOpen/view/render sequence): whatever
+    // opened this session — including the inline surface — needs its
+    // restoreAfterInline() cleanup (scroll unlock, focus return) to run no
+    // matter which view the visitor closes from.
+    if (closeBtn) closeBtn.onclick = closeWidget;
   }
 
   // ============================================
@@ -4111,7 +4902,11 @@
     var back = document.getElementById('ibot-gs-back');
     if (back) back.onclick = function () { view = 'chat'; render(); };
     var closeBtn = document.getElementById('ibot-close');
-    if (closeBtn) closeBtn.onclick = function () { isOpen = false; view = 'chat'; render(); };
+    // closeWidget() (not a duplicated isOpen/view/render sequence): whatever
+    // opened this session — including the inline surface — needs its
+    // restoreAfterInline() cleanup (scroll unlock, focus return) to run no
+    // matter which view the visitor closes from.
+    if (closeBtn) closeBtn.onclick = closeWidget;
   }
 
   // ============================================
@@ -4246,6 +5041,10 @@
   function showProactiveTeaser(reason) {
     try {
       if (isOpen) return;
+      // Same reason as showBubbleTooltip: #ibot-teaser lives on document.body,
+      // outside `container`, so hiding the bubble does not hide it. A teaser
+      // anchored to an absent launcher is worse than no teaser.
+      if (container.style.display === 'none') return;
       // Same reasoning as showBubbleTooltip: "dismissed forever" is a
       // real-visitor guard, skipped in preview mode.
       if (!PREVIEW_MODE && teaserDismissedForever()) return;
