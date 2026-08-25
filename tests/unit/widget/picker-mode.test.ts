@@ -5,6 +5,8 @@ import { bootWidget } from './helpers/boot-widget';
 // picker emits and this function rejects is a customer's click that vanishes
 // with no error anywhere — so the test asserts against the real predicate.
 import { isUnsafeSelector } from '@/lib/widget/inline';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 const HERO = '<section class="hero"><div class="content_home-c-hero">' +
   '<h1>We Turn Brands Into Leaders</h1>' +
@@ -21,7 +23,35 @@ function captureUp(): any[] {
   return seen;
 }
 
-beforeEach(() => { try { sessionStorage.clear(); } catch { /* */ } });
+beforeEach(() => {
+  try { sessionStorage.clear(); } catch { /* */ }
+  // The harness rewrites document.body.innerHTML between boots but not the
+  // body element's own attributes, so a class one test puts there to exercise
+  // the <body> guard would otherwise still be on it in the next.
+  document.body.className = '';
+});
+
+/**
+ * The picker's copy of the storable-selector grammar, lifted out of the file
+ * that is actually served rather than restated here. A third copy of the regex
+ * living in the test would drift on its own and take the drift check with it.
+ */
+function pickerStorableRegex(): RegExp {
+  let dir = process.cwd();
+  for (let i = 0; i < 8; i++) {
+    const candidate = join(dir, 'public', 'widget.js');
+    if (existsSync(candidate)) {
+      const m = readFileSync(candidate, 'utf8').match(/var PICKER_STORABLE = (\/.*\/);/);
+      if (!m) throw new Error('picker-mode.test: PICKER_STORABLE not found in public/widget.js');
+      // eslint-disable-next-line no-new-func
+      return new Function('return ' + m[1])() as RegExp;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error('picker-mode.test: could not locate public/widget.js from ' + process.cwd());
+}
 
 describe('picker mode', () => {
   it('is inert when the widget is not in preview mode', async () => {
@@ -53,6 +83,12 @@ describe('picker mode', () => {
 
   it('refuses to pick body, html or head', async () => {
     await bootWidget({ html: HERO, config: { inline: null }, preview: true });
+    // A bare <body> carries no id and no class, so pickerSelector() returns
+    // null for it and the pick is refused whether or not the <body> guard
+    // exists — which would make this test green with the guard deleted. Real
+    // sites ship <body class="home">, where that guard is the only thing
+    // between a click and mounting Bestie into the document body.
+    document.body.className = 'home-page';
     const up = captureUp();
     post({ type: 'ibot:picker', on: true });
     document.body.click();
@@ -136,5 +172,42 @@ describe('picker mode', () => {
     post({ type: 'ibot:picker', on: false });
     (document.querySelector('.content_home-c-hero') as HTMLElement).click();
     expect(up.filter((m) => m?.type === 'ibot:picked')).toHaveLength(0);
+  });
+});
+
+/**
+ * The one seam in this feature that fails invisibly, pinned from both sides.
+ *
+ * `PICKER_STORABLE` in public/widget.js and `STORABLE_SELECTOR` behind
+ * isUnsafeSelector() in src/lib/widget/inline.ts are two hand-kept copies of
+ * one grammar — widget.js is served raw and imports nothing, so they cannot be
+ * a shared module. If the widget's copy ever grows looser than the server's,
+ * the picker emits selectors the save silently discards and the customer's
+ * click vanishes with no error anywhere.
+ *
+ * Asserting the two agree WITH EACH OTHER is not enough: that stays green if
+ * both are loosened. So each case pins the expected verdict, and either copy
+ * drifting in either direction turns this red.
+ */
+describe('picker selector grammar', () => {
+  const CORPUS: Array<[string, boolean]> = [
+    ['#a', true],           // the simplest id
+    ['#2a', false],         // legal HTML, illegal CSS ident — leading digit
+    ['#nav:main', false],   // legal HTML id; querySelectorAll on it THROWS
+    ['.כותרת', false],  // Hebrew class — common on the sites this pilot targets
+    ['.a', true],           // one class
+    ['.a.b', true],         // two chained
+    ['.a.b.c', true],       // three chained — the ceiling
+    ['.a.b.c.d', false],    // four — one past it
+    ['body', false],        // a bare tag: what the whole allowlist exists to refuse
+    ['', false],            // nothing at all
+  ];
+
+  it('is the same grammar the server enforces on save, in both directions', () => {
+    const re = pickerStorableRegex();
+    for (const [sel, storable] of CORPUS) {
+      expect(re.test(sel), 'widget PICKER_STORABLE on ' + JSON.stringify(sel)).toBe(storable);
+      expect(isUnsafeSelector(sel), 'server isUnsafeSelector on ' + JSON.stringify(sel)).toBe(!storable);
+    }
   });
 });

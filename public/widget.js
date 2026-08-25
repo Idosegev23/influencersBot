@@ -1468,9 +1468,15 @@
       // channel's origin check above; the PREVIEW_MODE test is redundant with
       // the block this listener already sits in and is kept as a second lock on
       // the one path that can reach into a customer's page.
+      //
+      // Wrapped like every other new path: this branch shares its listener with
+      // the draft channel, and a throw here would take the editor's live
+      // preview down with it.
       if (msg && msg.type === 'ibot:picker' && PREVIEW_MODE) {
-        pickerOn = msg.on === true;
-        if (!pickerOn) pickerStop();
+        try {
+          pickerOn = msg.on === true;
+          if (!pickerOn) pickerStop();
+        } catch (e) { report('picker_failed', e); }
         return;
       }
       if (!msg || msg.type !== 'ibot:draft' || !msg.config) return;
@@ -1770,6 +1776,13 @@
           selector: selector,
           label: pickerLabel(el),
           mode: 'into',
+          // The TARGET's own height, not Bestie's. mountInline() applies
+          // reserve as host.style.minHeight whatever the mode is (see the
+          // reserve block in mountInline), and `into` — the only mode this
+          // emits — appends the host INSIDE the target, so a 600px hero
+          // approved as-is becomes a 1200px hero. Whoever consumes this
+          // message decides what to do with that; it is not safe to save
+          // unexamined.
           reserve: pickerMeasure(el),
           theme: pickerSampleTheme(el)
         }, window.location.origin);
