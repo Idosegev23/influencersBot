@@ -55,36 +55,37 @@ const MAX_PATHS = 20;
 const MAX_PATH = 200;
 
 /**
+ * What we are willing to store, expressed as what we accept rather than what
+ * we reject.
+ *
+ * A blocklist of dangerous spellings cannot be completed: `body`, `body,.foo`,
+ * `:is(body)`, `:has(> body)`, `:root`, `*` and `body[title="a b"]` all
+ * resolve to `<body>` or `<html>`, and any string-level parser that is not a
+ * real CSS parser will keep missing new spellings — two rounds of patching
+ * individual bypasses is what proved this. The picker (Task 2) emits an id or
+ * a short class chain and nothing else, so that is the whole grammar we need
+ * to allow.
+ *
+ * This is not the safety guarantee — `<body class="page">` plus `.page` would
+ * pass here. The guarantee is `inlineTargetIsSafe` in `public/widget.js`,
+ * which compares element identity against `document.documentElement` / body /
+ * head once a DOM exists — the only place "what does this resolve to" can
+ * actually be answered. This check exists to stop the obviously-wrong thing
+ * from ever being stored, not to replace that one.
+ */
+const STORABLE_SELECTOR = /^(#[A-Za-z_][\w-]*|\.[A-Za-z_][\w-]*(\.[A-Za-z_][\w-]*){0,2})$/;
+
+/**
  * A selector we refuse to store at all.
  *
  * `mode: "replace"` calls `parentNode.replaceChild`, so a selector resolving
  * to the document root, `body` or `head` deletes the customer's page — and
  * our own container with it. The widget refuses these at mount time too;
  * this stops one ever being saved.
- *
- * This is a string-parsing problem, not a single-regex-pattern problem: a
- * selector *list* ("body,.foo") resolves to the first element in document
- * order that matches ANY member, not the first member written, and `body`
- * precedes nearly everything — so one dangerous member anywhere in the list
- * is enough. And a trailing pseudo-class or attribute filter narrows a match
- * without changing which element type it is ("body:not(.x)" is still
- * `<body>`). So: split the list, take the last compound selector of each
- * member (that's what the whole chain resolves to), strip the parts that
- * only narrow rather than retarget, and check what's left.
  */
 export function isUnsafeSelector(sel: string): boolean {
   const s = (sel || '').trim();
-  if (!s) return true;
-  return s.split(',').some((member) => {
-    const m = member.trim();
-    if (!m) return true;
-    // The last compound selector is what the whole chain resolves to.
-    const last = m.split(/[\s>+~]+/).filter(Boolean).pop() || '';
-    // Attribute filters and pseudo-classes narrow a match, they never change
-    // which element type it is: `body:not(.x)` is still <body>.
-    const bare = last.replace(/\[[^\]]*\]/g, '').split(/[:.#]/)[0];
-    return /^(html|body|head)$/i.test(bare);
-  });
+  return !STORABLE_SELECTOR.test(s);
 }
 
 /**

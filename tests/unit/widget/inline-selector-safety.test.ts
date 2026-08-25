@@ -5,37 +5,61 @@ const mount = (selector: string, extra: Record<string, unknown> = {}) =>
   ({ widget: { inline: { enabled: true, selector, ...extra } } });
 
 describe('isUnsafeSelector', () => {
-  it('refuses the document root, body and head — replace mode would delete the page', () => {
-    for (const s of ['html', 'body', 'head', 'HTML', ' body ', 'html > body']) {
+  // A blocklist of dangerous spellings is unwinnable — there are unbounded
+  // ways to write a selector that resolves to <body> or <html>, and a
+  // string-level parser keeps missing new ones (two rounds of patching
+  // individual bypasses proved it). So this checks a GRAMMAR instead: the
+  // picker only ever emits an id or a short class chain, so that is the
+  // whole shape we accept. Everything outside that shape is refused,
+  // including every adversarial spelling below — not because each one was
+  // special-cased, but because none of them are an id or a class chain.
+  it('refuses every selector that resolves to <body> or <html>, however it is spelled', () => {
+    const dangerous = [
+      'html',
+      'body',
+      'head',
+      'HTML',
+      ' body ',
+      'html > body',
+      '*',
+      ':root',
+      ':is(body)',
+      ':where(body)',
+      ':has(body)',
+      ':has(> body)',
+      ':is(body, .foo)',
+      'body[title="a b"]',
+      'body,.foo',
+      'body, .foo',
+      'body:not(.x)',
+      'div[data-x="body"]',
+    ];
+    for (const s of dangerous) {
       expect(isUnsafeSelector(s)).toBe(true);
     }
   });
 
-  it('allows an ordinary content selector', () => {
-    expect(isUnsafeSelector('.content_home-c-hero')).toBe(false);
+  it('refuses a hand-written combinator chain — not because it is dangerous, but because it is outside the id/class-chain grammar the picker emits', () => {
+    expect(isUnsafeSelector('section.hero > div')).toBe(true);
+    expect(isUnsafeSelector('#a b')).toBe(true);
+  });
+
+  it('refuses an empty string and an oversized garbage string', () => {
+    expect(isUnsafeSelector('')).toBe(true);
+    expect(isUnsafeSelector('x'.repeat(300))).toBe(true);
+  });
+
+  it('allows an id or a short chain of one to three classes — the exact grammar the picker emits', () => {
     expect(isUnsafeSelector('#hero-search')).toBe(false);
+    expect(isUnsafeSelector('.content_home-c-hero')).toBe(false);
+    expect(isUnsafeSelector('.a.b')).toBe(false);
+    expect(isUnsafeSelector('.a.b.c')).toBe(false);
   });
 
-  it('refuses a selector list with a dangerous member anywhere in it — a list resolves to the first DOCUMENT-ORDER match across every member, not the first member written, and body precedes nearly everything', () => {
-    expect(isUnsafeSelector('body,.foo')).toBe(true);
-    expect(isUnsafeSelector('body, .foo')).toBe(true);
-  });
-
-  it('refuses a pseudo-class filter on body — it narrows the match, it does not retarget it', () => {
-    expect(isUnsafeSelector('body:not(.x)')).toBe(true);
-  });
-
-  it('allows an attribute filter whose value happens to contain the word "body"', () => {
-    expect(isUnsafeSelector('div[data-x="body"]')).toBe(false);
-  });
-
-  it('allows a class or id that merely starts with "body"', () => {
-    expect(isUnsafeSelector('.body-content')).toBe(false);
-    expect(isUnsafeSelector('body-content')).toBe(false);
-  });
-
-  it('fails safe on a descendant chain ending in a bare body — not a real mount anyone wants, refused anyway', () => {
-    expect(isUnsafeSelector('#hero body')).toBe(true);
+  it('is a grammar check, not the safety guarantee — a class that happens to sit on <body> passes here and is caught at mount time instead, by inlineTargetIsSafe in public/widget.js comparing real element identity', () => {
+    // `<body class="page">` plus `.page` is exactly this case: shaped like an
+    // ordinary content class, indistinguishable from one at the string level.
+    expect(isUnsafeSelector('.page')).toBe(false);
   });
 });
 
