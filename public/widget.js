@@ -2626,10 +2626,22 @@
       if (!m.content) {
         // The empty assistant row sendMessage() pushes ahead of the reply.
         if (isLoading && isLast) {
+          // Dots, never the server's `thinking` phrase.
+          //
+          // The chat route picks that phrase at random from four ways of
+          // saying "hang on" (src/app/api/widget/chat/route.ts) — both of its
+          // emitters draw from the same list, so there is never anything
+          // specific in it to lose. In a corner bubble that is filler; here it
+          // is worse. Two lines above this sits the account's eyebrow — for the
+          // pilot, `מ־2009 · 4,000 קמפיינים · 350 מותגים` — and "אחלה, תן לי
+          // רגע" is a shop assistant answering it. Dots are language-neutral,
+          // register-neutral, read by everyone as "someone is composing", and
+          // cannot say anything foolish on a customer's own homepage.
+          //
+          // The floating panel still renders `thinkingText`; seven live
+          // customers run it and nobody asked for that to change.
           out += '<div class="row bot"><div class="say">' +
-            (thinkingText
-              ? escapeHtml(thinkingText)
-              : '<span class="dots"><i></i><i></i><i></i></span>') +
+            '<span class="dots"><i></i><i></i><i></i></span>' +
             '</div></div>';
         }
         continue;
