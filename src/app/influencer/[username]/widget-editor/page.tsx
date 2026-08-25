@@ -1607,6 +1607,11 @@ export default function WidgetEditorPage() {
                 accountId={accountId}
                 draft={previewDraft}
                 view={previewView}
+                // Preview the page the mount will actually run on. `paths` is
+                // the customer's own scoping for exactly that, so its first
+                // entry is the honest default — otherwise the iframe shows `/`,
+                // which for some customers is a different website altogether.
+                path={inlineDraft?.paths?.[0]}
                 picking={picking}
                 onPick={handleInlinePick}
                 onPickFailed={handleInlinePickFailed}

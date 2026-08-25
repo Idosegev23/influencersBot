@@ -57,6 +57,7 @@ export function WidgetDraftPreview({
   accountId,
   draft,
   view = 'open',
+  path,
   picking,
   onPick,
   onPickFailed,
@@ -64,6 +65,15 @@ export function WidgetDraftPreview({
   accountId: string;
   draft: unknown;
   view?: 'open' | 'teaser' | 'tooltip';
+  /**
+   * Which page of the customer's site to preview. The route defaults to `/`,
+   * and for a customer whose real site is not at `/` that is a different
+   * website: LDRS serve an English global site at `/` and their actual Hebrew
+   * site at `/he`. Previewing the default showed the wrong site, and a mount
+   * picked there named an element that does not exist on the page it would
+   * run on — which is exactly how the first pilot pick failed.
+   */
+  path?: string;
   /** Puts the iframe's widget into picker mode (Task 2's `ibot:picker`). */
   picking?: boolean;
   /** Called with a validated pick once the customer clicks an element. */
@@ -217,7 +227,10 @@ export function WidgetDraftPreview({
       // mount stored as `enabled: 'preview'` never rendered in the dashboard's
       // own preview, which is exactly where every fresh pick lands by design:
       // a LIVE mount was visible here and a PREVIEW one was not, backwards.
-      src={`/api/widget/preview/${accountId}?bestie=1`}
+      src={
+        `/api/widget/preview/${accountId}?bestie=1` +
+        (path && path !== '/' ? `&path=${encodeURIComponent(path)}` : '')
+      }
       className="h-[720px] w-full rounded-2xl border border-[#e5e5ea]"
       title="תצוגה מקדימה"
     />

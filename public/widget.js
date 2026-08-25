@@ -164,6 +164,12 @@
   // changes innerHeight, not innerWidth, but any height-only resize would still
   // reach this check).
   var inlineLastChipBudget = null;
+  // True while the conversation fills the box the inline invitation held rather
+  // than floating in the corner. Only for a `replace` mount on desktop: there
+  // the hero IS Bestie's surface, so a 400px card at the screen edge reads as
+  // an unrelated component — the visitor clicked the middle of the page and
+  // something happened at the corner of it.
+  var inlineAnchored = false;
   // Set the instant a visitor engages from the inline surface, to the customer's
   // own body.style.overflow value at that moment; null the rest of the time.
   // restoreAfterInline() uses "not null" as its own idempotency guard (safe to
@@ -1973,6 +1979,29 @@
     });
   }
 
+  // Put the floating container exactly over the inline host's box. Page scroll
+  // is already locked while an inline-opened conversation is up, so a fixed box
+  // stays aligned with the hero underneath it.
+  function anchorContainerToInline() {
+    if (!inlineHost) return false;
+    try {
+      var r = inlineHost.getBoundingClientRect();
+      if (!r || !r.width || !r.height) return false;
+      container.style.cssText = 'position:fixed;z-index:2147483647;' +
+        'top:' + Math.round(r.top) + 'px;left:' + Math.round(r.left) + 'px;' +
+        'width:' + Math.round(r.width) + 'px;height:' + Math.round(r.height) + 'px;' +
+        'direction:' + locale.dir + ';';
+      inlineAnchored = true;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function releaseInlineAnchor() {
+    if (!inlineAnchored) return;
+    inlineAnchored = false;
+    updateContainerPosition();
+  }
+
   function updateContainerPosition() {
     container.style.cssText = 'position:fixed;z-index:2147483647;' +
       (config.position === 'bottom-left'
@@ -3073,6 +3102,14 @@
       // bubble modes, its own earlier logic) may have hidden this container.
       container.style.display = '';
 
+      // A mount that took the hero over opens IN the hero. A mount that is only
+      // a guest inside someone's layout keeps the corner panel, and mobile keeps
+      // its full-screen sheet — that already is 'in place' on a phone, and a
+      // hero-height box would be a cramped place to hold a conversation.
+      if (INLINE && INLINE.mode === 'replace' && window.innerWidth >= 640) {
+        anchorContainerToInline();
+      }
+
       // panelStyle's slide-up entrance animation only plays when !panelPainted.
       // Forcing it true here means renderOpen() emits no competing `animation`
       // inline style, so the grow-from-origin keyframe below (added to the
@@ -3131,6 +3168,7 @@
   // stays null, so the body/pop-focus/bubble work below is a no-op) — closeWidget()
   // is the one shared close path for every entry point.
   function restoreAfterInline() {
+    releaseInlineAnchor();
     if (inlineScrollLock === null) return;
     document.body.style.overflow = inlineScrollLock;
     inlineScrollLock = null;
@@ -3410,7 +3448,9 @@
     // Panel dimensions per Figma
     var panelStyle = isMobile
       ? mobilePanelStyle()
-      : 'width:400px;height:auto;max-height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
+      : inlineAnchored
+        ? 'width:100%;height:100%;max-height:none;border-radius:0;position:relative;'
+        : 'width:400px;height:auto;max-height:min(680px, calc(100vh - 80px));border-radius:18px;position:relative;';
 
     // Slide the panel up on open only — not on every rebuild.
     var panelAnim = panelPainted ? '' : 'animation:ibot-slide-up 0.35s cubic-bezier(0.34,1.56,0.64,1);';
