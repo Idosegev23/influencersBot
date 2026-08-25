@@ -2282,7 +2282,21 @@
     // renderInlineConversation() can replace the composer's siblings, and a
     // handler bound to the input itself would not survive a rebuild.
     function sendFromInline() {
-      try { sendMessage(); } catch (err) { report('inline_send_failed', err); }
+      try {
+        sendMessage();
+      } catch (err) {
+        // sendMessage() has already pushed the visitor's row AND an empty
+        // assistant row and set isLoading — so a throw anywhere after that
+        // leaves the send button disabled and the dots spinning forever. The
+        // diagnostic alone only makes that failure loud; this makes it
+        // recoverable, and mirrors what the fetch's own .catch does.
+        isLoading = false;
+        thinkingText = null;
+        var last = messages[messages.length - 1];
+        if (last && last.role === 'assistant' && !last.content) last.content = locale.connectionError;
+        try { render(); } catch (e2) { /* */ }
+        report('inline_send_failed', err);
+      }
     }
 
     inlineRoot.addEventListener('click', function (e) {
@@ -2400,7 +2414,7 @@
         'min-height:32px;display:inline-flex;align-items:center;}' +
       '@media (max-width:639px){.chip{min-height:44px;}.pill{min-height:52px;}}' +
       '@media (prefers-reduced-motion:reduce){.pill{transition:none;}}' +
-      inlineConversationCss(ink, fill, edge, radius, light);
+      inlineConversationCss(ink, edge, radius, light);
   }
 
   // The reserved height this mount is holding open in the customer's layout,
@@ -2421,7 +2435,10 @@
   // `ink` for text and `fill`/`edge` for the pill. The visitor's own words get
   // the pill's material (they typed them INTO the pill); Bestie answers as bare
   // text on the hero, the way the headline was bare a moment earlier.
-  function inlineConversationCss(ink, fill, edge, radius, light) {
+  function inlineConversationCss(ink, edge, radius, light) {
+    // See `.row.me .say` below: the pill's own fill is far too weak to carry a
+    // whole column of 15px text over a playing video.
+    var meFill = light ? 'rgba(20,20,19,0.16)' : 'rgba(245,244,241,0.28)';
     var reserve = inlineReserveHeight();
     // No reserve configured (`into`-shaped config on a replace mount, or a row
     // predating the reserve field): fall back to a height that is still bounded,
@@ -2435,6 +2452,13 @@
       '.head.away{overflow:hidden;animation:ibot-inline-away .3s ease forwards;}' +
       '@keyframes ibot-inline-away{from{max-height:260px;opacity:1;}' +
         'to{max-height:0;opacity:0;margin-bottom:0;}}' +
+      // The wrap is capped and clipped for the length of the collapse. Without
+      // this the host box is head(260px) + conv(reserve) tall for those 300ms —
+      // the customer's whole page below the hero slides down and back up again.
+      // `flex-end` keeps the conversation fully visible while the invitation
+      // clips off the top; at rest the conv fills the box exactly, so it has no
+      // effect on the final layout.
+      '.wrap.talking{max-height:' + box + ';overflow:hidden;justify-content:flex-end;}' +
       '.conv{display:flex;flex-direction:column;width:100%;max-width:560px;' +
         'height:' + box + ';max-height:' + box + ';' +
         'animation:ibot-inline-conv-in .3s ease-out;}' +
@@ -2445,7 +2469,12 @@
         '.conv{animation:none;}}' +
       // min-height:0 is what lets a flex child actually scroll instead of
       // growing its parent past the reserve.
-      '.msgs{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;' +
+      // Deliberately NO overscroll-behavior:contain. The panel can contain its
+      // scroll because it is a dismissible overlay; this list sits in the
+      // customer's own scroll flow, and `contain` would refuse to chain a swipe
+      // that started inside it — stranding a phone visitor inside a ~395px box
+      // with only a narrow strip beside it to get past the hero at all.
+      '.msgs{flex:1;min-height:0;overflow-y:auto;' +
         '-webkit-overflow-scrolling:touch;padding:4px 2px 12px;' +
         'display:flex;flex-direction:column;gap:10px;color:' + ink + ';}' +
       '.row{display:flex;max-width:100%;}' +
@@ -2457,9 +2486,14 @@
       '.say{max-width:86%;font-size:15px;line-height:1.55;color:' + ink + ';' +
         'word-break:break-word;' +
         (light ? '' : 'text-shadow:0 1px 10px rgba(0,0,0,0.55);') + '}' +
-      // The visitor's words keep the pill's material — they were typed into it.
-      '.row.me .say{background:' + fill + ';border:1px solid ' + edge + ';' +
-        'border-radius:' + Math.min(radius, 18) + 'px;padding:8px 13px;text-shadow:none;}' +
+      // The visitor's words keep the pill's material — but not the pill's
+      // strength. The resting state exposes ONE 15px line of it beside a 52px
+      // headline; a conversation is a much larger surface of much smaller type,
+      // and an 11% wash over a bright video frame (sky, a white shirt, a light
+      // cut) is near-white on near-white. So this rule gets its own heavier
+      // fill, and it KEEPS the text-shadow every other line has.
+      '.row.me .say{background:' + meFill + ';border:1px solid ' + edge + ';' +
+        'border-radius:' + Math.min(radius, 18) + 'px;padding:8px 13px;}' +
       // formatMessage() hard-codes #000/#fff on list items and the account
       // colour on links — both invisible against a video. !important in an
       // author stylesheet is the only thing that outranks an inline style.
@@ -2600,13 +2634,37 @@
         }
         continue;
       }
+      // The actively-streaming assistant row is addressable on its own, exactly
+      // as the panel marks #ibot-streaming-bubble, so a delta can rewrite that
+      // one node instead of the whole list. aria-live rides HERE and nowhere
+      // else: on the list container it would make a screen reader re-read the
+      // entire thread from the top on every frame of a streaming reply.
+      var streaming = !isUser && isLast && isLoading;
       out += '<div class="row ' + (isUser ? 'me' : 'bot') + '">' +
         // `false` (not `isUser`): formatMessage's user branch hard-codes white
         // text, which is for the panel's filled bubble. Here the colour comes
         // from the stylesheet's ink for both speakers.
-        '<div class="say">' + formatMessage(m.content, false) + '</div></div>';
+        '<div class="say"' +
+          (streaming ? ' id="ibot-inline-streaming" aria-live="polite"' : '') + '>' +
+        formatMessage(m.content, false) + '</div></div>';
     }
     return out;
+  }
+
+  // Rewrite ONLY the streaming row, mirroring what the panel does with
+  // #ibot-streaming-bubble. Returns false when there is no such row yet (the
+  // first paint after the thinking dots), which is the caller's cue to do a
+  // full list rebuild once.
+  function paintInlineStream() {
+    if (!inlineRoot || !inlineConversing) return false;
+    var el = inlineRoot.getElementById('ibot-inline-streaming');
+    if (!el) return false;
+    var msg = messages[messages.length - 1];
+    if (!msg || msg.role !== 'assistant') return false;
+    el.innerHTML = formatMessage(msg.content, false);
+    var list = inlineRoot.getElementById('ibot-inline-msgs');
+    if (list) list.scrollTop = list.scrollHeight;
+    return true;
   }
 
   function renderInlineConversation() {
@@ -2636,9 +2694,9 @@
 
     inlineRoot.innerHTML =
       '<style>' + inlineStylesCss() + '</style>' +
-      '<div class="wrap">' + inlineHeadlineHtml(true) +
+      '<div class="wrap talking">' + inlineHeadlineHtml(true) +
       '<div class="conv" id="ibot-inline-conv">' +
-        '<div class="msgs" id="ibot-inline-msgs" role="log" aria-live="polite">' +
+        '<div class="msgs" id="ibot-inline-msgs">' +
           inlineMessagesHtml() +
         '</div>' +
         inlineComposerHtml() +
@@ -3571,7 +3629,16 @@
       avatarHtml(60) +
       '</div>';
 
-    var trigger = document.getElementById('ibot-trigger');
+    // container.querySelector, NOT document.getElementById. This runs one line
+    // after writing container.innerHTML, so in the normal single-instance case
+    // it resolves the same node — but a SECOND live copy of widget.js on the
+    // page (an SPA re-injecting the script, a stale instance whose in-flight
+    // fetch resolves after a re-mount) would otherwise reach across and bind
+    // ITS openFromTrigger onto the other instance's launcher. Clicking then
+    // renders a panel into a container that is no longer in the document, and
+    // the visitor's click does visibly nothing. Surfaced by a cross-test
+    // hijack in tests/unit/widget/inline-conversation.test.ts.
+    var trigger = container.querySelector('#ibot-trigger');
     var openFromTrigger = function () {
       isOpen = true;
       inputTouched = false;   // fresh open → no keyboard until the user taps the input
@@ -5011,14 +5078,16 @@
         if (msgsScroll) msgsScroll.scrollTop = msgsScroll.scrollHeight;
         // The hero keeps pace with the panel token by token when both are up.
         if (inlineConversing) {
-          try { renderInline(); } catch (e) { report('inline_render_failed', e); }
+          try { if (!paintInlineStream()) renderInline(); } catch (e) { report('inline_render_failed', e); }
         }
       } else if (!streamingEl && inlineConversing) {
-        // No panel is open — the hero owns this conversation. Repaint just its
-        // message list rather than falling through to a full render(), which
-        // would also rebuild the (hidden) floating bubble on every token.
+        // No panel is open — the hero owns this conversation. Repaint the one
+        // streaming node rather than falling through to a full render(), which
+        // would rebuild the entire thread AND the (hidden) floating bubble on
+        // every token. renderInline() is the fallback for the first paint after
+        // the thinking dots, when no streaming node exists yet.
         thinkingText = null;
-        try { renderInline(); } catch (e) { report('inline_render_failed', e); }
+        try { if (!paintInlineStream()) renderInline(); } catch (e) { report('inline_render_failed', e); }
       } else {
         // First paint after thinking dots — full render to swap dot bubble for text bubble.
         thinkingText = null;
@@ -5702,7 +5771,12 @@
   // ============================================
   var PROACTIVE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
   function canFireProactive() {
-    if (isOpen) return false; // visitor already engaged
+    // `isOpen` alone stopped being "the visitor is engaged" the day the hero
+    // learned to hold the conversation itself: a replace mount converses with
+    // isOpen false by design, so without inlineConversing an exit-intent flick
+    // would pop a "chat with us" teaser in the corner while a live conversation
+    // sits in the hero above it.
+    if (isOpen || inlineConversing) return false; // visitor already engaged
     if (Date.now() - proactiveLastFired < PROACTIVE_COOLDOWN_MS) return false;
     return true;
   }
