@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   // The ES code lives ~30 seconds — exchanged here, synchronously, never deferred to a queue.
   let accessToken: string;
   try {
-    accessToken = await exchangeEsCode(String(code));
+    accessToken = await exchangeEsCode(String(code), body?.redirect_uri ? String(body.redirect_uri) : undefined);
   } catch (e: any) {
     console.error('[wa-connect] code exchange failed', e?.metaDetail ?? e);
     // Echo Meta's own error fields so a live failure is diagnosable from the browser instead

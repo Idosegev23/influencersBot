@@ -11,49 +11,66 @@
 const GRAPH = `https://graph.facebook.com/${process.env.WHATSAPP_GRAPH_VERSION || 'v23.0'}`;
 
 /**
- * Exchange the Embedded Signup code for a business-integration system-user token.
+ * Exchange the Embedded Signup code for a business integration system-user token.
  *
- * GET with query params, which is the form Meta documents for /oauth/access_token — a POST
- * body is not reliably accepted there. The secret travels inside the TLS tunnel of a
- * server-to-server call and is never written to our own logs.
+ * Meta rejects our documented-form request with "Invalid verification code format" even though
+ * the code arrives intact (430 chars, correct prefix, no whitespace) and the app secret is
+ * provably right — the same secret validates every inbound webhook signature. That message is
+ * also returned for a WRONG secret and for a malformed code alike, so it carries no signal.
+ *
+ * Rather than guess again, try the plausible request shapes in order and record which one Meta
+ * accepts. A rejected code is not consumed, so a failed attempt costs nothing. Once production
+ * tells us the answer, collapse this back to the single winning form.
  */
-export async function exchangeEsCode(code: string): Promise<string> {
+export async function exchangeEsCode(code: string, redirectUri?: string): Promise<string> {
   const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
   const appSecret = process.env.WHATSAPP_APP_SECRET;
   if (!appId || !appSecret) {
     throw new Error('NEXT_PUBLIC_FB_APP_ID and WHATSAPP_APP_SECRET are required to exchange an ES code');
   }
 
-  // Same reason as the client-side shape log: the rejection is about the code's FORM, so
-  // record what we actually received without ever writing the value down.
+  // Character classes only — the code is single-use and short-lived but still a credential.
   console.log('[wa-connect] exchanging code', {
     length: code?.length ?? 0,
     prefix: typeof code === 'string' ? code.slice(0, 6) : null,
-    hasWhitespace: typeof code === 'string' ? /\s/.test(code) : null,
+    hasWhitespace: /\s/.test(code),
+    hasPlus: code.includes('+'), hasSlash: code.includes('/'),
+    hasEquals: code.includes('='), hasPercent: code.includes('%'), hasHash: code.includes('#'),
+    redirectUri: redirectUri ?? null,
     appId,
   });
 
-  const qs = new URLSearchParams({ client_id: appId, client_secret: appSecret, code });
-  const res = await fetch(`${GRAPH}/oauth/access_token?${qs.toString()}`, { method: 'GET' });
-  const data = await res.json().catch(() => null);
-
-  if (!res.ok || !data?.access_token) {
-    // Meta's own diagnosis, minus anything that could carry the code itself. Without this the
-    // failure is untriageable — which is exactly where the first live attempt got stuck.
-    const e = data?.error ?? {};
-    const detail = {
-      status: res.status,
-      code: e.code ?? null,
-      subcode: e.error_subcode ?? null,
-      type: e.type ?? null,
-      message: typeof e.message === 'string' ? e.message.slice(0, 200) : null,
-    };
-    console.error('[wa-connect] ES code exchange failed', detail);
-    const err: any = new Error(`ES code exchange failed (status ${res.status})`);
-    err.metaDetail = detail;
-    throw err;
+  const base: Record<string, string> = { client_id: appId, client_secret: appSecret, code };
+  const attempts: Array<{ name: string; params: Record<string, string> }> = [
+    { name: 'plain', params: base },
+    { name: 'grant_type', params: { ...base, grant_type: 'authorization_code' } },
+  ];
+  if (redirectUri) {
+    attempts.push({ name: 'redirect_uri', params: { ...base, redirect_uri: redirectUri } });
+    attempts.push({ name: 'redirect_uri+grant_type', params: { ...base, redirect_uri: redirectUri, grant_type: 'authorization_code' } });
   }
-  return data.access_token as string;
+
+  const failures: Array<Record<string, unknown>> = [];
+  for (const attempt of attempts) {
+    const res = await fetch(`${GRAPH}/oauth/access_token?${new URLSearchParams(attempt.params)}`, { method: 'GET' });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.access_token) {
+      console.log('[wa-connect] exchange SUCCEEDED via', attempt.name);
+      return data.access_token as string;
+    }
+    const e = data?.error ?? {};
+    failures.push({
+      attempt: attempt.name, status: res.status, code: e.code ?? null,
+      subcode: e.error_subcode ?? null, type: e.type ?? null,
+      message: typeof e.message === 'string' ? e.message.slice(0, 200) : null,
+      fbtrace_id: e.fbtrace_id ?? null,
+    });
+  }
+
+  console.error('[wa-connect] ES code exchange failed — every variant rejected', failures);
+  const err: any = new Error('ES code exchange failed');
+  err.metaDetail = failures;
+  throw err;
 }
 
 /**

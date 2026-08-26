@@ -48,17 +48,32 @@ describe('ES code exchange', () => {
     await expect(exchangeEsCode('CODE')).rejects.toThrow(/exchange failed/i);
   });
 
-  it('surfaces Meta\'s error detail without leaking the secret or the code', async () => {
-    // GET with query params is the form Meta documents for /oauth/access_token, so the secret
-    // does travel in the URL — inside TLS, on a server-to-server call. What must NEVER escape
-    // is the secret or the authorization code appearing in what we log or return.
+  it('reports every attempted variant without leaking the secret or the code', async () => {
+    // The exchange tries several request shapes because Meta's rejection message is identical
+    // for a malformed code and a wrong secret, so it tells us nothing on its own. Each attempt
+    // is reported; none of them may carry the secret or the authorization code.
     mockJson({ error: { message: 'This authorization code has expired.', code: 100, error_subcode: 36009, type: 'OAuthException' } }, false);
-    await expect(exchangeEsCode('SECRET_CODE_VALUE')).rejects.toMatchObject({
-      metaDetail: { code: 100, subcode: 36009, type: 'OAuthException' },
-    });
-    const detail = await exchangeEsCode('SECRET_CODE_VALUE').catch((e) => JSON.stringify(e.metaDetail));
-    expect(detail).not.toContain('SECRET_CODE_VALUE');
-    expect(detail).not.toContain('secret');
-    expect(detail).toContain('expired');   // and it DOES carry the diagnosis
+    const err: any = await exchangeEsCode('SECRET_CODE_VALUE', 'https://bestie.ldrsgroup.com/onboard/abc').catch((e) => e);
+
+    expect(Array.isArray(err.metaDetail)).toBe(true);
+    expect(err.metaDetail.map((f: any) => f.attempt))
+      .toEqual(['plain', 'grant_type', 'redirect_uri', 'redirect_uri+grant_type']);
+    expect(err.metaDetail[0]).toMatchObject({ code: 100, subcode: 36009, type: 'OAuthException' });
+
+    const dump = JSON.stringify(err.metaDetail);
+    expect(dump).not.toContain('SECRET_CODE_VALUE');
+    expect(dump).not.toContain('secret');
+    expect(dump).toContain('expired');   // and it DOES carry the diagnosis
+  });
+
+  it('returns the token from whichever variant Meta accepts', async () => {
+    let n = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      n++;
+      return n === 1
+        ? { ok: false, status: 400, json: async () => ({ error: { message: 'nope', code: 100 } }), text: async () => '' }
+        : { ok: true, status: 200, json: async () => ({ access_token: 'EAAG-from-variant-2' }), text: async () => '' };
+    }));
+    await expect(exchangeEsCode('CODE')).resolves.toBe('EAAG-from-variant-2');
   });
 });
