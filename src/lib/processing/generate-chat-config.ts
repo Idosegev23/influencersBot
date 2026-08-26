@@ -66,6 +66,22 @@ function gatherPersonaText(persona: any, parsed: any, identity: any): string {
   return parts.join(' ');
 }
 
+/**
+ * Match a keyword as a whole word when it is Latin script.
+ *
+ * The old code built `new RegExp(kw, 'gi')` with no boundaries, so the parenting
+ * keyword 'mom' scored a point for every "**mom**ent" and "**mom**entum" in an
+ * English persona. That is how Inter Miami CF came out classified as a parenting
+ * account with a purple theme, and it would do the same to any English account
+ * whose content says "small moments". JS `\b` is ASCII-based, so it is applied
+ * only to Latin keywords — around Hebrew letters it would never match.
+ */
+function keywordRegex(kw: string): RegExp {
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const isLatin = /^[\x20-\x7E]+$/.test(kw);
+  return new RegExp(isLatin ? `\\b${escaped}\\b` : escaped, 'gi');
+}
+
 function detectInfluencerTypes(personaText: string): { primary: InfluencerType; all: InfluencerType[] } {
   const allText = personaText.toLowerCase();
 
@@ -74,8 +90,7 @@ function detectInfluencerTypes(personaText: string): { primary: InfluencerType; 
   for (const [type, keywords] of Object.entries(TYPE_KEYWORDS)) {
     if (type === 'other') continue;
     scores[type] = keywords.reduce((score, kw) => {
-      const regex = new RegExp(kw, 'gi');
-      const matches = allText.match(regex);
+      const matches = allText.match(keywordRegex(kw));
       return score + (matches ? matches.length : 0);
     }, 0);
   }
@@ -125,6 +140,61 @@ function generateGreeting(displayName: string, personaIdentity: any): string {
   }
 
   return `היי! אני הבוט של ${firstName} 💕 אני כאן לעזור עם כל מה שקשור לתוכן, המוצרים וההמלצות!`;
+}
+
+/**
+ * English starter questions.
+ *
+ * The Hebrew generator below is keyed on Hebrew topic names, so on an English
+ * account every branch missed and the generic Hebrew fallbacks shipped verbatim
+ * into the pills — the leak Lenovo and Inter Miami both had to undo by hand with
+ * SQL after every re-scan. Keyed by archetype rather than influencer_type, since
+ * an association or a B2B account has no retail category at all.
+ */
+const EN_QUESTIONS_BY_ARCHETYPE: Record<string, string[]> = {
+  association: ['How do I become a member? 🤝', 'What events are coming up? 📅', 'Where do you stand on the issues? 🏛️'],
+  service_provider: ['What services do you offer? 💼', 'Can you show me your work? 📁', 'How do we get started? 🚀'],
+  b2b_saas: ['What can the platform do? ⚡', 'How does pricing work? 💳', 'Can I see a demo? 🖥️'],
+  government_ministry: ['What services do you provide? 📋', 'How do I apply? 📝', 'Who should I contact? 📞'],
+  media_news: ["What's the latest? 🆕", 'What are people talking about? 🔥', 'Tell me more 📌'],
+  brand: ['What do you recommend? ✨', "What's new? 🆕", 'Do you have any offers? 💸'],
+};
+
+const EN_QUESTIONS_BY_TYPE: Record<string, string[]> = {
+  beauty: ['What products do you recommend? ✨', "What's your daily routine? 🌟", 'Any deals right now? 💸'],
+  fashion: ["What's trending right now? 👗", 'Where should I shop? 🛍️', 'Any discount codes? 💸'],
+  food: ["What's your most popular recipe? 🍽️", 'Something quick for dinner? ⚡', 'Any deals right now? 💸'],
+  fitness: ['Which program do you recommend? 💪', 'Any nutrition tips? 🥗', "What's the most effective workout? 🔥"],
+  travel: ['Where should I go? ✈️', 'Any travel tips? 🗺️', 'Where should I stay? 🏨'],
+  tech: ["What's the best gadget right now? 📱", 'Any app recommendations? 💡', "What's new in the space? 🆕"],
+  parenting: ['Any tips for parents? 👶', "What's worth buying? 🛍️", 'What do you recommend? 💕'],
+  lifestyle: ["What's your top pick? ✨", 'Any deals right now? 💸', "What's new? 🆕"],
+  other: ["What's your top recommendation? ✨", 'Tell me more 📌', "What's new? 🆕"],
+};
+
+function generateSuggestedQuestionsEn(
+  coreTopics: any[],
+  influencerType: InfluencerType,
+  archetype: string | undefined,
+): string[] {
+  const questions: string[] = [];
+
+  // An archetype with its own vocabulary always wins: "What's trending?" is wrong
+  // for a trade association no matter what its content keywords look like.
+  const byArchetype = archetype ? EN_QUESTIONS_BY_ARCHETYPE[archetype] : undefined;
+  if (byArchetype) return byArchetype.slice(0, 3);
+
+  for (const topic of coreTopics.slice(0, 2)) {
+    const name = String(topic?.name || topic?.topic || '').split('(')[0].trim();
+    if (name && name.length < 30) questions.push(`Tell me about ${name} 📌`);
+  }
+
+  for (const q of EN_QUESTIONS_BY_TYPE[influencerType] || EN_QUESTIONS_BY_TYPE.other) {
+    if (questions.length >= 3) break;
+    if (!questions.includes(q)) questions.push(q);
+  }
+
+  return questions.slice(0, 3);
 }
 
 function generateSuggestedQuestions(coreTopics: any[], influencerType: InfluencerType): string[] {
@@ -209,9 +279,10 @@ export async function generateAndSaveChatConfig(accountId: string): Promise<{
     throw new Error(`Persona not found for account ${accountId}`);
   }
 
-  // Load current account config + latest profile pic
+  // Load current account config + latest profile pic. `language` decides which
+  // starter questions ship; without it an English account got Hebrew pills.
   const [accountRes, profileRes] = await Promise.all([
-    supabase.from('accounts').select('config').eq('id', accountId).single(),
+    supabase.from('accounts').select('config, language').eq('id', accountId).single(),
     supabase.from('instagram_profile_history')
       .select('profile_pic_url, full_name')
       .eq('account_id', accountId)
@@ -238,9 +309,15 @@ export async function generateAndSaveChatConfig(accountId: string): Promise<{
   // Get theme preset (based on primary type)
   const theme = themePresets[influencerType] || themePresets.other;
 
-  // Generate greeting & questions
+  // Generate greeting & questions. The greeting is overwritten moments later by
+  // generateTabConfig, which is language- and archetype-aware; the questions are
+  // not, so they are the one thing that has to be right here.
   const greeting = generateGreeting(displayName, identity);
-  const questions = generateSuggestedQuestions(coreTopics, influencerType);
+  const isEn = (account as any).language === 'en';
+  const archetype: string | undefined = account.config?.archetype;
+  const questions = isEn
+    ? generateSuggestedQuestionsEn(coreTopics, influencerType, archetype)
+    : generateSuggestedQuestions(coreTopics, influencerType);
 
   // Build updated config — include avatar from profile if not already set
   const avatarUrl = account.config?.avatar_url || latestProfile?.profile_pic_url || null;
@@ -273,3 +350,9 @@ export async function generateAndSaveChatConfig(accountId: string): Promise<{
 
   return { influencerType, greeting, questions };
 }
+
+// Internal helpers exposed for unit tests. Not part of the module's public API —
+// `generateAndSaveChatConfig` is. Exported because the keyword-boundary rule and
+// the English question vocabulary are exactly the parts that have shipped wrong
+// before and need to be pinned directly.
+export const __test = { detectInfluencerTypes, generateSuggestedQuestionsEn, keywordRegex };
