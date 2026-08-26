@@ -1,12 +1,33 @@
 import { discoverSitemapUrls } from '@/lib/pipeline/sitemap';
-import { pushFrontier, setCount } from '@/lib/pipeline/state';
+import { pushFrontier, setCount, loadState, saveState } from '@/lib/pipeline/state';
 import { groupUrlsByPath } from '@/lib/pipeline/discover';
+import { isSiteChallenged, startApifyCrawl } from '@/lib/pipeline/apify-crawl';
 import type { StepContext } from '../types';
 import { enrichSkips, type StepResult } from './index';
+
+/** Pages to crawl on a challenged site when the scan set no explicit cap. */
+const APIFY_DEFAULT_MAX_PAGES = 300;
 
 export async function siteDiscoverStep(ctx: StepContext): Promise<StepResult> {
   if (enrichSkips(ctx, 'website')) return { status: 'advance' }; // enriching a different source
   if (!ctx.state.websiteUrl) return { status: 'advance' };
+
+  // A site behind a bot challenge answers every plain fetch with a 403, including
+  // its sitemap. Discovering nothing and carrying on would produce a job that
+  // reports success with zero website pages — the failure this whole branch
+  // exists to prevent. Hand the crawl to a real browser instead.
+  try {
+    if (await isSiteChallenged(ctx.state.websiteUrl)) {
+      return await startChallengedCrawl(ctx);
+    }
+  } catch (e: any) {
+    // Starting the browser crawl failed. This one DOES fail the step: we know the
+    // site is guarded, so falling through to the fetch path would crawl nothing
+    // while claiming to have finished.
+    const message = e?.message || String(e);
+    console.error(`[site-discover] apify transport failed for job ${ctx.jobId}: ${message}`);
+    return { status: 'failed', error: `Bot-protected site and the browser crawl could not start: ${message}` };
+  }
 
   try {
     return await discoverAndQueue(ctx);
@@ -29,6 +50,36 @@ export async function siteDiscoverStep(ctx: StepContext): Promise<StepResult> {
     await setCount(ctx.jobId, 'crawl', { done: 0, total: 0 });
     return { status: 'advance' };
   }
+}
+
+/**
+ * Kick off a browser crawl for a challenged site and record the handle on the
+ * pipeline state. The frontier stays empty on purpose — site-crawl reads the
+ * run's dataset instead, and BFS is the crawler's job now.
+ */
+async function startChallengedCrawl(ctx: StepContext): Promise<StepResult> {
+  const maxPages = ctx.state.options?.maxPages ?? APIFY_DEFAULT_MAX_PAGES;
+  const handle = await startApifyCrawl(ctx.state.websiteUrl!, maxPages);
+
+  // Re-read before writing: other steps mutate state, and this runs late enough
+  // that a blind overwrite could drop their counts.
+  const state = await loadState(ctx.jobId);
+  state.crawlTransport = 'apify';
+  state.apifyRunId = handle.runId;
+  state.apifyDatasetId = handle.datasetId;
+  await saveState(ctx.jobId, state);
+
+  await setCount(ctx.jobId, 'crawl', { done: 0, total: maxPages });
+
+  try {
+    const { getScanJobsRepo } = await import('@/lib/db/repositories/scanJobsRepo');
+    await getScanJobsRepo().addStepLog(
+      ctx.jobId, 'site-discover', 'completed', 100,
+      `האתר מוגן בבוט-צ'לנג' — סריקה בדפדפן אמיתי (Apify run ${handle.runId}), עד ${maxPages} עמודים`,
+    );
+  } catch { /* logging must never fail the job */ }
+
+  return { status: 'advance' };
 }
 
 async function discoverAndQueue(ctx: StepContext): Promise<StepResult> {

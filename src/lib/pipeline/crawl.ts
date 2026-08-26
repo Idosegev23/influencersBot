@@ -82,11 +82,183 @@ function detectPageType($: cheerio.CheerioAPI, url: string, product: ProductData
 }
 
 /**
- * Fetch + parse a batch of page URLs and persist each to `instagram_bio_websites`
- * (the same table `scripts/deep-scrape-website.mjs` writes to). Pure per-batch:
- * no crawl loop, no frontier mutation — the site-crawl step owns BFS/re-enqueue.
- * Returns the number of pages saved and every same-host link discovered (raw,
- * absolute) so the caller can extend the frontier when the sitemap was empty.
+ * Metadata a transport may already hold that the HTML itself no longer carries.
+ *
+ * Apify's crawler hands back a page whose `<head>` has been rewritten, so its
+ * title, description, JSON-LD and og:image arrive alongside the HTML rather than
+ * inside it. Passing them here keeps ONE extraction path for both transports
+ * instead of letting a protected site and an unprotected one drift apart.
+ */
+export interface PageFallbacks {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+  structuredData?: unknown[];
+}
+
+/**
+ * Parse one page's HTML and persist it to `instagram_bio_websites` (the same table
+ * `scripts/deep-scrape-website.mjs` writes to).
+ *
+ * Split out of `crawlPageBatch` so the Apify transport persists pages through
+ * exactly the same product detection, structured-data collection, image gathering
+ * and page-type classification as a plain fetch. Returns the same-host links found
+ * on the page, for BFS.
+ */
+export async function persistPageHtml(
+  url: string,
+  html: string,
+  accountId: string,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  fallbacks?: PageFallbacks,
+): Promise<{ saved: boolean; discoveredLinks: string[] }> {
+  const links: string[] = [];
+  try {
+    const origin = new URL(url).origin;
+    const host = new URL(url).host;
+    const $ = cheerio.load(html);
+
+    // Structured data — MUST be collected before the <script> strip below, otherwise
+    // cheerio has already detached the ld+json nodes and every page saves an empty array.
+    const structuredData: unknown[] = [];
+    $('script[type="application/ld+json"]').each((_, el) => {
+      try {
+        structuredData.push(JSON.parse($(el).html() || ''));
+      } catch {
+        /* skip malformed */
+      }
+    });
+    // A transport whose HTML no longer carries ld+json supplies it separately.
+    if (structuredData.length === 0 && fallbacks?.structuredData?.length) {
+      structuredData.push(...fallbacks.structuredData);
+    }
+
+    // Remove noise before extraction.
+    $('script, style, noscript, iframe, svg').remove();
+    $('.cookie-banner, .popup, #cookie-consent, .cookie-notice').remove();
+    $('nav, footer, header').remove();
+
+    // Metadata
+    const title =
+    $('title').text().trim() || $('h1').first().text().trim() || fallbacks?.title?.trim() || '';
+    const description =
+    $('meta[name="description"]').attr('content') ||
+    $('meta[property="og:description"]').attr('content') ||
+    fallbacks?.description ||
+    '';
+    const ogImage = $('meta[property="og:image"]').attr('content') || fallbacks?.ogImage || '';
+
+    // Product data
+    const product = extractProductData($, url);
+
+    // Main content — prefer product fields then rich content selectors, else body.
+    let content = '';
+    if (product.name) {
+      content += `שם מוצר: ${product.name}\n`;
+      if (product.price) content += `מחיר: ${product.price}\n`;
+      if (product.salePrice) content += `מחיר מבצע: ${product.salePrice}\n`;
+      if (product.category) content += `קטגוריה: ${product.category}\n`;
+      if (product.description) content += `תיאור: ${product.description}\n`;
+      if (product.ingredients) content += `רכיבים: ${product.ingredients}\n`;
+      if (product.volume) content += `נפח: ${product.volume}\n`;
+      content += '\n';
+    }
+    const contentSelectors = [
+      '.product-description',
+      '.product-info',
+      '.product-details',
+      '[data-product]',
+      '.category-description',
+      'article',
+      '.page-content',
+      'main',
+      '.content',
+      '.entry-content',
+      '#content',
+      '.post-content',
+      '.page-body',
+    ];
+    for (const selector of contentSelectors) {
+      const els = $(selector);
+      if (els.length > 0) {
+        els.each((_, el) => {
+          const text = $(el).text().trim();
+          if (text.length > 30) content += text + '\n\n';
+        });
+        if (content.length > 200) break;
+      }
+    }
+    if (content.length < 100) content = $('body').text().trim();
+    content = content
+      .replace(/[\t ]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/^\s+|\s+$/gm, '')
+      .trim();
+
+    // Images
+    const imageUrls: string[] = [];
+    if (ogImage) imageUrls.push(ogImage);
+    if (product.images) imageUrls.push(...product.images);
+    $('img[src]').each((_, el) => {
+      const src = $(el).attr('src');
+      if (src && src.startsWith('http') && !src.includes('data:') && !src.includes('.svg')) {
+        imageUrls.push(src);
+      }
+    });
+
+    // Same-host discovered links (absolute) for BFS fallback.
+    $('a[href]').each((_, el) => {
+      const href = $(el).attr('href');
+      if (!href || href.includes('#')) return;
+      let abs: string;
+      try {
+        abs = href.startsWith('/') ? `${origin}${href}` : href;
+        if (new URL(abs).host !== host) return;
+      } catch {
+        return;
+      }
+      links.push(abs);
+    });
+
+    const pageType = detectPageType($, url, product);
+
+    const { error } = await supabase.from('instagram_bio_websites').upsert(
+    {
+      account_id: accountId,
+      url,
+      page_title: title,
+      page_description: description,
+      page_content: content,
+      image_urls: [...new Set(imageUrls)].slice(0, 15),
+      meta_tags: { title, description, pageType },
+      structured_data: structuredData,
+      extracted_data: product,
+      parent_url: null,
+      crawl_depth: 0,
+      http_status: 200,
+      content_type: 'text/html',
+      processing_status: 'completed',
+      source_type: 'standalone',
+      scraped_at: new Date().toISOString(),
+    },
+    { onConflict: 'account_id,url' }
+    );
+    return { saved: !error, discoveredLinks: [...new Set(links)] };
+  } catch {
+    return { saved: false, discoveredLinks: [] };
+  }
+}
+
+/**
+ * Fetch + parse a batch of page URLs over plain HTTP and persist each.
+ *
+ * Pure per-batch: no crawl loop, no frontier mutation — the site-crawl step owns
+ * BFS/re-enqueue. Returns the number of pages saved and every same-host link
+ * discovered (raw, absolute) so the caller can extend the frontier when the
+ * sitemap was empty.
+ *
+ * Sites behind a bot challenge never reach this function: site-discover detects
+ * them and routes the crawl through the Apify transport instead.
  */
 export async function crawlPageBatch(
   urls: string[],
@@ -98,9 +270,6 @@ export async function crawlPageBatch(
 
   for (const url of urls) {
     try {
-      const origin = new URL(url).origin;
-      const host = new URL(url).host;
-
       const res = await fetch(url, {
         headers: {
           // Realistic browser UA — bot-marker UAs get 403'd by Akamai/Cloudflare
@@ -114,129 +283,14 @@ export async function crawlPageBatch(
       });
       if (!res.ok) continue;
 
-      const html = await res.text();
-      const $ = cheerio.load(html);
-
-      // Structured data — MUST be collected before the <script> strip below, otherwise
-      // cheerio has already detached the ld+json nodes and every page saves an empty array.
-      const structuredData: unknown[] = [];
-      $('script[type="application/ld+json"]').each((_, el) => {
-        try {
-          structuredData.push(JSON.parse($(el).html() || ''));
-        } catch {
-          /* skip malformed */
-        }
-      });
-
-      // Remove noise before extraction.
-      $('script, style, noscript, iframe, svg').remove();
-      $('.cookie-banner, .popup, #cookie-consent, .cookie-notice').remove();
-      $('nav, footer, header').remove();
-
-      // Metadata
-      const title = $('title').text().trim() || $('h1').first().text().trim() || '';
-      const description =
-        $('meta[name="description"]').attr('content') ||
-        $('meta[property="og:description"]').attr('content') ||
-        '';
-      const ogImage = $('meta[property="og:image"]').attr('content') || '';
-
-      // Product data
-      const product = extractProductData($, url);
-
-      // Main content — prefer product fields then rich content selectors, else body.
-      let content = '';
-      if (product.name) {
-        content += `שם מוצר: ${product.name}\n`;
-        if (product.price) content += `מחיר: ${product.price}\n`;
-        if (product.salePrice) content += `מחיר מבצע: ${product.salePrice}\n`;
-        if (product.category) content += `קטגוריה: ${product.category}\n`;
-        if (product.description) content += `תיאור: ${product.description}\n`;
-        if (product.ingredients) content += `רכיבים: ${product.ingredients}\n`;
-        if (product.volume) content += `נפח: ${product.volume}\n`;
-        content += '\n';
-      }
-      const contentSelectors = [
-        '.product-description',
-        '.product-info',
-        '.product-details',
-        '[data-product]',
-        '.category-description',
-        'article',
-        '.page-content',
-        'main',
-        '.content',
-        '.entry-content',
-        '#content',
-        '.post-content',
-        '.page-body',
-      ];
-      for (const selector of contentSelectors) {
-        const els = $(selector);
-        if (els.length > 0) {
-          els.each((_, el) => {
-            const text = $(el).text().trim();
-            if (text.length > 30) content += text + '\n\n';
-          });
-          if (content.length > 200) break;
-        }
-      }
-      if (content.length < 100) content = $('body').text().trim();
-      content = content
-        .replace(/[\t ]+/g, ' ')
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/^\s+|\s+$/gm, '')
-        .trim();
-
-      // Images
-      const imageUrls: string[] = [];
-      if (ogImage) imageUrls.push(ogImage);
-      if (product.images) imageUrls.push(...product.images);
-      $('img[src]').each((_, el) => {
-        const src = $(el).attr('src');
-        if (src && src.startsWith('http') && !src.includes('data:') && !src.includes('.svg')) {
-          imageUrls.push(src);
-        }
-      });
-
-      // Same-host discovered links (absolute) for BFS fallback.
-      $('a[href]').each((_, el) => {
-        const href = $(el).attr('href');
-        if (!href || href.includes('#')) return;
-        let abs: string;
-        try {
-          abs = href.startsWith('/') ? `${origin}${href}` : href;
-          if (new URL(abs).host !== host) return;
-        } catch {
-          return;
-        }
-        links.push(abs);
-      });
-
-      const pageType = detectPageType($, url, product);
-
-      const { error } = await supabase.from('instagram_bio_websites').upsert(
-        {
-          account_id: accountId,
-          url,
-          page_title: title,
-          page_description: description,
-          page_content: content,
-          image_urls: [...new Set(imageUrls)].slice(0, 15),
-          meta_tags: { title, description, pageType },
-          structured_data: structuredData,
-          extracted_data: product,
-          parent_url: null,
-          crawl_depth: 0,
-          http_status: 200,
-          content_type: 'text/html',
-          processing_status: 'completed',
-          source_type: 'standalone',
-          scraped_at: new Date().toISOString(),
-        },
-        { onConflict: 'account_id,url' }
+      const { saved, discoveredLinks } = await persistPageHtml(
+        url,
+        await res.text(),
+        accountId,
+        supabase,
       );
-      if (!error) savedPages++;
+      if (saved) savedPages++;
+      links.push(...discoveredLinks);
     } catch {
       /* skip page */
     }

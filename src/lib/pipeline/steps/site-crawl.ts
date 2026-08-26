@@ -1,11 +1,16 @@
-import { popFrontier, frontierSize, pushFrontier, setCount } from '@/lib/pipeline/state';
+import { popFrontier, frontierSize, pushFrontier, setCount, getCursor, setCursor } from '@/lib/pipeline/state';
 import { redisSetNx, redisExists } from '@/lib/redis';
-import { crawlPageBatch } from '@/lib/pipeline/crawl';
+import { crawlPageBatch, persistPageHtml } from '@/lib/pipeline/crawl';
+import { fetchApifyPages, getApifyRunState } from '@/lib/pipeline/apify-crawl';
+import { createClient } from '@/lib/supabase/server';
 import { BATCH_SIZES } from '../types';
 import type { StepContext } from '../types';
 import { enrichSkips, type StepResult } from './index';
 
 const KEY_TTL = 86400; // 24h — matches the pipeline cursor/frontier key lifetime
+
+/** Re-enqueue ceiling for the apify transport; the run route has none of its own. */
+const APIFY_MAX_BATCHES = 300;
 
 /**
  * Batched site crawl. Pops a bounded slice of the URL frontier, fetches + persists
@@ -16,6 +21,7 @@ const KEY_TTL = 86400; // 24h — matches the pipeline cursor/frontier key lifet
  */
 export async function siteCrawlStep(ctx: StepContext): Promise<StepResult> {
   if (enrichSkips(ctx, 'website')) return { status: 'advance' }; // enriching a different source
+  if (ctx.state.crawlTransport === 'apify') return apifyCrawlBatch(ctx);
   const batchUrls = await popFrontier(ctx.jobId, BATCH_SIZES['site-crawl']);
   if (batchUrls.length === 0) return { status: 'advance' };
 
@@ -81,4 +87,76 @@ export async function siteCrawlStep(ctx: StepContext): Promise<StepResult> {
 
   const remaining = await frontierSize(ctx.jobId);
   return remaining > 0 ? { status: 're-enqueue' } : { status: 'advance' };
+}
+
+/**
+ * Drain one batch of a browser crawl's dataset (the `apify` transport).
+ *
+ * The run produces pages while this drains them, so a batch may find nothing yet
+ * even though the crawl is far from done — that re-enqueues rather than
+ * advancing. The step only advances once the run has finished AND the dataset has
+ * been read to the end, so no page is left behind.
+ *
+ * Pages are persisted through `persistPageHtml`, the same function the plain
+ * fetch path uses, so a protected site and an unprotected one produce identical
+ * rows. BFS belongs to the crawler here, so discovered links are ignored.
+ */
+async function apifyCrawlBatch(ctx: StepContext): Promise<StepResult> {
+  const datasetId = ctx.state.apifyDatasetId;
+  const runId = ctx.state.apifyRunId;
+  if (!datasetId || !runId) {
+    return { status: 'failed', error: 'apify transport selected but no run handle on the pipeline state' };
+  }
+
+  // The run route re-enqueues without a ceiling of its own, so a crawl that never
+  // finishes would push itself around this loop forever. At a 20s poll this is
+  // well over an hour — far past any legitimate crawl of the sizes we cap at.
+  if (ctx.batch > APIFY_MAX_BATCHES) {
+    return { status: 'failed', error: `Apify crawl ${runId} did not finish within ${APIFY_MAX_BATCHES} batches` };
+  }
+
+  const offset = await getCursor(ctx.jobId, 'site-crawl');
+  const runState = await getApifyRunState(runId);
+
+  let pages;
+  try {
+    pages = await fetchApifyPages(datasetId, offset, BATCH_SIZES['site-crawl']);
+  } catch (e: any) {
+    // A dataset read failure mid-run is usually transient; a failure once the run
+    // is over is not, and must not masquerade as a finished crawl.
+    if (runState === 'running') return { status: 're-enqueue', delaySeconds: 20 };
+    return { status: 'failed', error: `Apify dataset read failed: ${e?.message || e}` };
+  }
+
+  if (pages.length === 0) {
+    if (runState === 'running') return { status: 're-enqueue', delaySeconds: 20 };
+    if (runState === 'failed' && offset === 0) {
+      return { status: 'failed', error: `Apify crawl ${runId} failed and produced no pages` };
+    }
+    const done = ctx.state.counts?.crawl?.done ?? offset;
+    await setCount(ctx.jobId, 'crawl', { done, total: done });
+    return { status: 'advance' };
+  }
+
+  const supabase = await createClient();
+  let saved = 0;
+  for (const page of pages) {
+    const res = await persistPageHtml(page.url, page.html, ctx.accountId, supabase, {
+      title: page.title,
+      description: page.description,
+      ogImage: page.ogImage,
+      structuredData: page.structuredData,
+    });
+    if (res.saved) saved++;
+  }
+
+  const nextOffset = offset + pages.length;
+  await setCursor(ctx.jobId, 'site-crawl', nextOffset);
+  await setCount(ctx.jobId, 'crawl', {
+    done: nextOffset,
+    total: Math.max(ctx.state.counts?.crawl?.total ?? nextOffset, nextOffset),
+  });
+  console.log(`[site-crawl/apify] saved ${saved}/${pages.length} pages (offset ${offset} → ${nextOffset})`);
+
+  return { status: 're-enqueue' };
 }

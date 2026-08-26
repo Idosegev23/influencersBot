@@ -45,6 +45,14 @@ export interface PipelineState {
   cursors: Record<string, number>;
   websiteUrl?: string;
   options: PipelineOptions;
+  /**
+   * How the website is being fetched. 'fetch' (default/absent) is plain HTTP.
+   * 'apify' means site-discover found a bot challenge and started a browser crawl
+   * instead; site-crawl then drains that run's dataset rather than a URL frontier.
+   */
+  crawlTransport?: 'fetch' | 'apify';
+  apifyRunId?: string;
+  apifyDatasetId?: string;
 }
 
 export interface StepContext {
