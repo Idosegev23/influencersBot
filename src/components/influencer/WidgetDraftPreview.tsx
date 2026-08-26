@@ -61,8 +61,12 @@ export function WidgetDraftPreview({
   picking,
   onPick,
   onPickFailed,
+  previewTitle,
 }: {
   accountId: string;
+  /** iframe title, for screen readers. Supplied by the caller so it follows the
+   *  account language rather than being pinned to Hebrew. */
+  previewTitle?: string;
   draft: unknown;
   view?: 'open' | 'teaser' | 'tooltip';
   /**
@@ -232,7 +236,7 @@ export function WidgetDraftPreview({
         (path && path !== '/' ? `&path=${encodeURIComponent(path)}` : '')
       }
       className="h-[720px] w-full rounded-2xl border border-[#e5e5ea]"
-      title="תצוגה מקדימה"
+      title={previewTitle ?? "Widget preview"}
     />
   );
 }

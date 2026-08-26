@@ -316,7 +316,7 @@ export default function ConversationsPage({
                           </div>
                           <p className="text-xs flex items-center gap-1 mt-0.5" style={{ color: 'var(--dash-text-3)' }}>
                             <Clock className="w-3 h-3" />
-                            {formatRelativeTime(session.created_at)}
+                            {formatRelativeTime(session.created_at, lang === 'en' ? 'en' : 'he')}
                           </p>
                         </div>
                       </div>

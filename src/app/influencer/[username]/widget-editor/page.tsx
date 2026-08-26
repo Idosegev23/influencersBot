@@ -1531,6 +1531,7 @@ export default function WidgetEditorPage() {
             </div>
             {accountId && previewDraft ? (
               <WidgetDraftPreview
+                previewTitle={t.widgetEditor.previewTitle}
                 accountId={accountId}
                 draft={previewDraft}
                 view={previewView}
