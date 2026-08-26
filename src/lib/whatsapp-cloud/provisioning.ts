@@ -190,6 +190,15 @@ export async function runProvisioningChain(args: {
     return { ok: false, state, failedStep: 'subscribed_apps' };
   }
 
+  // The row is useless without the number itself: the billing probe sends TO
+  // display_phone_number, and the admin block has nothing to display without it.
+  let numberMeta: { display_phone_number?: string; verified_name?: string } = {};
+  try {
+    const meta = await graph(`/${phoneNumberId}?fields=display_phone_number,verified_name`, accessToken);
+    if (meta.ok) numberMeta = (meta.data as any) ?? {};
+    else console.warn('[provision] number metadata unavailable', meta.status, meta.data);
+  } catch (e) { console.warn('[provision] number metadata lookup threw', e); }
+
   // 3. Channel row — 'pending' until the billing probe promotes it.
   const { data: row, error } = await supabase
     .from('whatsapp_channels')
