@@ -20,12 +20,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const SDK_ID = 'facebook-jssdk';
 
-const FB_ORIGINS = [
-  'https://www.facebook.com',
-  'https://web.facebook.com',
-  'https://business.facebook.com',
-  'https://staticxx.facebook.com',
-];
+/**
+ * Accept any facebook.com subdomain. A fixed list is too brittle: the dialog actually runs on
+ * m.facebook.com (display=touch), which an earlier www/web/business/staticxx allow-list dropped
+ * — silently discarding the FINISH event, so waba_id never arrived and the connect could not
+ * complete. Parsed with string ops rather than `new URL()`, which throws on opaque origins.
+ */
+function isFacebookOrigin(origin: unknown): boolean {
+  if (typeof origin !== 'string' || !origin.startsWith('https://')) return false;
+  const host = origin.slice('https://'.length).split('/')[0].split(':')[0].toLowerCase();
+  return host === 'facebook.com' || host.endsWith('.facebook.com');
+}
 
 type Status =
   | { kind: 'idle' }
@@ -63,12 +68,13 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
       // Plain string comparison, never `new URL(...)`: the page receives postMessages from
       // extensions, Vercel Live and embedded frames, and an opaque origin ("null") makes the
       // URL constructor THROW. That throw was uncaught and killed this handler's invocation.
-      if (!FB_ORIGINS.includes(event.origin)) return;
+      if (!isFacebookOrigin(event.origin)) return;
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (data?.type !== 'WA_EMBEDDED_SIGNUP') return;
         if (data.event === 'FINISH' || data.event === 'FINISH_ONLY_WABA' || data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') {
           sessionRef.current = { phone_number_id: data.data?.phone_number_id, waba_id: data.data?.waba_id };
+          console.log('[wa-connect] captured signup result', data.event, sessionRef.current);
         } else if (data.event === 'CANCEL') {
           setStatus({ kind: 'error', message: humanError(data.data?.error_code, data.data?.current_step) });
         }
@@ -173,6 +179,11 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
       clearTimeout(stuck);
       const code = response?.authResponse?.code;
       if (!code) { setStatus({ kind: 'error', message: humanError() }); return; }
+      if (!sessionRef.current.waba_id) {
+        console.error('[wa-connect] no waba_id captured — the FINISH event never reached us');
+        setStatus({ kind: 'error', message: 'החיבור אושר במטא אבל התוצאה לא הגיעה אלינו. נסו שוב, ואם זה חוזר — פנו אלינו.' });
+        return;
+      }
 
       try {
         const res = await fetch(`/api/onboard/${token}/whatsapp`, {
