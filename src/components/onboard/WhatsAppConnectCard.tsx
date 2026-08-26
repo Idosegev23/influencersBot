@@ -164,38 +164,45 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
         : cur);
     }, 60_000);
 
-    FB.login(
-      async (response: any) => {
-        clearTimeout(stuck);
-        const code = response?.authResponse?.code;
-        if (!code) { setStatus({ kind: 'error', message: humanError() }); return; }
+    // The FB SDK type-checks this callback and REJECTS an async function outright
+    // ("Expression is of type asyncfunction, not function"), so the popup opens but the
+    // result never comes back. Keep it a plain function and hand off to an async helper.
+    const onLoginResponse = (response: any) => { void handleLoginResponse(response); };
 
-        try {
-          const res = await fetch(`/api/onboard/${token}/whatsapp`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code,
-              waba_id: sessionRef.current.waba_id,
-              phone_number_id: sessionRef.current.phone_number_id,   // absent on Coexistence
-            }),
-          });
-          const out = await res.json();
-          if (!res.ok) {
-            const map: Record<string, string> = {
-              waba_not_owned: 'החשבון שנבחר אינו משויך אליכם. נסו שוב ובחרו את חשבון העסק שלכם.',
-              phone_number_unresolved: 'לא הצלחנו לזהות את המספר בחשבון. פנו אלינו ונשלים ידנית.',
-              exchange_failed: 'החיבור פג לפני שהספקנו לאשר אותו. נסו שוב.',
-            };
-            setStatus({ kind: 'error', message: map[out?.error] ?? humanError() });
-            return;
-          }
-          setStatus({ kind: 'connected' });
-          void refreshBilling();
-        } catch {
-          setStatus({ kind: 'error', message: humanError() });
+    const handleLoginResponse = async (response: any) => {
+      clearTimeout(stuck);
+      const code = response?.authResponse?.code;
+      if (!code) { setStatus({ kind: 'error', message: humanError() }); return; }
+
+      try {
+        const res = await fetch(`/api/onboard/${token}/whatsapp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            waba_id: sessionRef.current.waba_id,
+            phone_number_id: sessionRef.current.phone_number_id,   // absent on Coexistence
+          }),
+        });
+        const out = await res.json();
+        if (!res.ok) {
+          const map: Record<string, string> = {
+            waba_not_owned: 'החשבון שנבחר אינו משויך אליכם. נסו שוב ובחרו את חשבון העסק שלכם.',
+            phone_number_unresolved: 'לא הצלחנו לזהות את המספר בחשבון. פנו אלינו ונשלים ידנית.',
+            exchange_failed: 'החיבור פג לפני שהספקנו לאשר אותו. נסו שוב.',
+          };
+          setStatus({ kind: 'error', message: map[out?.error] ?? humanError() });
+          return;
         }
-      },
+        setStatus({ kind: 'connected' });
+        void refreshBilling();
+      } catch {
+        setStatus({ kind: 'error', message: humanError() });
+      }
+    };
+
+    FB.login(
+      onLoginResponse,
       {
         config_id: configId,
         response_type: 'code',
