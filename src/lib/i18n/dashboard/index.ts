@@ -32,6 +32,7 @@ import { manage } from './manage';
 import { tutorial } from './tutorial';
 import { common } from './common';
 import { share } from './share';
+import { whatsapp } from './whatsapp';
 import { valueProof } from './valueProof';
 import { widgetEditor } from './widgetEditor';
 
@@ -60,6 +61,7 @@ const STRINGS = {
     tutorial: tutorial.he,
     common: common.he,
     share: share.he,
+    whatsapp: whatsapp.he,
     valueProof: valueProof.he,
     widgetEditor: widgetEditor.he,
   },
@@ -85,6 +87,7 @@ const STRINGS = {
     tutorial: tutorial.en,
     common: common.en,
     share: share.en,
+    whatsapp: whatsapp.en,
     valueProof: valueProof.en,
     widgetEditor: widgetEditor.en,
   },

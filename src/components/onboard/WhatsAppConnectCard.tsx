@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 /**
  * Embedded Signup v4 — Coexistence ("WhatsApp Business app onboarding").
@@ -46,15 +47,15 @@ interface Billing {
   templateApproved: boolean;
 }
 
-// Meta returns machine codes; the wizard is customer-facing and Hebrew.
-function humanError(code?: string | number, step?: string): string {
+// Meta returns machine codes; the customer sees prose, in their own language.
+function humanError(T: any, code?: string | number, step?: string): string {
   const c = String(code ?? '');
-  if (c === '2' || c === 'API_UNAVAILABLE') return 'שירות של מטא לא זמין כרגע. נסו שוב בעוד כמה דקות.';
+  if (c === '2' || c === 'API_UNAVAILABLE') return T.metaUnavailable;
   if (/eligib|not_eligible/i.test(c)) {
-    return 'המספר לא עומד בתנאי החיבור של מטא. ודאו שאפליקציית WhatsApp Business מעודכנת (2.24.17 ומעלה) ושהחשבון פעיל מעל 30 יום.';
+    return T.notEligible;
   }
-  if (step) return `התהליך נעצר בשלב "${step}". אפשר לנסות שוב.`;
-  return 'החיבור לא הושלם. אפשר לנסות שוב.';
+  if (step) return T.stoppedAtStep.replace('{step}', step);
+  return T.notCompleted;
 }
 
 /**
@@ -64,7 +65,17 @@ function humanError(code?: string | number, step?: string): string {
  * Both expose the same /whatsapp and /whatsapp/billing endpoints, and both resolve the
  * account server-side — the card never handles an account id.
  */
-export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
+export function WhatsAppConnectCard({
+  apiBase,
+  language,
+}: {
+  apiBase: string;
+  /** Account language. Defaults to Hebrew so the onboarding wizard, which is
+   *  Hebrew-facing today, renders exactly as before. */
+  language?: 'he' | 'en';
+}) {
+  const T = getDashboardStrings(language === 'en' ? 'en' : 'he').whatsapp;
+  const isEn = language === 'en';
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const sessionRef = useRef<{ phone_number_id?: string; waba_id?: string }>({});
 
@@ -83,7 +94,7 @@ export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
           sessionRef.current = { phone_number_id: data.data?.phone_number_id, waba_id: data.data?.waba_id };
           console.log('[wa-connect] captured signup result', data.event, sessionRef.current);
         } else if (data.event === 'CANCEL') {
-          setStatus({ kind: 'error', message: humanError(data.data?.error_code, data.data?.current_step) });
+          setStatus({ kind: 'error', message: humanError(T, data.data?.error_code, data.data?.current_step) });
         }
       } catch { /* not our message */ }
     }
@@ -93,7 +104,7 @@ export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
 
   useEffect(() => {
     const appId = (process.env.NEXT_PUBLIC_FB_APP_ID || '').trim();
-    if (!appId) { setStatus({ kind: 'error', message: 'החיבור לוואטסאפ אינו מוגדר. פנו אלינו.' }); return; }
+    if (!appId) { setStatus({ kind: 'error', message: T.notConfigured }); return; }
 
     (window as any).fbAsyncInit = function () {
       (window as any).FB.init({ appId, autoLogAppEvents: true, xfbml: false, version: 'v23.0' });
@@ -106,7 +117,7 @@ export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
       js.async = true; js.defer = true; js.crossOrigin = 'anonymous';
       js.onerror = () => {
         console.error('[wa-connect] Facebook SDK failed to load (check CSP script-src)');
-        setStatus({ kind: 'error', message: 'לא הצלחנו לטעון את חלון החיבור של מטא. נסו לרענן, ואם זה חוזר — פנו אלינו.' });
+        setStatus({ kind: 'error', message: T.sdkLoadFailed });
       };
       document.body.appendChild(js);
     } else if ((window as any).FB) {
@@ -118,7 +129,7 @@ export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
     const t = setTimeout(() => {
       if (!(window as any).FB) {
         console.error('[wa-connect] FB SDK never initialised — likely CSP frame-src/script-src');
-        setStatus({ kind: 'error', message: 'חלון החיבור של מטא לא נטען. נסו לרענן את הדף.' });
+        setStatus({ kind: 'error', message: T.sdkNotLoaded });
       }
     }, 8000);
     return () => clearTimeout(t);
@@ -157,12 +168,12 @@ export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
     const FB = (window as any).FB;
     if (!configId) {
       console.error('[wa-connect] NEXT_PUBLIC_WA_ES_CONFIG_ID is missing from the build');
-      setStatus({ kind: 'error', message: 'החיבור לוואטסאפ אינו מוגדר. פנו אלינו.' });
+      setStatus({ kind: 'error', message: T.notConfigured });
       return;
     }
     if (!FB) {
       console.error('[wa-connect] window.FB is undefined at launch — SDK blocked or not loaded');
-      setStatus({ kind: 'error', message: 'חלון החיבור של מטא לא זמין. נסו לרענן את הדף.' });
+      setStatus({ kind: 'error', message: T.popupUnavailable });
       return;
     }
 
@@ -173,7 +184,7 @@ export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
     // fires and the card would sit on "waiting" forever. Time it out with a real message.
     const stuck = setTimeout(() => {
       setStatus((cur) => cur.kind === 'connecting'
-        ? { kind: 'error', message: 'החלון של מטא לא נפתח. ודאו שחוסם החלונות הקופצים כבוי ונסו שוב.' }
+        ? { kind: 'error', message: T.popupBlocked }
         : cur);
     }, 60_000);
 
@@ -197,10 +208,10 @@ export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
         codePrefix: typeof code === 'string' ? code.slice(0, 6) : null,
         topKeys: response ? Object.keys(response) : null,
       });
-      if (!code) { setStatus({ kind: 'error', message: humanError() }); return; }
+      if (!code) { setStatus({ kind: 'error', message: humanError(T, ) }); return; }
       if (!sessionRef.current.waba_id) {
         console.error('[wa-connect] no waba_id captured — the FINISH event never reached us');
-        setStatus({ kind: 'error', message: 'החיבור אושר במטא אבל התוצאה לא הגיעה אלינו. נסו שוב, ואם זה חוזר — פנו אלינו.' });
+        setStatus({ kind: 'error', message: T.resultMissing });
         return;
       }
 
@@ -217,17 +228,17 @@ export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
         const out = await res.json();
         if (!res.ok) {
           const map: Record<string, string> = {
-            waba_not_owned: 'החשבון שנבחר אינו משויך אליכם. נסו שוב ובחרו את חשבון העסק שלכם.',
-            phone_number_unresolved: 'לא הצלחנו לזהות את המספר בחשבון. פנו אלינו ונשלים ידנית.',
-            exchange_failed: 'החיבור פג לפני שהספקנו לאשר אותו. נסו שוב.',
+            waba_not_owned: T.notYourAccount,
+            phone_number_unresolved: T.numberNotFound,
+            exchange_failed: T.expired,
           };
-          setStatus({ kind: 'error', message: map[out?.error] ?? humanError() });
+          setStatus({ kind: 'error', message: map[out?.error] ?? humanError(T, ) });
           return;
         }
         setStatus({ kind: 'connected' });
         void refreshBilling();
       } catch {
-        setStatus({ kind: 'error', message: humanError() });
+        setStatus({ kind: 'error', message: humanError(T, ) });
       }
     };
 
@@ -250,16 +261,13 @@ export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
 
   return (
     <div className="rounded-2xl border border-gray-200 p-4 mb-4">
-      <div className="text-sm font-semibold text-gray-900 mb-1">וואטסאפ</div>
-      <p className="text-xs text-gray-400 mb-3">
-        חברו את מספר הוואטסאפ העסקי שלכם. תמשיכו להשתמש באפליקציה בטלפון כרגיל — הבוט פשוט יענה על אותו מספר.
-      </p>
+      <div className="text-sm font-semibold text-gray-900 mb-1">{T.title}</div>
+      <p className="text-xs text-gray-400 mb-3">{T.intro}</p>
       <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
-        <strong>חשוב לדעת מראש:</strong> בסוף התהליך תתבקשו לחבר אמצעי תשלום בחשבון של מטא.
-        בלעדיו מטא חוסמת הודעות יוצאות והבוט לא יוכל לענות ללקוחות שלכם.
+        <strong>{T.heads}</strong> {T.headsBody}
       </p>
 
-      {status.kind === 'loading' && <p className="text-xs text-gray-400">טוען…</p>}
+      {status.kind === 'loading' && <p className="text-xs text-gray-400">{T.loading}</p>}
 
       {(status.kind === 'idle' || status.kind === 'error') && (
         <>
@@ -267,61 +275,49 @@ export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
             onClick={launch}
             className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition"
             style={{ background: '#883fe2' }}
-          >
-            חבר וואטסאפ
-          </button>
+          >{T.connect}</button>
           {status.kind === 'error' && <p className="mt-2 text-xs text-amber-600">{status.message}</p>}
         </>
       )}
 
-      {status.kind === 'connecting' && <p className="text-xs text-gray-500">ממתין לאישור בחלון של מטא…</p>}
+      {status.kind === 'connecting' && <p className="text-xs text-gray-500">{T.waitingMeta}</p>}
 
       {status.kind === 'connected' && (
         <div className="space-y-3">
           <p className="text-sm font-medium text-green-600">
-            ✅ המספר חובר{billing?.displayPhoneNumber ? ` — ${billing.displayPhoneNumber}` : ''}.
+            {T.numberConnected}{billing?.displayPhoneNumber ? ` — ${billing.displayPhoneNumber}` : ''}.
           </p>
 
           {billing?.paymentReady ? (
-            <p className="text-sm font-medium text-green-600">✅ אמצעי התשלום פעיל. הכל מוכן.</p>
+            <p className="text-sm font-medium text-green-600">{T.paymentActive}</p>
           ) : (
             <div className="rounded-xl bg-amber-50 border-2 border-amber-300 p-3 space-y-2">
-              <div className="text-sm font-bold text-amber-900">
-                ⚠️ עוד לא סיימתם — חסר אמצעי תשלום
-              </div>
+              <div className="text-sm font-bold text-amber-900">{T.paymentMissing}</div>
               <p className="text-xs text-amber-800">
-                <strong>עד שתחברו כרטיס, הבוט לא ישלח אף הודעה.</strong> המספר מחובר, אבל מטא
-                חוסמת הודעות יוצאות מחשבון בלי אמצעי תשלום — הלקוחות שלכם יכתבו ולא יקבלו מענה.
+                <strong>{T.noCardNoMessages}</strong> {T.noCardBody}
               </p>
-              <p className="text-xs text-amber-700">
-                מטא מחייבת אתכם ישירות. אנחנו לא מעורבים בתשלום ולא רואים את פרטי הכרטיס.
-              </p>
+              <p className="text-xs text-amber-700">{T.metaBillsYou}</p>
               {billing?.wabaId && (
                 <a
                   href={`https://business.facebook.com/settings/whatsapp-business-accounts/${billing.wabaId}`}
                   target="_blank" rel="noopener noreferrer"
                   className="inline-block px-4 py-2 rounded-xl text-sm font-bold text-white transition"
                   style={{ background: '#b45309' }}
-                >
-                  חברו אמצעי תשלום עכשיו ←
-                </a>
+                >{T.addPaymentNow}</a>
               )}
-              <p className="text-xs text-gray-400">
-                בעמוד שנפתח: <span className="font-medium">Payment settings</span> → <span className="font-medium">Add payment method</span>.
+              <p className="text-xs text-gray-400">{T.onThePage}<span className="font-medium">Payment settings</span> → <span className="font-medium">Add payment method</span>.
               </p>
 
               {billing && !billing.templateApproved ? (
                 // Not a failure — the probe needs an approved template before it can send anything.
-                <p className="text-xs text-gray-500">
-                  ממתין גם לאישור תבנית אצל מטא (עד 24 שעות). נבדוק אוטומטית ברגע שתאושר.
-                </p>
+                <p className="text-xs text-gray-500">{T.awaitingTemplate}</p>
               ) : (
                 <button
                   onClick={probe}
                   disabled={probing}
                   className="text-xs font-semibold underline text-gray-700 disabled:opacity-40"
                 >
-                  {probing ? 'בודק…' : 'הוספתי כרטיס — בדקו שוב'}
+                  {probing ? T.checking : T.addedCardRecheck}
                 </button>
               )}
             </div>

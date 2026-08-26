@@ -30,7 +30,7 @@ export default function WhatsAppPage() {
           : 'Connect your business WhatsApp number so the bot can answer your customers on it.'}
       </p>
 
-      <WhatsAppConnectCard apiBase={`/api/influencer/${username}`} />
+      <WhatsAppConnectCard apiBase={`/api/influencer/${username}`} language={he ? 'he' : 'en'} />
     </div>
   );
 }
