@@ -105,17 +105,18 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
       ),
     ]);
   } catch (err: any) {
-    return NextResponse.json(
-      { error: 'failed to fetch customer site', details: err?.message },
-      { status: 502 },
-    );
+    return standInPage(req, accountId, cleanDomain, `could not be reached (${err?.message || 'network error'})`);
   }
 
   if (!upstreamRes.ok) {
-    return NextResponse.json(
-      { error: 'customer site returned ' + upstreamRes.status },
-      { status: 502 },
-    );
+    // The customer's own site refused us — most often a bot challenge, which is
+    // exactly what buses.org does to every non-browser request including ours.
+    //
+    // Returning JSON here meant the demo link a salesperson had just sent showed
+    // raw `{"error":"customer site returned 403"}`. The widget is the thing being
+    // demonstrated, not the customer's homepage, so serve it on a plain backdrop
+    // and say why the site itself is missing.
+    return standInPage(req, accountId, cleanDomain, `returned ${upstreamRes.status}`);
   }
 
   // Only HTML pages get the injection treatment; everything else passes through
@@ -195,4 +196,50 @@ function filterHeaders(src: Headers): Headers {
     if (!isBlockingHeader(key)) out.append(key, value);
   });
   return out;
+}
+
+/**
+ * A backdrop for the widget when the customer's own site cannot be framed.
+ *
+ * Deliberately plain: it must not be mistaken for the customer's site, and it
+ * must not pretend the page loaded. It states what happened and puts the real,
+ * live widget on top so the demo still demonstrates something true.
+ */
+function standInPage(req: NextRequest, accountId: string, domain: string, reason: string): Response {
+  const origin = req.nextUrl.origin;
+  const safeDomain = domain.replace(/[<>&"]/g, '');
+  const safeReason = reason.replace(/[<>&"]/g, '');
+  const html = `<!doctype html>
+<html lang="en" dir="ltr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Widget preview</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         background:
+           radial-gradient(1200px 600px at 50% -10%, #ede9fe 0%, transparent 60%),
+           linear-gradient(#fafafa, #f4f4f5); }
+  .card { text-align:center; max-width:34rem; padding:2rem; color:#3f3f46; }
+  .card h1 { font-size:1.05rem; font-weight:600; margin:0 0 .5rem; color:#18181b; }
+  .card p { font-size:.85rem; line-height:1.6; margin:0; color:#71717a; }
+  code { background:#e4e4e7; padding:.1rem .35rem; border-radius:.25rem; font-size:.8rem; }
+</style></head>
+<body>
+  <div class="card">
+    <h1>The assistant is live — the site preview is not</h1>
+    <p><code>${safeDomain}</code> ${safeReason} when we asked for it, so its pages can't be shown here.
+       The assistant below is the real one for this account: open it and ask it anything.</p>
+  </div>
+  <script src="${origin}/widget.js" data-account-id="${accountId}" data-preview="true"></script>
+</body></html>`;
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'Content-Security-Policy':
+        "default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors *",
+    },
+  });
 }
