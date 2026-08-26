@@ -59,10 +59,39 @@ export async function GET(request: Request) {
     let greeting: string;
     let quickReplies: string[];
     const topicSuggestions: string[] = [];
-    // Coupon/price fillers make no sense for service orgs and public bodies
+    // Coupon/price fillers make no sense for service orgs, public bodies,
+    // membership associations or B2B platforms — none of them sell at a discount.
     const hasCommercialSuggestions =
-      !['service_provider', 'government_ministry'].includes(config.archetype) &&
-      config.coupons_disabled !== true;
+      !['service_provider', 'government_ministry', 'association', 'b2b_saas', 'saas_product'].includes(
+        config.archetype,
+      ) && config.coupons_disabled !== true;
+
+    // Suggestion templates. This whole branch used to be hardcoded Hebrew with no
+    // language check, so an English account's pills came out as
+    // "מה חדש בMotorcoach Industry Advocacy?" — a Hebrew template glued to an
+    // English topic name, without even a space.
+    const isEnAccount = (account as any).language === 'en';
+    const SUG = isEnAccount
+      ? {
+          tellMeAbout: (n: string) => `Tell me about ${n}`,
+          whatsNewIn: (n: string) => `What's new with ${n}?`,
+          tellMeMore: 'Tell me more',
+          anyCoupons: 'Any offers?',
+          couponQ: 'Any discount codes?',
+          bestNow: "What's worth it right now?",
+          fallbackGreeting: (n: string) => `Hi! I'm the ${n} assistant.`,
+          greetingHelp: '\nHow can I help?',
+        }
+      : {
+          tellMeAbout: (n: string) => `ספר/י לי על ${n}`,
+          whatsNewIn: (n: string) => `מה חדש ב${n}?`,
+          tellMeMore: 'ספרו לי עוד',
+          anyCoupons: 'יש קופונים?',
+          couponQ: 'יש קופון הנחה?',
+          bestNow: 'מה הכי שווה עכשיו?',
+          fallbackGreeting: (n: string) => `שלום! אני הבוט של ${n}`,
+          greetingHelp: '\nאיך אפשר לעזור?',
+        };
 
     if (isMediaNews) {
       // Media/News accounts: greeting with hot topics
@@ -99,12 +128,10 @@ export async function GET(request: Request) {
       if (config.greeting_message) {
         greeting = config.greeting_message;
       } else {
-        greeting = `שלום! אני הבוט של ${persona?.name || displayName}`;
-        if (persona?.voice_rules?.tone) {
-          greeting += `\nאני כאן כדי לעזור לך עם שאלות, המלצות וקופונים בלעדיים. במה אפשר לעזור?`;
-        } else {
-          greeting += `\nאיך אפשר לעזור?`;
-        }
+        greeting = SUG.fallbackGreeting(persona?.name || displayName);
+        greeting += persona?.voice_rules?.tone && !isEnAccount
+          ? `\nאני כאן כדי לעזור לך עם שאלות, המלצות וקופונים בלעדיים. במה אפשר לעזור?`
+          : SUG.greetingHelp;
       }
 
       // ── Quick replies: prefer user-configured, fallback to persona topics ──
@@ -114,9 +141,9 @@ export async function GET(request: Request) {
         quickReplies = [];
         if (persona?.knowledge_map?.coreTopics?.length > 0) {
           const topTopics = persona.knowledge_map.coreTopics.slice(0, 3);
-          quickReplies.push(...topTopics.map((t: any) => `ספר/י לי על ${t.name}`));
+          quickReplies.push(...topTopics.map((t: any) => SUG.tellMeAbout(t.name)));
         }
-        quickReplies.push(hasCommercialSuggestions ? 'יש קופונים?' : 'ספרו לי עוד');
+        quickReplies.push(hasCommercialSuggestions ? SUG.anyCoupons : SUG.tellMeMore);
       }
 
       // Build topic-based suggestion pool for fast follow-ups
@@ -127,15 +154,15 @@ export async function GET(request: Request) {
         for (const topic of persona.knowledge_map.coreTopics.slice(0, 8)) {
           const name = topic.name || topic;
           if (typeof name === 'string' && name.length > 0 && name.length < 30) {
-            topicSuggestions.push(`מה חדש ב${name}?`);
-            topicSuggestions.push(`ספרו לי על ${name}`);
+            topicSuggestions.push(SUG.whatsNewIn(name));
+            topicSuggestions.push(SUG.tellMeAbout(name));
           }
         }
       }
       if (hasCommercialSuggestions) {
-        topicSuggestions.push('יש קופון הנחה?', 'מה הכי שווה עכשיו?');
+        topicSuggestions.push(SUG.couponQ, SUG.bestNow);
       }
-      topicSuggestions.push('ספרו לי עוד');
+      topicSuggestions.push(SUG.tellMeMore);
     }
 
     // Load partnerships count for marketing disclaimer
