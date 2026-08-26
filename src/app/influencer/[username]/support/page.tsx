@@ -435,14 +435,14 @@ export default function SupportPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#883fe2' }} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ color: 'var(--dash-text, #fff)' }}>
+    <div className="min-h-screen" style={{ color: 'var(--dash-text, #fff)' }}>
       <div className="max-w-7xl mx-auto p-4 animate-slide-up">
         {/* Agent header bar — only when an agent session is active */}
         {agent && (

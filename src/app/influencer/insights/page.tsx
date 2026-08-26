@@ -56,7 +56,7 @@ export default function InsightsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8" dir="rtl">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">

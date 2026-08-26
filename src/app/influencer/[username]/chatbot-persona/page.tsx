@@ -244,7 +244,7 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
     : (voiceRules?.tone as any)?.primary?.join(', ') || persona?.tone || '';
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
         {/* ═══ HEADER ═══ */}

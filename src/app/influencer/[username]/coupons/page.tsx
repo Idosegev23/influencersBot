@@ -204,14 +204,14 @@ export default function CouponsPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--dash-text-3)' }} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

@@ -315,7 +315,7 @@ export default function InfluencerDashboardPage({
   // ── Render ──
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" style={{ color: 'var(--dash-text)' }}>
 
       {/* ── Page header ── */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-2 flex items-center justify-between animate-fade-in aurora-bg rounded-2xl mb-2">

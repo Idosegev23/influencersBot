@@ -47,7 +47,6 @@ export default function InfluencerLandingPage({
   return (
     <div
       className="min-h-screen flex items-center justify-center"
-      dir="rtl"
       style={{ background: 'var(--dash-bg)' }}
     >
       <div className="text-center">

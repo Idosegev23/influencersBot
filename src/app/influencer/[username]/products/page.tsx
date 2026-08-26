@@ -131,7 +131,7 @@ export default function ProductsPage({
   };
 
   return (
-    <div className="min-h-screen" dir="rtl" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
+    <div className="min-h-screen" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
@@ -391,7 +391,6 @@ function ProductDetailModal({ product, onClose, t }: { product: Product; onClose
       <div
         className="glass-card rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
-        dir="rtl"
       >
         <div className="sticky top-0 flex items-center justify-between px-5 py-3 backdrop-blur-md"
           style={{ background: 'var(--dash-surface)', borderBottom: '1px solid var(--dash-glass-border)' }}
