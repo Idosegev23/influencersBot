@@ -178,6 +178,18 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
     const handleLoginResponse = async (response: any) => {
       clearTimeout(stuck);
       const code = response?.authResponse?.code;
+
+      // Meta rejected a real code with "Invalid verification code format", which points at
+      // WHAT we read out of the SDK response rather than at the exchange. Log the shape —
+      // keys, length, prefix — never the code itself (single-use, 30s, still a credential).
+      console.log('[wa-connect] login response shape', {
+        status: response?.status,
+        authKeys: response?.authResponse ? Object.keys(response.authResponse) : null,
+        codeType: typeof code,
+        codeLength: typeof code === 'string' ? code.length : null,
+        codePrefix: typeof code === 'string' ? code.slice(0, 6) : null,
+        topKeys: response ? Object.keys(response) : null,
+      });
       if (!code) { setStatus({ kind: 'error', message: humanError() }); return; }
       if (!sessionRef.current.waba_id) {
         console.error('[wa-connect] no waba_id captured — the FINISH event never reached us');

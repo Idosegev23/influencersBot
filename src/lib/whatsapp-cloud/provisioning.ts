@@ -24,6 +24,15 @@ export async function exchangeEsCode(code: string): Promise<string> {
     throw new Error('NEXT_PUBLIC_FB_APP_ID and WHATSAPP_APP_SECRET are required to exchange an ES code');
   }
 
+  // Same reason as the client-side shape log: the rejection is about the code's FORM, so
+  // record what we actually received without ever writing the value down.
+  console.log('[wa-connect] exchanging code', {
+    length: code?.length ?? 0,
+    prefix: typeof code === 'string' ? code.slice(0, 6) : null,
+    hasWhitespace: typeof code === 'string' ? /\s/.test(code) : null,
+    appId,
+  });
+
   const qs = new URLSearchParams({ client_id: appId, client_secret: appSecret, code });
   const res = await fetch(`${GRAPH}/oauth/access_token?${qs.toString()}`, { method: 'GET' });
   const data = await res.json().catch(() => null);
