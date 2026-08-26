@@ -57,7 +57,14 @@ function humanError(code?: string | number, step?: string): string {
   return 'החיבור לא הושלם. אפשר לנסות שוב.';
 }
 
-export function WhatsAppConnectCard({ token }: { token: string }) {
+/**
+ * `apiBase` is the only thing that differs between the two places this card lives:
+ *   onboarding wizard → /api/onboard/<token>
+ *   customer dashboard → /api/influencer/<username>
+ * Both expose the same /whatsapp and /whatsapp/billing endpoints, and both resolve the
+ * account server-side — the card never handles an account id.
+ */
+export function WhatsAppConnectCard({ apiBase }: { apiBase: string }) {
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const sessionRef = useRef<{ phone_number_id?: string; waba_id?: string }>({});
 
@@ -122,10 +129,10 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
 
   const refreshBilling = useCallback(async () => {
     try {
-      const res = await fetch(`/api/onboard/${token}/whatsapp/billing`);
+      const res = await fetch(`${apiBase}/whatsapp/billing`);
       if (res.ok) setBilling(await res.json());
     } catch { /* the wizard simply keeps showing the previous state */ }
-  }, [token]);
+  }, [apiBase]);
 
   // The customer leaves to Meta's billing screen and comes back — re-check on focus so they
   // never have to guess whether we noticed.
@@ -140,10 +147,10 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
   const probe = useCallback(async () => {
     setProbing(true);
     try {
-      await fetch(`/api/onboard/${token}/whatsapp/billing`, { method: 'POST' });
+      await fetch(`${apiBase}/whatsapp/billing`, { method: 'POST' });
       await refreshBilling();
     } finally { setProbing(false); }
-  }, [token, refreshBilling]);
+  }, [apiBase, refreshBilling]);
 
   const launch = useCallback(() => {
     const configId = (process.env.NEXT_PUBLIC_WA_ES_CONFIG_ID || '').trim();
@@ -198,7 +205,7 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
       }
 
       try {
-        const res = await fetch(`/api/onboard/${token}/whatsapp`, {
+        const res = await fetch(`${apiBase}/whatsapp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -239,7 +246,7 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
         },
       },
     );
-  }, [token]);
+  }, [apiBase]);
 
   return (
     <div className="rounded-2xl border border-gray-200 p-4 mb-4">

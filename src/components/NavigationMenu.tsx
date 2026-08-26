@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useTheme } from '@/components/ThemeProvider';
-import {
+import { MessageSquare,
   LayoutDashboard,
   Briefcase,
   Tag,
@@ -27,7 +27,7 @@ import { LanguageToggle } from '@/components/LanguageToggle';
 const BRAND_LIKE_ARCHETYPES = new Set(['brand', 'local_business', 'b2b_saas']);
 
 type NavKey =
-  | 'dashboard' | 'instagram' | 'analytics' | 'partnerships' | 'coupons' | 'products'
+  | 'dashboard' | 'instagram' | 'whatsapp' | 'analytics' | 'partnerships' | 'coupons' | 'products'
   | 'conversations' | 'support' | 'attribution' | 'widget-editor' | 'settings';
 
 const BASE_NAV_ITEMS: {
@@ -39,6 +39,7 @@ const BASE_NAV_ITEMS: {
 }[] = [
   { key: 'dashboard', icon: LayoutDashboard },
   { key: 'instagram', icon: Instagram },
+  { key: 'whatsapp', icon: MessageSquare },
   { key: 'analytics', icon: BarChart3 },
   { key: 'partnerships', icon: Briefcase },
   { key: 'coupons', icon: Tag },

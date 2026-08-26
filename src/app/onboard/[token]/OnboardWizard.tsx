@@ -159,7 +159,7 @@ export default function OnboardWizard({ token, lang }: { token: string; lang: On
               </div>
 
               {/* WhatsApp connect (optional like every other source — D1) */}
-              <WhatsAppConnectCard token={token} />
+              <WhatsAppConnectCard apiBase={`/api/onboard/${token}`} />
 
               {/* Fields */}
               <div className="space-y-3">
@@ -209,11 +209,11 @@ export default function OnboardWizard({ token, lang }: { token: string; lang: On
               {/* Also here, not only on the form: connecting WhatsApp needs a round trip to
                   Meta for the payment method, and the form screen is gone by the time the
                   customer comes back. This is the screen they can return to. */}
-              <WhatsAppConnectCard token={token} />
+              <WhatsAppConnectCard apiBase={`/api/onboard/${token}`} />
             </>
           )}
 
-          {phase === 'scanning' && <WhatsAppConnectCard token={token} />}
+          {phase === 'scanning' && <WhatsAppConnectCard apiBase={`/api/onboard/${token}`} />}
 
           {phase === 'error' && (
             <div className="py-8 text-center">

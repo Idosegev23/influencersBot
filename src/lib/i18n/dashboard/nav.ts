@@ -3,6 +3,7 @@ export const nav = {
   he: {
     dashboard: 'דשבורד',
     instagram: 'אינסטגרם',
+    whatsapp: 'וואטסאפ',
     analytics: 'אנליטיקס',
     partnerships: 'שת״פים',
     coupons: 'קופונים',
@@ -21,6 +22,7 @@ export const nav = {
   en: {
     dashboard: 'Dashboard',
     instagram: 'Instagram',
+    whatsapp: 'WhatsApp',
     analytics: 'Analytics',
     partnerships: 'Partnerships',
     coupons: 'Promotions',
