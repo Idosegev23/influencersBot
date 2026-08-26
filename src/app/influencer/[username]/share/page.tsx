@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { fetchInfluencerByUsername } from '@/lib/influencer/client';
 import type { Influencer } from '@/types';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 // Simple QR Code SVG Generator
 function QRCodeSVG({ value, size = 200, bgColor = '#ffffff', fgColor = '#000000' }: {
@@ -107,12 +109,14 @@ function generateQRPattern(data: string): boolean[][] {
   return pattern;
 }
 
-const utmSources = [
+// Built from the strings bundle rather than a module constant: two of the five
+// labels are translatable, and a module-level constant cannot see `t`.
+const buildUtmSources = (t: any) => [
   { id: 'instagram', label: 'Instagram', icon: Instagram },
-  { id: 'website', label: 'אתר אישי', icon: Globe },
+  { id: 'website', label: t.share.presetPersonalSite, icon: Globe },
   { id: 'linktree', label: 'Linktree', icon: Link2 },
   { id: 'whatsapp', label: 'WhatsApp', icon: Smartphone },
-  { id: 'custom', label: 'מותאם אישית', icon: Share2 },
+  { id: 'custom', label: t.share.presetCustom, icon: Share2 },
 ];
 
 export default function SharePage({
@@ -122,6 +126,9 @@ export default function SharePage({
 }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const { lang } = useDashboardLang(username);
+  const t = getDashboardStrings(lang);
+  const utmSources = buildUtmSources(t);
   const router = useRouter();
   const qrRef = useRef<HTMLDivElement>(null);
 
@@ -256,7 +263,7 @@ export default function SharePage({
               </div>
 
               <p className="text-sm mb-4 text-center" style={{ color: 'var(--dash-text-2)' }}>
-                סרקו את הקוד כדי לגשת ישירות לצ'אטבוט
+                {t.share.qrHint}
               </p>
 
               <button
@@ -264,7 +271,7 @@ export default function SharePage({
                 className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl transition-colors"
               >
                 <Download className="w-5 h-5" />
-                הורד QR Code
+                {t.share.downloadQr}
               </button>
             </div>
           </div>
@@ -275,13 +282,11 @@ export default function SharePage({
             style={{ borderColor: 'var(--dash-glass-border)' }}
           >
             <h2 className="text-lg font-semibold mb-6 flex items-center gap-2" style={{ color: 'var(--dash-text)' }}>
-              <Link2 className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-              לינקים
-            </h2>
+              <Link2 className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />{t.share.linksTitle}</h2>
 
             {/* Basic Link */}
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>לינק בסיסי</label>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>{t.share.basicLink}</label>
               <div className="flex items-center gap-2">
                 <div
                   className="flex-1 px-4 py-3 rounded-xl text-sm truncate"
@@ -313,7 +318,7 @@ export default function SharePage({
 
             {/* UTM Link Builder */}
             <div className="pt-6" style={{ borderTop: '1px solid var(--dash-border)' }}>
-              <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>לינק עם מעקב (UTM)</label>
+              <label className="block text-sm font-medium mb-3" style={{ color: 'var(--dash-text-2)' }}>{t.share.trackedLink}</label>
 
               {/* Source Selection */}
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-4">
@@ -345,7 +350,7 @@ export default function SharePage({
                     type="text"
                     value={customSource}
                     onChange={(e) => setCustomSource(e.target.value)}
-                    placeholder="מקור (source)"
+                    placeholder={t.share.sourceLabel}
                     className="rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                   />
@@ -353,7 +358,7 @@ export default function SharePage({
                     type="text"
                     value={customMedium}
                     onChange={(e) => setCustomMedium(e.target.value)}
-                    placeholder="אמצעי (medium)"
+                    placeholder={t.share.mediumLabel}
                     className="rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
                   />
@@ -365,7 +370,7 @@ export default function SharePage({
                 type="text"
                 value={customCampaign}
                 onChange={(e) => setCustomCampaign(e.target.value)}
-                placeholder="שם הקמפיין (אופציונלי)"
+                placeholder={t.share.campaignPlaceholder}
                 className="w-full rounded-xl px-4 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid' }}
               />
@@ -398,23 +403,23 @@ export default function SharePage({
           className="mt-8 glass-card rounded-2xl p-6 animate-slide-up"
           style={{ borderColor: 'var(--dash-glass-border)', background: 'rgba(255,255,255,0.03)' }}
         >
-          <h3 className="font-semibold mb-4" style={{ color: 'var(--dash-text)' }}>💡 טיפים לשיתוף</h3>
+          <h3 className="font-semibold mb-4" style={{ color: 'var(--dash-text)' }}>{t.share.tipsTitle}</h3>
           <ul className="space-y-2 text-sm" style={{ color: 'var(--dash-text-2)' }}>
             <li className="flex items-start gap-2">
               <span style={{ color: 'var(--color-primary)' }}>•</span>
-              הוסיפו את הלינק לביו באינסטגרם או ב-Linktree
+              {t.share.tipBio}
             </li>
             <li className="flex items-start gap-2">
               <span style={{ color: 'var(--color-primary)' }}>•</span>
-              השתמשו ב-QR Code בסטוריז או בפוסטים
+              {t.share.tipStories}
             </li>
             <li className="flex items-start gap-2">
               <span style={{ color: 'var(--color-primary)' }}>•</span>
-              לינקים עם UTM יעזרו לכם לעקוב מאיפה מגיעים המבקרים
+              {t.share.tipUtm}
             </li>
             <li className="flex items-start gap-2">
               <span style={{ color: 'var(--color-primary)' }}>•</span>
-              שנו את שם הקמפיין לכל פרסום שונה למעקב מדויק
+              {t.share.tipCampaign}
             </li>
           </ul>
         </div>

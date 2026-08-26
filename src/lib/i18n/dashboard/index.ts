@@ -31,6 +31,9 @@ import { login } from './login';
 import { manage } from './manage';
 import { tutorial } from './tutorial';
 import { common } from './common';
+import { share } from './share';
+import { valueProof } from './valueProof';
+import { widgetEditor } from './widgetEditor';
 
 export type DashboardLang = 'he' | 'en';
 
@@ -56,6 +59,9 @@ const STRINGS = {
     manage: manage.he,
     tutorial: tutorial.he,
     common: common.he,
+    share: share.he,
+    valueProof: valueProof.he,
+    widgetEditor: widgetEditor.he,
   },
   en: {
     nav: nav.en,
@@ -78,6 +84,9 @@ const STRINGS = {
     manage: manage.en,
     tutorial: tutorial.en,
     common: common.en,
+    share: share.en,
+    valueProof: valueProof.en,
+    widgetEditor: widgetEditor.en,
   },
 } as const;
 

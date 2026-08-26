@@ -79,8 +79,11 @@ export default function CookieConsent() {
       setLang('en');
       return;
     }
-    // On an account chat page (/chat/<username>), localize to the account language.
-    const m = path.match(/^\/chat\/([^/?#]+)/);
+    // On an account surface, localize to the account language. Both the public
+    // chat page AND the owner dashboard — the banner renders from the root layout,
+    // outside the dashboard's own i18n, so an English customer logging in to their
+    // own dashboard was greeted by a Hebrew cookie banner.
+    const m = path.match(/^\/(?:chat|influencer)\/([^/?#]+)/);
     if (!m) return;
     fetch(`/api/account/language?username=${encodeURIComponent(m[1])}`)
       .then((r) => r.json())

@@ -14,6 +14,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 
 interface Turn {
   role: 'user' | 'assistant';
@@ -46,12 +47,38 @@ export function linkifyBarePaths(text: string): string {
   return text.replace(BARE_PATH, '[$1]($1)');
 }
 
-const STARTERS = [
+const STARTERS_HE = [
   { label: 'מה קרה השבוע?', message: 'מה קרה בחשבון שלי השבוע?' },
   { label: 'על מה הבוט לא ידע?', message: 'על אילו שאלות הבוט שלי לא ידע לענות?' },
   { label: 'יש משהו לא תקין?', message: 'יש משהו לא תקין בחשבון שלי?' },
   { label: 'איך משנים…', message: 'איך משנים את האישיות של הבוט?' },
 ];
+
+const STARTERS_EN = [
+  { label: 'How was this week?', message: 'What happened on my account this week?' },
+  { label: "What couldn't it answer?", message: "Which questions did my assistant fail to answer?" },
+  { label: 'Anything broken?', message: 'Is anything wrong with my account?' },
+  { label: 'How do I change…', message: "How do I change my assistant's personality?" },
+];
+
+/** Assistant chrome. It floats above every dashboard page, so it is the one
+ *  component an English customer sees on all of them. */
+const ASSIST = {
+  he: {
+    starters: STARTERS_HE,
+    open: 'פתח את בסטי', alt: 'בסטי', newChat: 'שיחה חדשה', close: 'סגור',
+    ask: 'שאלו משהו…',
+    errGeneric: 'משהו השתבש. נסו שוב בעוד רגע.',
+    errConnect: 'לא הצלחתי להתחבר. נסו שוב.',
+  },
+  en: {
+    starters: STARTERS_EN,
+    open: 'Open Bestie', alt: 'Bestie', newChat: 'New chat', close: 'Close',
+    ask: 'Ask me anything…',
+    errGeneric: 'Something went wrong. Please try again in a moment.',
+    errConnect: "I couldn't connect. Please try again.",
+  },
+};
 
 /**
  * Conversation state survives two different things, and they need two different
@@ -84,6 +111,8 @@ function loadSaved(username: string): { turns: Turn[]; open: boolean } {
 }
 
 export default function DashboardAssistant({ username }: { username: string }) {
+  const { lang } = useDashboardLang(username);
+  const A = lang === 'en' ? ASSIST.en : ASSIST.he;
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -150,11 +179,11 @@ export default function DashboardAssistant({ username }: { username: string }) {
         ...prev,
         {
           role: 'assistant',
-          content: data?.reply || 'משהו השתבש. נסו שוב בעוד רגע.',
+          content: data?.reply || A.errGeneric,
         },
       ]);
     } catch {
-      setTurns(prev => [...prev, { role: 'assistant', content: 'לא הצלחתי להתחבר. נסו שוב.' }]);
+      setTurns(prev => [...prev, { role: 'assistant', content: A.errConnect }]);
     } finally {
       setBusy(false);
     }
@@ -164,7 +193,7 @@ export default function DashboardAssistant({ username }: { username: string }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        aria-label="פתח את בסטי"
+        aria-label={A.open}
         style={{
           position: 'fixed', bottom: 20, left: 20, zIndex: 60,
           width: 60, height: 60, borderRadius: 999, border: 'none', cursor: 'pointer',
@@ -175,7 +204,7 @@ export default function DashboardAssistant({ username }: { username: string }) {
       >
         {/* The mark carries its own gradient, so it sits on white rather than
             on the brand gradient — layering both muddies it. */}
-        <img src={BRAND.icon} alt="בסטי" style={{ width: '100%', height: '100%' }} />
+        <img src={BRAND.icon} alt={A.alt} style={{ width: '100%', height: '100%' }} />
       </button>
     );
   }
@@ -220,19 +249,19 @@ export default function DashboardAssistant({ username }: { username: string }) {
           {turns.length > 0 && (
             <button
               onClick={clearChat}
-              aria-label="שיחה חדשה"
-              title="שיחה חדשה"
+              aria-label={A.newChat}
+              title={A.newChat}
               style={{
                 background: 'rgba(255,255,255,.18)', border: 'none', color: '#fff',
                 fontSize: 12, cursor: 'pointer', borderRadius: 8, padding: '4px 8px',
               }}
             >
-              שיחה חדשה
+              {A.newChat}
             </button>
           )}
           <button
             onClick={() => setOpen(false)}
-            aria-label="סגור"
+            aria-label={A.close}
             style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer' }}
           >
             ×
@@ -251,7 +280,7 @@ export default function DashboardAssistant({ username }: { username: string }) {
             <p style={{ fontSize: 14, opacity: 0.7, margin: '0 0 4px' }}>
               אני רואה את החשבון שלך ואת המסך שאתה נמצא בו. אפשר להתחיל מכאן:
             </p>
-            {STARTERS.map(s => (
+            {A.starters.map(s => (
               <button
                 key={s.label}
                 onClick={() => send(s.message)}
@@ -364,7 +393,7 @@ export default function DashboardAssistant({ username }: { username: string }) {
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="שאלו משהו…"
+          placeholder={A.ask}
           disabled={busy}
           style={{
             flex: 1, padding: '10px 12px', borderRadius: 10, fontSize: 14,

@@ -21,6 +21,27 @@ export default function InfluencerLayout({
   const dir = dashboardDir(lang);
   const showNav = !pathname.endsWith('/login');
 
+  // ── Page shell direction ────────────────────────────────────────────────────
+  // The inner container below already gets dir={dir}, but the root layout pins
+  // <html lang="he" dir="rtl"> for the whole app. Everything rendered OUTSIDE this
+  // layout's div — the cookie banner, the Bestie assistant, portals, toasts — and
+  // the browser's own chrome (scrollbar side) therefore stayed right-to-left on an
+  // English account, which is what makes the page still read as RTL even though
+  // the content is not. Cleanup restores the Hebrew default on the way out.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (dir !== 'ltr') return;
+    const root = document.documentElement;
+    const prevDir = root.getAttribute('dir');
+    const prevLang = root.getAttribute('lang');
+    root.setAttribute('dir', 'ltr');
+    root.setAttribute('lang', 'en');
+    return () => {
+      root.setAttribute('dir', prevDir ?? 'rtl');
+      root.setAttribute('lang', prevLang ?? 'he');
+    };
+  }, [dir]);
+
   // Metric 10 — the brand opening its own system. Once per browser session, not
   // per navigation, so the number means "visits" and not "clicks". Never blocks
   // the render, and the login screen is excluded.

@@ -6,11 +6,12 @@
  * different depending on where you read it.
  *
  * The single non-negotiable rule lives in MetricCell: a metric whose
- * `measured` is false renders "לא נמדד" plus the reason. It never renders 0 —
+ * `measured` is false renders T.notMeasured plus the reason. It never renders 0 —
  * a zero reads as a result, and this whole surface exists to stop that.
  */
 
 import type { ReactNode } from 'react';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 export interface Metric<T = number> {
   value: T | null;
@@ -51,20 +52,22 @@ export interface ValueProofData {
 
 export const ils = (n: number) => `₪${Math.round(n).toLocaleString('he-IL')}`;
 export const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
-const hours = (sec: number) => `${(sec / 3600).toFixed(1)} שעות`;
-const ms = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)} שניות` : `${Math.round(v)} מ״ש`);
+// These take the bundle rather than closing over one: they are module-level, and
+// the same module renders both a Hebrew admin view and an English brand view.
+const hours = (sec: number, T: any) => `${(sec / 3600).toFixed(1)} ${T.hours}`;
+const ms = (v: number, T: any) => (v >= 1000 ? `${(v / 1000).toFixed(1)} ${T.seconds}` : `${Math.round(v)} ${T.ms}`);
 
-const TRIGGER_LABELS: Record<string, string> = {
-  human_demand: 'הלקוח ביקש נציג אנושי',
-  sustained_anger: 'כעס מתמשך',
-  legal: 'איום משפטי',
-};
+const triggerLabels = (T: any): Record<string, string> => ({
+  human_demand: T.reqHuman,
+  sustained_anger: T.sustainedAnger,
+  legal: T.legalThreat,
+});
 
-export function MetricCell({ m, render }: { m?: Metric<any>; render: (v: any) => string }) {
+export function MetricCell({ m, render, T }: { m?: Metric<any>; render: (v: any) => string; T: any }) {
   if (!m || !m.measured) {
     return (
       <div>
-        <div className="vp-unmeasured">לא נמדד</div>
+        <div className="vp-unmeasured">{T.notMeasured}</div>
         {m?.basis ? <div className="vp-basis">{m.basis}</div> : null}
       </div>
     );
@@ -72,7 +75,7 @@ export function MetricCell({ m, render }: { m?: Metric<any>; render: (v: any) =>
   return (
     <div>
       <div className="vp-value">{render(m.value)}</div>
-      {m.lowConfidence ? <div className="vp-lowconf">מדגם קטן · n={m.n}</div> : null}
+      {m.lowConfidence ? <div className="vp-lowconf">{T.smallSample}· n={m.n}</div> : null}
     </div>
   );
 }
@@ -96,62 +99,74 @@ function Section({ title, note, children }: { title: string; note?: string; chil
   );
 }
 
-export default function ValueProofView({ data, audience }: { data: ValueProofData; audience: 'admin' | 'brand' }) {
+export default function ValueProofView({
+  data,
+  audience,
+  language,
+}: {
+  data: ValueProofData;
+  audience: 'admin' | 'brand';
+  /** Account language. Defaults to Hebrew so the admin and report callers, which
+   *  are internal and Hebrew-facing, render exactly as before. */
+  language?: 'he' | 'en';
+}) {
+  const T = getDashboardStrings(language === 'en' ? 'en' : 'he').valueProof;
   const d = data;
   return (
     <div className="vp-root" dir="rtl">
       <Section
-        title="הכנסה שנוצרה בשיחות"
-        note="שלוש שכבות ייחוס נפרדות. כל שכבה אומרת משהו אחר, ולכן הן לא נסכמות למספר אחד בלי הפילוח לידו."
+        title={T.revenueFromChats}
+        note={T.attributionNote}
       >
-        <Stat label="סה״כ מיוחס"><MetricCell m={d.revenue.total} render={ils} /></Stat>
-        <Stat label="מלינק של הבוט"><MetricCell m={d.revenue.byTier.direct} render={ils} /></Stat>
-        <Stat label="דיבר ואז קנה"><MetricCell m={d.revenue.byTier.assisted} render={ils} /></Stat>
-        <Stat label="זוהה בטלפון או מייל"><MetricCell m={d.revenue.byTier.influenced} render={ils} /></Stat>
-        <Stat label="הזמנות — מלינק"><MetricCell m={d.revenue.orders.direct} render={String} /></Stat>
-        <Stat label="הזמנות — דיבר ואז קנה"><MetricCell m={d.revenue.orders.assisted} render={String} /></Stat>
-        <Stat label="הזמנות — טלפון/מייל"><MetricCell m={d.revenue.orders.influenced} render={String} /></Stat>
-        <Stat label="שיעור המרת שיחה"><MetricCell m={d.conversion} render={pct} /></Stat>
+        <Stat label={T.totalAttributed}><MetricCell T={T} m={d.revenue.total} render={ils} /></Stat>
+        <Stat label={T.fromBotLink}><MetricCell T={T} m={d.revenue.byTier.direct} render={ils} /></Stat>
+        <Stat label={T.talkedThenBought}><MetricCell T={T} m={d.revenue.byTier.assisted} render={ils} /></Stat>
+        <Stat label={T.matchedByContact}><MetricCell T={T} m={d.revenue.byTier.influenced} render={ils} /></Stat>
+        <Stat label={T.ordersFromLink}><MetricCell T={T} m={d.revenue.orders.direct} render={String} /></Stat>
+        <Stat label={T.ordersTalked}><MetricCell T={T} m={d.revenue.orders.assisted} render={String} /></Stat>
+        <Stat label={T.ordersContact}><MetricCell T={T} m={d.revenue.orders.influenced} render={String} /></Stat>
+        <Stat label={T.chatConversionRate}><MetricCell T={T} m={d.conversion} render={pct} /></Stat>
       </Section>
 
       <Section
-        title="סל ממוצע ועגלות"
-        note="ההשוואה נעשית בתוך אותו חלון זמן ומול הזמנות אונליין בלבד — בלי מכירות קופה ובלי רשומות באפס שקלים, שאחרת הבסיס מוטה."
+        title={T.basketAndCarts}
+        note="{T.basketNote}"
       >
-        <Stat label="סל ממוצע: עם שיחה מול בלי" wide>
-          <MetricCell m={d.aov} render={(v: Comparison) => `${ils(v.withChat)} מול ${ils(v.without)} · ${v.deltaPct > 0 ? '+' : ''}${v.deltaPct.toFixed(1)}%`} />
+        <Stat label={T.basketWithVsWithout} wide>
+          <MetricCell T={T} m={d.aov} render={(v: Comparison) => `${ils(v.withChat)} {T.versus} ${ils(v.without)} · ${v.deltaPct > 0 ? '+' : ''}${v.deltaPct.toFixed(1)}%`} />
         </Stat>
-        <Stat label="שחזור עגלות נטושות (7 ימים)"><MetricCell m={d.carts.recoveryRate} render={pct} /></Stat>
-        <Stat label="שווי העגלות ששוחזרו"><MetricCell m={d.carts.recoveredValue} render={ils} /></Stat>
-        <Stat label="מהן בנגיעת בסטי"><MetricCell m={d.carts.bestieTouched} render={String} /></Stat>
-        <Stat label="שחזור של הפלטפורמה עצמה"><MetricCell m={d.carts.platformBaseline} render={String} /></Stat>
+        <Stat label={T.cartRecovery}><MetricCell T={T} m={d.carts.recoveryRate} render={pct} /></Stat>
+        <Stat label={T.recoveredCartValue}><MetricCell T={T} m={d.carts.recoveredValue} render={ils} /></Stat>
+        <Stat label={T.ofThoseBestieTouched}><MetricCell T={T} m={d.carts.bestieTouched} render={String} /></Stat>
+        <Stat label={T.platformRecovery}><MetricCell T={T} m={d.carts.platformBaseline} render={String} /></Stat>
       </Section>
 
       <Section
-        title="שירות"
-        note="Deflection נמדד מתוך שיחות שהן באמת פניית שירות — לא מתוך כל השיחות. שיחת ייעוץ על מוצר לא הייתה מגיעה לנציג ממילא."
+        title={T.service}
+        note={T.deflectionNote}
       >
-        <Stat label="פניות שנסגרו בלי אדם"><MetricCell m={d.deflection.rate} render={pct} /></Stat>
-        <Stat label="חיסכון משוער"><MetricCell m={d.deflection.value_ils} render={ils} /></Stat>
-        <Stat label="זמן תגובה ראשון"><MetricCell m={d.responseTime.firstResponse} render={ms} /></Stat>
-        <Stat label="זמן סגירת פנייה (חציון)"><MetricCell m={d.responseTime.timeToClose} render={hours} /></Stat>
-        <Stat label="הבוט הפנה לאדם"><MetricCell m={d.escalation.gaveUpRate} render={pct} /></Stat>
-        <Stat label="פניות שנגע בהן אדם"><MetricCell m={d.escalation.anyHumanRate} render={pct} /></Stat>
-        <Stat label="על מה הבוט מפנה לאדם" wide>
+        <Stat label={T.closedWithoutHuman}><MetricCell T={T} m={d.deflection.rate} render={pct} /></Stat>
+        <Stat label={T.estimatedSaving}><MetricCell T={T} m={d.deflection.value_ils} render={ils} /></Stat>
+        <Stat label={T.firstResponseTime}><MetricCell T={T} m={d.responseTime.firstResponse} render={(v) => ms(v, T)} /></Stat>
+        <Stat label={T.medianResolution}><MetricCell T={T} m={d.responseTime.timeToClose} render={(v) => hours(v, T)} /></Stat>
+        <Stat label={T.escalatedToHuman}><MetricCell T={T} m={d.escalation.gaveUpRate} render={pct} /></Stat>
+        <Stat label={T.humanTouched}><MetricCell T={T} m={d.escalation.anyHumanRate} render={pct} /></Stat>
+        <Stat label={T.escalationReasons} wide>
           <MetricCell
+            T={T}
             m={d.escalation.byReason}
             render={(v: Array<{ reason: string; n: number }>) =>
-              v.map((r) => `${TRIGGER_LABELS[r.reason] || r.reason}: ${r.n}`).join(' · ')}
+              v.map((r) => `${triggerLabels(T)[r.reason] || r.reason}: ${r.n}`).join(' · ')}
           />
         </Stat>
       </Section>
 
       {audience === 'admin' && (
-        <Section title="מדדי מוצר (פנימי)" note="אלה מדדים שלנו על המוצר, לא מדדי ערך של המותג. הם לא מוצגים בדשבורד של הלקוח.">
-          <Stat label="דיוק תשובות"><MetricCell m={d.accuracy} render={String} /></Stat>
-          <Stat label="זמן הקמה"><MetricCell m={d.setup?.days} render={(v) => `${v} ימים`} /></Stat>
-          <Stat label="שעות אדם בהקמה"><MetricCell m={d.setup?.staffHours} render={String} /></Stat>
-          <Stat label="כניסות של הלקוח למערכת"><MetricCell m={d.clientUsage} render={String} /></Stat>
+        <Section title={T.productMetrics} note={T.productMetricsNote}>
+          <Stat label={T.answerAccuracy}><MetricCell T={T} m={d.accuracy} render={String} /></Stat>
+          <Stat label={T.setupTime}><MetricCell T={T} m={d.setup?.days} render={(v) => `${v} ${T.days}`} /></Stat>
+          <Stat label={T.setupPersonHours}><MetricCell T={T} m={d.setup?.staffHours} render={String} /></Stat>
+          <Stat label={T.customerLogins}><MetricCell T={T} m={d.clientUsage} render={String} /></Stat>
         </Section>
       )}
     </div>

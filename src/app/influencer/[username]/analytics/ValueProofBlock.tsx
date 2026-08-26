@@ -9,9 +9,14 @@
 import { useEffect, useState } from 'react';
 import ValueProofView, { type ValueProofData } from '@/components/value-proof/ValueProofView';
 import CostPerTicketPrompt from './CostPerTicketPrompt';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 import '@/components/value-proof/value-proof.css';
 
 export default function ValueProofBlock({ username, days }: { username: string; days: number }) {
+  const { lang } = useDashboardLang(username);
+  const t = getDashboardStrings(lang);
+  const isEn = lang === 'en';
   const [data, setData] = useState<ValueProofData | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
   // Bumped after the brand saves a cost per ticket, so the shekel metric flips
@@ -38,22 +43,22 @@ export default function ValueProofBlock({ username, days }: { username: string; 
 
   return (
     <section className="mt-8">
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-3" dir="rtl">
-        <h2 className="text-base font-semibold">הוכחת ערך</h2>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3" dir={isEn ? 'ltr' : 'rtl'}>
+        <h2 className="text-base font-semibold">{t.valueProof.sectionTitle}</h2>
         <a
           href={`/influencer/${encodeURIComponent(username)}/analytics/report?days=${days}`}
           target="_blank"
           rel="noopener"
           className="text-xs rounded-lg border border-white/15 px-3 py-1.5 hover:bg-white/5 whitespace-nowrap"
         >
-          ייצוא דוח ↗
+          {t.valueProof.exportReport} ↗
         </a>
       </div>
       {state === 'loading'
-        ? <div className="text-sm opacity-60" dir="rtl">טוען…</div>
+        ? <div className="text-sm opacity-60" dir={isEn ? 'ltr' : 'rtl'}>{t.common?.loading ?? (isEn ? 'Loading…' : 'טוען…')}</div>
         : data ? (
           <>
-            <ValueProofView data={data} audience="brand" />
+            <ValueProofView data={data} audience="brand" language={isEn ? 'en' : 'he'} />
             {/* Shown only when deflection itself is measurable — otherwise the
                 shekel figure has no count to multiply and the prompt is noise. */}
             {data.deflection.rate.measured && (

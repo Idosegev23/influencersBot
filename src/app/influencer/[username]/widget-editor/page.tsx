@@ -24,6 +24,8 @@ import {
   type InlineMountDraft,
 } from '@/lib/widget/inline-draft';
 import { resolveInlineMount } from '@/lib/widget/inline';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 // Caps mirrored from src/lib/widget/banner.ts (not exported there, so kept in
 // sync with resolveBanner's own MAX_EYEBROW/MAX_HEADLINE/MAX_SUBLINE/CTA/label
@@ -88,12 +90,12 @@ const inputStyle = {
 
 type OverrideBadge = 'active' | 'scheduled' | 'ended' | 'invalid';
 
-const OVERRIDE_BADGE_LABEL: Record<OverrideBadge, string> = {
-  active: 'פעיל עכשיו',
-  scheduled: 'מתוזמן',
-  ended: 'הסתיים',
-  invalid: 'תאריכים לא תקינים',
-};
+const overrideBadgeLabel = (t: any): Record<OverrideBadge, string> => ({
+  active: t.widgetEditor.badgeActive,
+  scheduled: t.widgetEditor.badgeScheduled,
+  ended: t.widgetEditor.badgeEnded,
+  invalid: t.widgetEditor.badgeInvalid,
+});
 const OVERRIDE_BADGE_STYLE: Record<OverrideBadge, { bg: string; fg: string }> = {
   active: { bg: '#DCFCE7', fg: '#15803D' },
   scheduled: { bg: '#DBEAFE', fg: '#1D4ED8' },
@@ -164,18 +166,20 @@ function overrideHasStartersContent(row: BannerOverride): boolean {
   return label.trim().length > 0 || items.some((i) => i.trim().length > 0);
 }
 
-const OVERRIDE_FIELD_LABELS: [key: 'eyebrow' | 'headline' | 'subline' | 'starters' | 'teaser' | 'tooltip', label: string][] = [
-  ['eyebrow', 'תגית עילית'],
-  ['headline', 'כותרת ראשית'],
-  ['subline', 'שורת משנה'],
-  ['starters', 'שאלות פתיחה'],
-  ['teaser', 'בועה שמופיעה מעצמה'],
-  ['tooltip', 'בועה ליד הכפתור הסגור'],
+// These label helpers all take `t`: they are module-level (used by pure helpers
+// below) but their labels are translatable, so the bundle has to be handed in.
+const overrideFieldLabelPairs = (t: any): [key: 'eyebrow' | 'headline' | 'subline' | 'starters' | 'teaser' | 'tooltip', label: string][] => [
+  ['eyebrow', t.widgetEditor.eyebrow],
+  ['headline', t.widgetEditor.headline],
+  ['subline', t.widgetEditor.subhead],
+  ['starters', t.widgetEditor.fieldStarters],
+  ['teaser', t.widgetEditor.bubbleAuto],
+  ['tooltip', t.widgetEditor.bubbleIdle],
 ];
 
-/** Which fields this row actually replaces — for the "מחליף: …" summary line. */
-function overrideFieldLabels(row: BannerOverride): string[] {
-  return OVERRIDE_FIELD_LABELS
+/** Which fields this row actually replaces — for the "Replaces: …" summary line. */
+function overrideFieldLabels(row: BannerOverride, t: any): string[] {
+  return overrideFieldLabelPairs(t)
     .filter(([key]) => {
       if (key === 'starters') return overrideHasStartersContent(row);
       const v = (row as Record<string, unknown>)[key];
@@ -184,14 +188,14 @@ function overrideFieldLabels(row: BannerOverride): string[] {
     .map(([, label]) => label);
 }
 
-function overrideSurfaceLabel(surface: BannerOverride['surface']): string {
-  if (surface === 'widget') return 'ווידג׳ט בלבד';
-  if (surface === 'chat') return 'צ׳אט בלבד';
-  return 'ווידג׳ט וצ׳אט';
+function overrideSurfaceLabel(surface: BannerOverride['surface'], t: any): string {
+  if (surface === 'widget') return t.widgetEditor.widgetOnly;
+  if (surface === 'chat') return t.widgetEditor.chatOnly;
+  return t.widgetEditor.widgetAndChat;
 }
 
-function overrideWindowLabel(row: BannerOverride): string {
-  return `${row.from || 'ללא תאריך התחלה'} – ${row.until || 'ללא תאריך סיום'}`;
+function overrideWindowLabel(row: BannerOverride, t: any): string {
+  return `${row.from || t.widgetEditor.noStartDate} – ${row.until || t.widgetEditor.noEndDate}`;
 }
 
 function makeOverrideId(): string {
@@ -218,6 +222,8 @@ function withStableIds(rows: BannerOverride[]): BannerOverride[] {
 export default function WidgetEditorPage() {
   const params = useParams();
   const username = params.username as string;
+  const { lang } = useDashboardLang(username);
+  const t = getDashboardStrings(lang);
 
   const [accountId, setAccountId] = useState<string>('');
   const [brandName, setBrandName] = useState<string>('');
@@ -433,7 +439,7 @@ export default function WidgetEditorPage() {
         // the catch below is defense in depth, not the primary path.
         if (!influencer) {
           setLoadState('failed');
-          setLoadError('לא הצלחנו לטעון את הגדרות הווידג׳ט. ייתכן שהחיבור נכשל או שהחשבון לא נמצא.');
+          setLoadError(t.widgetEditor.loadFailedLong);
           return;
         }
         const rawConfig = (influencer as any)._rawConfig || {};
@@ -446,7 +452,7 @@ export default function WidgetEditorPage() {
         console.error('[widget-editor] failed to load account:', err);
         if (!cancelled) {
           setLoadState('failed');
-          setLoadError('לא הצלחנו לטעון את הגדרות הווידג׳ט. ייתכן שהחיבור נכשל או שהחשבון לא נמצא.');
+          setLoadError(t.widgetEditor.loadFailedLong);
         }
       }
     })();
@@ -743,7 +749,7 @@ export default function WidgetEditorPage() {
     // (see hasInvalidOverrideDates), but handleSave itself must never post
     // a row sanitizeOverrides will silently drop.
     if (hasInvalidOverrideDates) {
-      setError('יש לתקן תאריכים לא תקינים במבצעים למעלה (תאריך סיום לפני תאריך התחלה) לפני השמירה.');
+      setError(t.widgetEditor.fixDatesLong);
       return;
     }
     // Defense in depth, mirroring the guard above — the form (and its Save
@@ -752,7 +758,7 @@ export default function WidgetEditorPage() {
     // future change to the render branches can reopen a path where a config
     // that never loaded gets posted over the account's real one.
     if (loadState !== 'loaded') {
-      setError('הגדרות הווידג׳ט עדיין לא נטענו — לא ניתן לשמור.');
+      setError(t.widgetEditor.notLoadedCantSave);
       return;
     }
     setSaving(true);
@@ -817,7 +823,7 @@ export default function WidgetEditorPage() {
             // save itself failed.
             if (!influencer) {
               setRefetchWarning(
-                'השמירה הצליחה, אך לא הצלחנו לרענן את התצוגה. מומלץ לרענן את הדף כדי לוודא שהיא תואמת למה שנשמר בפועל.',
+                t.widgetEditor.saveOkRefreshFailed,
               );
             } else {
               const rawConfig = (influencer as any)._rawConfig || {};
@@ -829,7 +835,7 @@ export default function WidgetEditorPage() {
             // is, this must not fall through to applyRawConfig(undefined).
             console.error('[widget-editor] post-save refetch failed:', refetchErr);
             setRefetchWarning(
-              'השמירה הצליחה, אך לא הצלחנו לרענן את התצוגה. מומלץ לרענן את הדף כדי לוודא שהיא תואמת למה שנשמר בפועל.',
+              t.widgetEditor.saveOkRefreshFailed,
             );
           }
         }
@@ -837,11 +843,11 @@ export default function WidgetEditorPage() {
         setTimeout(() => setSaved(false), 3000);
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'שמירה נכשלה');
+        setError(data.error || t.widgetEditor.saveFailed);
       }
     } catch (err) {
       console.error('[widget-editor] save failed:', err);
-      setError('שמירה נכשלה');
+      setError(t.widgetEditor.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -870,16 +876,14 @@ export default function WidgetEditorPage() {
           style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)' }}
         >
           <p className="text-sm" style={{ color: '#dc2626' }}>
-            {loadError || 'לא הצלחנו לטעון את הגדרות הווידג׳ט.'}
+            {loadError || t.widgetEditor.loadFailed}
           </p>
           <button
             type="button"
             onClick={() => setReloadNonce((n) => n + 1)}
             className="px-4 py-2 rounded-xl text-sm font-medium shadow-lg hover:shadow-xl transition-all duration-200"
             style={{ background: 'var(--color-primary)', color: '#fff' }}
-          >
-            ניסיון נוסף
-          </button>
+          >{t.widgetEditor.retry}</button>
         </div>
       </div>
     );
@@ -889,16 +893,14 @@ export default function WidgetEditorPage() {
     <div className="min-h-screen p-6 animate-slide-up" style={{ background: 'transparent', color: 'var(--dash-text)' }}>
       <div className="max-w-6xl mx-auto space-y-6 animate-slide-up">
         <div>
-          <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>עורך הווידג׳ט</h1>
-          <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>
-            ערכו את מה שהווידג׳ט מציג ברגע הראשון, עם תצוגה מקדימה חיה של הווידג׳ט האמיתי.
-          </p>
+          <h1 className="text-4xl font-bold" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.title}</h1>
+          <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>{t.widgetEditor.subtitle}</p>
         </div>
 
         {liveOverride ? (
           <div className="mb-4 rounded-xl px-4 py-3 text-[13px]" style={{ background: '#FFF4E5', color: '#7a4b00' }}>
-            כרגע פעיל מבצע מתוזמן ({liveOverride.from || 'ללא תאריך התחלה'} – {liveOverride.until || 'ללא תאריך סיום'}) שמכסה חלק מהשדות למטה בתצוגה המקדימה ובווידג׳ט החי.
-            השדות כאן עורכים את הבסיס — מה שיחזור להיות פעיל ברגע שהמבצע יסתיים. שמירה כאן לא משנה את המבצע עצמו.
+            {t.widgetEditor.promoActiveNote} ({liveOverride.from || t.widgetEditor.noStartDate} – {liveOverride.until || t.widgetEditor.noEndDate}) {t.widgetEditor.promoCoversNote}
+            {t.widgetEditor.promoBaseNote}
           </div>
         ) : null}
 
@@ -931,9 +933,7 @@ export default function WidgetEditorPage() {
               style={{ borderColor: 'var(--dash-glass-border)', background: 'var(--dash-bar)' }}
             >
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <span className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
-                  באנר פתיחה בווידג׳ט
-                </span>
+                <span className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.bannerSection}</span>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -945,9 +945,7 @@ export default function WidgetEditorPage() {
                       color: bannerEnabled ? '#fff' : 'var(--dash-text)',
                       border: '1px solid var(--dash-glass-border)',
                     }}
-                  >
-                    פעיל
-                  </button>
+                  >{t.widgetEditor.on}</button>
                   <button
                     type="button"
                     onClick={() => setBannerEnabled(false)}
@@ -958,137 +956,123 @@ export default function WidgetEditorPage() {
                       color: !bannerEnabled ? '#fff' : 'var(--dash-text)',
                       border: '1px solid var(--dash-glass-border)',
                     }}
-                  >
-                    כבוי
-                  </button>
+                  >{t.widgetEditor.off}</button>
                 </div>
               </div>
               <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
                 {bannerEnabled
-                  ? 'הבאנר מוצג למבקרים. השדות שמתחת קובעים את התוכן שלו.'
-                  : 'הבאנר כבוי — השדות שמתחת לא יוצגו לאף מבקר, עד שתחזירו אותו למצב פעיל.'}
+                  ? t.widgetEditor.bannerOnHint
+                  : t.widgetEditor.bannerOffHint}
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
-                תגית עילית
-              </label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.eyebrow}</label>
               <input
                 type="text"
                 value={eyebrow}
                 onChange={(e) => setEyebrow(e.target.value)}
                 maxLength={MAX_EYEBROW}
-                placeholder={resolvedBanner?.eyebrow || 'לדוגמה: חדש'}
+                placeholder={resolvedBanner?.eyebrow || t.widgetEditor.egNew}
                 disabled={saving}
                 className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={inputStyle}
               />
               <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                שורה קצרה מעל הכותרת. {eyebrow.length}/{MAX_EYEBROW} תווים.
+                {t.widgetEditor.eyebrowHint} {eyebrow.length}/{MAX_EYEBROW} {t.widgetEditor.chars}
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
-                כותרת ראשית
-              </label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.headline}</label>
               <input
                 type="text"
                 value={headline}
                 onChange={(e) => setHeadline(e.target.value)}
                 maxLength={MAX_HEADLINE}
-                placeholder={resolvedBanner?.headline || 'היי, אני העוזר של המותג. שאלו אותי כל דבר.'}
+                placeholder={resolvedBanner?.headline || t.widgetEditor.egHeadline}
                 disabled={saving}
                 className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={inputStyle}
               />
               <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                השורה הראשונה שהמבקר רואה כשהווידג׳ט נפתח. {headline.length}/{MAX_HEADLINE} תווים.
+                {t.widgetEditor.headlineHint} {headline.length}/{MAX_HEADLINE} {t.widgetEditor.chars}
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
-                שורת משנה
-              </label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.subhead}</label>
               <input
                 type="text"
                 value={subline}
                 onChange={(e) => setSubline(e.target.value)}
                 maxLength={MAX_SUBLINE}
-                placeholder={resolvedBanner?.subline || 'משפט קצר שמסביר מה אפשר לשאול'}
+                placeholder={resolvedBanner?.subline || t.widgetEditor.egSubhead}
                 disabled={saving}
                 className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={inputStyle}
               />
               <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                {subline.length}/{MAX_SUBLINE} תווים.
+                {subline.length}/{MAX_SUBLINE} {t.widgetEditor.chars}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
-                  טקסט כפתור
-                </label>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.ctaLabel}</label>
                 <input
                   type="text"
                   value={ctaLabel}
                   onChange={(e) => setCtaLabel(e.target.value)}
                   maxLength={MAX_CTA_LABEL}
-                  placeholder={resolvedBanner?.cta?.label || 'לדוגמה: דברו איתי'}
+                  placeholder={resolvedBanner?.cta?.label || t.widgetEditor.egCtaLabel}
                   disabled={saving}
                   className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   style={inputStyle}
                 />
                 <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                  {ctaLabel.length}/{MAX_CTA_LABEL} תווים.
+                  {ctaLabel.length}/{MAX_CTA_LABEL} {t.widgetEditor.chars}
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
-                  מה הכפתור עושה
-                </label>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.ctaValue}</label>
                 <input
                   type="text"
                   value={ctaValue}
                   onChange={(e) => setCtaValue(e.target.value)}
                   maxLength={MAX_CTA_VALUE}
-                  placeholder={resolvedBanner?.cta?.value || 'הטקסט שיוזן אוטומטית לתיבת הצ׳אט'}
+                  placeholder={resolvedBanner?.cta?.value || t.widgetEditor.egCtaValue}
                   disabled={saving}
                   className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   style={inputStyle}
                 />
                 <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                  {ctaValue.length}/{MAX_CTA_VALUE} תווים.
+                  {ctaValue.length}/{MAX_CTA_VALUE} {t.widgetEditor.chars}
                 </p>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
-                כותרת לרשימת השאלות
-              </label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.questionsTitle}</label>
               <input
                 type="text"
                 value={startersLabel}
                 onChange={(e) => setStartersLabel(e.target.value)}
                 maxLength={MAX_STARTERS_LABEL}
-                placeholder={resolvedBanner?.starters?.label || 'לדוגמה: שאלות נפוצות'}
+                placeholder={resolvedBanner?.starters?.label || t.widgetEditor.egQuestionsTitle}
                 disabled={saving}
                 className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={inputStyle}
               />
               <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                {startersLabel.length}/{MAX_STARTERS_LABEL} תווים.
+                {startersLabel.length}/{MAX_STARTERS_LABEL} {t.widgetEditor.chars}
               </p>
             </div>
 
             <div>
               <p className="text-xs text-[#655e51]">
-                בלי שאלות משלכם, הווידג׳ט מציע שאלות שמתעדכנות לבד לפי התוכן שלכם.
-                ברגע שתכתבו שאלות כאן, הן יוצגו כמו שהן ולא יתעדכנו.
+                {t.widgetEditor.questionsHintA}
+                {t.widgetEditor.questionsHintB}
               </p>
               <div className="space-y-2 mt-2">
                 {starterItems.map((item, index) => (
@@ -1098,7 +1082,7 @@ export default function WidgetEditorPage() {
                       value={item}
                       onChange={(e) => updateStarterItem(index, e.target.value)}
                       maxLength={MAX_STARTER_ITEM}
-                      placeholder={`שאלה ${index + 1}`}
+                      placeholder={`${t.widgetEditor.questionN} ${index + 1}`}
                       disabled={saving}
                       className="flex-1 px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                       style={inputStyle}
@@ -1109,9 +1093,7 @@ export default function WidgetEditorPage() {
                       disabled={saving}
                       className="px-3 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: 'var(--dash-bar)', color: '#dc2626', border: '1px solid var(--dash-glass-border)' }}
-                    >
-                      הסרה
-                    </button>
+                    >{t.widgetEditor.remove}</button>
                   </div>
                 ))}
               </div>
@@ -1122,26 +1104,20 @@ export default function WidgetEditorPage() {
                   disabled={saving}
                   className="mt-2 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ color: 'var(--color-primary)' }}
-                >
-                  + הוספת שאלה
-                </button>
+                >{t.widgetEditor.addQuestion}</button>
               ) : null}
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
-                סרטוני רילס ברקע הווידג׳ט
-              </label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.reelsSection}</label>
               {!reelsLoaded ? (
-                <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>טוען סרטונים…</p>
+                <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>{t.widgetEditor.loadingReels}</p>
               ) : reelsFailed ? (
                 <p className="text-sm" style={{ color: '#dc2626' }}>
-                  לא הצלחנו לטעון את רשימת הסרטונים כרגע. רענון הדף בדרך כלל פותר את זה — הסרטונים שכבר נבחרו לא נפגעו.
+                  {t.widgetEditor.reelsLoadFailed}
                 </p>
               ) : reelCandidates.length === 0 ? (
-                <p className="text-sm text-[#655e51]">
-                  עוד לא הופקו סרטונים לחשבון הזה. אחרי הסריקה הבאה הם יופיעו כאן.
-                </p>
+                <p className="text-sm text-[#655e51]">{t.widgetEditor.noReels}</p>
               ) : (
                 <>
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
@@ -1158,9 +1134,9 @@ export default function WidgetEditorPage() {
                           disabled={disabled}
                           title={
                             !isPlayable
-                              ? 'הסרטון הזה עוד לא עובד לשידור — הוא יופיע כאן כשיהיה מוכן'
+                              ? t.widgetEditor.reelNotReady
                               : candidate.postMissing
-                              ? 'הפוסט המקורי כבר לא באינסטגרם, אבל הסרטון הזה עדיין מוצג בווידג׳ט'
+                              ? t.widgetEditor.reelOrphaned
                               : undefined
                           }
                           className="relative aspect-square rounded-lg overflow-hidden"
@@ -1191,16 +1167,14 @@ export default function WidgetEditorPage() {
                             <span
                               className="absolute bottom-0 inset-x-0 text-center text-[9px] leading-tight px-0.5 py-0.5"
                               style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
-                            >
-                              לא באינסטגרם
-                            </span>
+                            >{t.widgetEditor.notOnInstagram}</span>
                           ) : null}
                         </button>
                       );
                     })}
                   </div>
                   <p className="text-xs text-[#655e51] mt-2">
-                    נבחרו {selectedReels.length} מתוך {MAX_REELS}. הסרטונים מתחלפים בין מבקרים.
+                    {t.widgetEditor.reelsSelected} {selectedReels.length} {t.widgetEditor.reelsOf} {MAX_REELS}. {t.widgetEditor.reelsRotate}
                   </p>
                 </>
               )}
@@ -1208,71 +1182,61 @@ export default function WidgetEditorPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
-                  בועה שמופיעה מעצמה
-                </label>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.bubbleAuto}</label>
                 <input
                   type="text"
                   value={teaser}
                   onChange={(e) => setTeaser(e.target.value)}
                   maxLength={MAX_INVITATION}
-                  placeholder={resolvedInvitation?.teaser || 'לדוגמה: יש לי הנחה בשבילך 👋'}
+                  placeholder={resolvedInvitation?.teaser || t.widgetEditor.egBubbleAuto}
                   disabled={saving}
                   className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   style={inputStyle}
                 />
                 <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                  {teaser.length}/{MAX_INVITATION} תווים.
+                  {teaser.length}/{MAX_INVITATION} {t.widgetEditor.chars}
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>
-                  בועה ליד הכפתור הסגור
-                </label>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.bubbleIdle}</label>
                 <input
                   type="text"
                   value={tooltip}
                   onChange={(e) => setTooltip(e.target.value)}
                   maxLength={MAX_INVITATION}
-                  placeholder={resolvedInvitation?.tooltip || 'לדוגמה: שאלו אותי כל דבר'}
+                  placeholder={resolvedInvitation?.tooltip || t.widgetEditor.egBubbleIdle}
                   disabled={saving}
                   className="w-full px-4 py-2.5 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   style={inputStyle}
                 />
                 <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                  {tooltip.length}/{MAX_INVITATION} תווים. שדה ריק יציג טקסט ברירת מחדל כללי.
+                  {tooltip.length}/{MAX_INVITATION} {t.widgetEditor.charsEmptyDefault}
                 </p>
               </div>
             </div>
 
             <div className="pt-4 border-t" style={{ borderColor: 'var(--dash-glass-border)' }}>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
-                  מבצעים מתוזמנים
-                </label>
+                <label className="block text-sm font-medium" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.promosSection}</label>
                 <button
                   type="button"
                   onClick={addOverride}
                   disabled={saving}
                   className="text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ color: 'var(--color-primary)' }}
-                >
-                  + הוספת מבצע
-                </button>
+                >{t.widgetEditor.addPromo}</button>
               </div>
               <p className="text-xs mb-3" style={{ color: 'var(--dash-text-3)' }}>
-                כל שדה במבצע הוא זמני: הוא מחליף את הבסיס למעלה רק בין התאריכים
-                שנבחרו, ואז חוזר לבד לברירת המחדל. שדה שנשאר ריק לא משנה כלום —
-                אין צורך למלא הכול.
+                {t.widgetEditor.promoTemporaryNote}
               </p>
 
               {overridesDraft.length === 0 ? (
-                <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>אין מבצעים מתוזמנים.</p>
+                <p className="text-sm" style={{ color: 'var(--dash-text-3)' }}>{t.widgetEditor.noPromos}</p>
               ) : (
                 <div className="space-y-3">
                   {overridesDraft.map((row, index) => {
                     const badge = overrideBadgeState(row);
-                    const fieldLabels = overrideFieldLabels(row);
+                    const fieldLabels = overrideFieldLabels(row, t);
                     const isPreviewing = previewingOverrideIndex === index;
                     return (
                       <div
@@ -1293,13 +1257,13 @@ export default function WidgetEditorPage() {
                                 color: OVERRIDE_BADGE_STYLE[badge].fg,
                               }}
                             >
-                              {OVERRIDE_BADGE_LABEL[badge]}
+                              {overrideBadgeLabel(t)[badge]}
                             </span>
                             <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                              {overrideWindowLabel(row)}
+                              {overrideWindowLabel(row, t)}
                             </span>
                             <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                              · {overrideSurfaceLabel(row.surface)}
+                              · {overrideSurfaceLabel(row.surface, t)}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -1313,7 +1277,7 @@ export default function WidgetEditorPage() {
                                 border: '1px solid var(--dash-glass-border)',
                               }}
                             >
-                              {isPreviewing ? 'מוצג בתצוגה המקדימה' : 'תצוגה מקדימה של המבצע'}
+                              {isPreviewing ? t.widgetEditor.shownInPreview : t.widgetEditor.promoPreview}
                             </button>
                             <button
                               type="button"
@@ -1321,27 +1285,21 @@ export default function WidgetEditorPage() {
                               disabled={saving}
                               className="px-2.5 py-1 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                               style={{ color: '#dc2626', border: '1px solid var(--dash-glass-border)' }}
-                            >
-                              הסרה
-                            </button>
+                            >{t.widgetEditor.remove}</button>
                           </div>
                         </div>
 
                         {fieldLabels.length > 0 ? (
                           <p className="text-xs mb-2" style={{ color: 'var(--dash-text-3)' }}>
-                            מחליף: {fieldLabels.join(', ')}
+                            {t.widgetEditor.replacesPrefix}: {fieldLabels.join(', ')}
                           </p>
                         ) : (
-                          <p className="text-xs mb-2" style={{ color: 'var(--dash-text-3)' }}>
-                            לא הוגדר שום שדה — המבצע לא ישנה כלום עד שיתמלא לפחות שדה אחד.
-                          </p>
+                          <p className="text-xs mb-2" style={{ color: 'var(--dash-text-3)' }}>{t.widgetEditor.promoEmpty}</p>
                         )}
 
                         <div className="grid grid-cols-2 gap-2 mb-2">
                           <div>
-                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                              מתאריך
-                            </label>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.widgetEditor.fromDate}</label>
                             <input
                               type="date"
                               value={row.from || ''}
@@ -1352,9 +1310,7 @@ export default function WidgetEditorPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                              עד תאריך
-                            </label>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.widgetEditor.toDate}</label>
                             <input
                               type="date"
                               value={row.until || ''}
@@ -1367,15 +1323,11 @@ export default function WidgetEditorPage() {
                         </div>
 
                         {overrideInvalidDateOrder(row) ? (
-                          <p className="text-xs mb-2" style={{ color: '#dc2626' }}>
-                            תאריך הסיום קודם לתאריך ההתחלה — לא ניתן לשמור עד שהתאריכים יתוקנו.
-                          </p>
+                          <p className="text-xs mb-2" style={{ color: '#dc2626' }}>{t.widgetEditor.endBeforeStart}</p>
                         ) : null}
 
                         <div className="mb-2">
-                          <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                            איפה מוצג
-                          </label>
+                          <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.widgetEditor.whereShown}</label>
                           <select
                             value={row.surface || 'both'}
                             onChange={(e) => updateOverrideField(index, { surface: e.target.value as BannerOverride['surface'] })}
@@ -1383,22 +1335,20 @@ export default function WidgetEditorPage() {
                             className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                             style={inputStyle}
                           >
-                            <option value="both">ווידג׳ט וצ׳אט</option>
-                            <option value="widget">ווידג׳ט בלבד</option>
-                            <option value="chat">צ׳אט בלבד</option>
+                            <option value="both">{t.widgetEditor.widgetAndChat}</option>
+                            <option value="widget">{t.widgetEditor.widgetOnly}</option>
+                            <option value="chat">{t.widgetEditor.chatOnly}</option>
                           </select>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                              תגית עילית
-                            </label>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.widgetEditor.eyebrow}</label>
                             <input
                               type="text"
                               value={overrideField(row, 'eyebrow')}
                               maxLength={MAX_EYEBROW}
-                              placeholder="ללא שינוי"
+                              placeholder={t.widgetEditor.noChange}
                               onChange={(e) => updateOverrideField(index, { eyebrow: e.target.value })}
                               disabled={saving}
                               className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1406,14 +1356,12 @@ export default function WidgetEditorPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                              כותרת ראשית
-                            </label>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.widgetEditor.headline}</label>
                             <input
                               type="text"
                               value={overrideField(row, 'headline')}
                               maxLength={MAX_HEADLINE}
-                              placeholder="ללא שינוי"
+                              placeholder={t.widgetEditor.noChange}
                               onChange={(e) => updateOverrideField(index, { headline: e.target.value })}
                               disabled={saving}
                               className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1421,14 +1369,12 @@ export default function WidgetEditorPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                              שורת משנה
-                            </label>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.widgetEditor.subhead}</label>
                             <input
                               type="text"
                               value={overrideField(row, 'subline')}
                               maxLength={MAX_SUBLINE}
-                              placeholder="ללא שינוי"
+                              placeholder={t.widgetEditor.noChange}
                               onChange={(e) => updateOverrideField(index, { subline: e.target.value })}
                               disabled={saving}
                               className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1436,14 +1382,12 @@ export default function WidgetEditorPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                              בועה שמופיעה מעצמה
-                            </label>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.widgetEditor.bubbleAuto}</label>
                             <input
                               type="text"
                               value={row.teaser || ''}
                               maxLength={MAX_INVITATION}
-                              placeholder="ללא שינוי"
+                              placeholder={t.widgetEditor.noChange}
                               onChange={(e) => updateOverrideField(index, { teaser: e.target.value })}
                               disabled={saving}
                               className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1451,14 +1395,12 @@ export default function WidgetEditorPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                              בועה ליד הכפתור הסגור
-                            </label>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.widgetEditor.bubbleIdle}</label>
                             <input
                               type="text"
                               value={row.tooltip || ''}
                               maxLength={MAX_INVITATION}
-                              placeholder="ללא שינוי"
+                              placeholder={t.widgetEditor.noChange}
                               onChange={(e) => updateOverrideField(index, { tooltip: e.target.value })}
                               disabled={saving}
                               className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1468,14 +1410,12 @@ export default function WidgetEditorPage() {
                         </div>
 
                         <div className="mt-2">
-                          <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                            כותרת לרשימת השאלות (במבצע)
-                          </label>
+                          <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>{t.widgetEditor.promoQuestionsTitle}</label>
                           <input
                             type="text"
                             value={overrideStarters(row).label}
                             maxLength={MAX_STARTERS_LABEL}
-                            placeholder="ללא שינוי"
+                            placeholder={t.widgetEditor.noChange}
                             onChange={(e) => updateOverrideStartersLabel(index, e.target.value)}
                             disabled={saving}
                             className="w-full px-3 py-2 rounded-lg text-sm outline-none mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1488,7 +1428,7 @@ export default function WidgetEditorPage() {
                                   type="text"
                                   value={item}
                                   maxLength={MAX_STARTER_ITEM}
-                                  placeholder={`שאלה ${itemIndex + 1}`}
+                                  placeholder={`${t.widgetEditor.questionN} ${itemIndex + 1}`}
                                   onChange={(e) => updateOverrideStarterItem(index, itemIndex, e.target.value)}
                                   disabled={saving}
                                   className="flex-1 px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1500,9 +1440,7 @@ export default function WidgetEditorPage() {
                                   disabled={saving}
                                   className="px-3 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                   style={{ background: 'var(--dash-bar)', color: '#dc2626', border: '1px solid var(--dash-glass-border)' }}
-                                >
-                                  הסרה
-                                </button>
+                                >{t.widgetEditor.remove}</button>
                               </div>
                             ))}
                           </div>
@@ -1513,13 +1451,9 @@ export default function WidgetEditorPage() {
                               disabled={saving}
                               className="mt-2 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                               style={{ color: 'var(--color-primary)' }}
-                            >
-                              + הוספת שאלה
-                            </button>
+                            >{t.widgetEditor.addQuestion}</button>
                           ) : null}
-                          <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                            ריק (גם כותרת וגם שאלות) = משאיר את שאלות ברירת המחדל כמו שהן.
-                          </p>
+                          <p className="mt-1.5 text-xs" style={{ color: 'var(--dash-text-3)' }}>{t.widgetEditor.promoQuestionsHint}</p>
                         </div>
                       </div>
                     );
@@ -1529,9 +1463,7 @@ export default function WidgetEditorPage() {
             </div>
 
             {hasInvalidOverrideDates ? (
-              <p className="text-xs" style={{ color: '#dc2626' }}>
-                יש לתקן תאריכים לא תקינים במבצעים למעלה (תאריך סיום לפני תאריך התחלה) לפני השמירה.
-              </p>
+              <p className="text-xs" style={{ color: '#dc2626' }}>{t.widgetEditor.fixDatesLong}</p>
             ) : null}
 
             {error ? (
@@ -1546,7 +1478,7 @@ export default function WidgetEditorPage() {
               <button
                 onClick={handleSave}
                 disabled={saving || hasInvalidOverrideDates}
-                title={hasInvalidOverrideDates ? 'יש לתקן תאריכים לא תקינים במבצעים לפני השמירה' : undefined}
+                title={hasInvalidOverrideDates ? t.widgetEditor.fixDatesShort : undefined}
                 className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50 shadow-lg hover:shadow-xl"
                 style={{ background: saved ? '#17A34A' : 'var(--color-primary)', color: '#fff' }}
               >
@@ -1557,7 +1489,7 @@ export default function WidgetEditorPage() {
                 ) : (
                   <Save className="w-4 h-4" />
                 )}
-                {saved ? 'נשמר!' : 'שמירה'}
+                {saved ? t.widgetEditor.saved : t.widgetEditor.save}
               </button>
             </div>
           </div>
@@ -1574,9 +1506,7 @@ export default function WidgetEditorPage() {
                   color: previewView === 'open' ? '#fff' : 'var(--dash-text)',
                   border: '1px solid var(--dash-glass-border)',
                 }}
-              >
-                צ׳אט פתוח
-              </button>
+              >{t.widgetEditor.chatOpen}</button>
               <button
                 type="button"
                 onClick={() => setPreviewView('teaser')}
@@ -1586,9 +1516,7 @@ export default function WidgetEditorPage() {
                   color: previewView === 'teaser' ? '#fff' : 'var(--dash-text)',
                   border: '1px solid var(--dash-glass-border)',
                 }}
-              >
-                בועה שמופיעה מעצמה
-              </button>
+              >{t.widgetEditor.bubbleAuto}</button>
               <button
                 type="button"
                 onClick={() => setPreviewView('tooltip')}
@@ -1598,9 +1526,7 @@ export default function WidgetEditorPage() {
                   color: previewView === 'tooltip' ? '#fff' : 'var(--dash-text)',
                   border: '1px solid var(--dash-glass-border)',
                 }}
-              >
-                בועה ליד הכפתור הסגור
-              </button>
+              >{t.widgetEditor.bubbleIdle}</button>
             </div>
             {accountId && previewDraft ? (
               <WidgetDraftPreview
