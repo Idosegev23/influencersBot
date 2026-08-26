@@ -165,10 +165,10 @@ export function ReviewPageClient({
           </button>
         </div>
 
-        <h1 className="text-2xl font-bold mb-2 text-right" style={{ color: 'var(--dash-text)' }}>
+        <h1 className="text-2xl font-bold mb-2 text-start" style={{ color: 'var(--dash-text)' }}>
           מילוי ידני - שת"פ חדש
         </h1>
-        <p className="mb-8 text-right" style={{ color: 'var(--dash-text-2)' }}>
+        <p className="mb-8 text-start" style={{ color: 'var(--dash-text-2)' }}>
           מלא את כל הפרטים באופן ידני
         </p>
 
@@ -190,7 +190,7 @@ export function ReviewPageClient({
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-right">
+          <div className="text-start">
             <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>
               סקירת מסמך ואישור
             </h1>
@@ -207,7 +207,7 @@ export function ReviewPageClient({
           className="rounded-lg p-4 flex items-center justify-between"
           style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
         >
-          <div className="text-right">
+          <div className="text-start">
             <div className="text-sm" style={{ color: 'var(--dash-text-2)' }}>קובץ</div>
             <div className="font-medium" style={{ color: 'var(--dash-text)' }}>{document.file_name}</div>
           </div>
@@ -224,7 +224,7 @@ export function ReviewPageClient({
           >
             <div className="flex items-start gap-2">
               <span style={{ color: 'var(--color-warning)' }}>⚠</span>
-              <div className="flex-1 text-right">
+              <div className="flex-1 text-start">
                 <div className="font-medium mb-2" style={{ color: 'var(--color-warning)' }}>
                   שים לב לשדות הבאים:
                 </div>
@@ -247,10 +247,10 @@ export function ReviewPageClient({
             className="rounded-xl border p-4 sticky top-4"
             style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
           >
-            <h3 className="font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
+            <h3 className="font-semibold mb-4 text-start" style={{ color: 'var(--dash-text)' }}>
               תצוגה מקדימה
             </h3>
-            <div className="text-sm space-y-2 text-right" style={{ color: 'var(--dash-text-2)' }}>
+            <div className="text-sm space-y-2 text-start" style={{ color: 'var(--dash-text-2)' }}>
               <div>
                 <span className="font-medium">מותג:</span>{' '}
                 {parsedData.brand_name || '—'}
@@ -289,7 +289,7 @@ export function ReviewPageClient({
             className="rounded-xl border p-6"
             style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
           >
-            <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
+            <h3 className="text-lg font-semibold mb-4 text-start" style={{ color: 'var(--dash-text)' }}>
               פרטים בסיסיים
             </h3>
 
@@ -385,7 +385,7 @@ export function ReviewPageClient({
             className="rounded-xl border p-6"
             style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
           >
-            <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
+            <h3 className="text-lg font-semibold mb-4 text-start" style={{ color: 'var(--dash-text)' }}>
               פרטי קשר
             </h3>
 
@@ -419,7 +419,7 @@ export function ReviewPageClient({
             className="rounded-xl border p-6"
             style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
           >
-            <h3 className="text-lg font-semibold mb-4 text-right" style={{ color: 'var(--dash-text)' }}>
+            <h3 className="text-lg font-semibold mb-4 text-start" style={{ color: 'var(--dash-text)' }}>
               הערות
             </h3>
             <InlineEdit

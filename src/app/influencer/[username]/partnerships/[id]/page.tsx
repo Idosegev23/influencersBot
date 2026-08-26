@@ -415,13 +415,13 @@ export default function PartnershipDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>סטטוס</label>
-              <select value={editData.status || ''} onChange={e => setEditData({ ...editData, status: e.target.value })} className="w-full px-3 py-2 rounded-xl text-sm text-right" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}>
+              <select value={editData.status || ''} onChange={e => setEditData({ ...editData, status: e.target.value })} className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}>
                 {Object.entries(STATUS_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>סכום (₪)</label>
-              <input type="number" value={editData.contract_amount ?? ''} onChange={e => setEditData({ ...editData, contract_amount: parseFloat(e.target.value) || null })} className="w-full px-3 py-2 rounded-xl text-sm text-right" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
+              <input type="number" value={editData.contract_amount ?? ''} onChange={e => setEditData({ ...editData, contract_amount: parseFloat(e.target.value) || null })} className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
             </div>
             <div>
               <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>תאריך התחלה</label>
@@ -433,7 +433,7 @@ export default function PartnershipDetailPage() {
             </div>
             <div className="sm:col-span-2">
               <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>שם קמפיין</label>
-              <input type="text" value={editData.campaign_name ?? ''} onChange={e => setEditData({ ...editData, campaign_name: e.target.value })} className="w-full px-3 py-2 rounded-xl text-sm text-right" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
+              <input type="text" value={editData.campaign_name ?? ''} onChange={e => setEditData({ ...editData, campaign_name: e.target.value })} className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
             </div>
           </div>
 
@@ -446,7 +446,7 @@ export default function PartnershipDetailPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>שם איש קשר</label>
-                <input type="text" value={editData.brand_contact_name ?? ''} onChange={e => setEditData({ ...editData, brand_contact_name: e.target.value })} placeholder="למשל: יוסי כהן" className="w-full px-3 py-2 rounded-xl text-sm text-right" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
+                <input type="text" value={editData.brand_contact_name ?? ''} onChange={e => setEditData({ ...editData, brand_contact_name: e.target.value })} placeholder="למשל: יוסי כהן" className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
               </div>
               <div>
                 <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>וואטסאפ מותג</label>
@@ -491,7 +491,7 @@ export default function PartnershipDetailPage() {
 
           <div>
             <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>הערות</label>
-            <textarea value={editData.notes ?? ''} onChange={e => setEditData({ ...editData, notes: e.target.value })} rows={3} className="w-full px-3 py-2 rounded-xl text-sm text-right" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
+            <textarea value={editData.notes ?? ''} onChange={e => setEditData({ ...editData, notes: e.target.value })} rows={3} className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
           </div>
         </div>
       )}

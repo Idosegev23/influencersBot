@@ -379,11 +379,11 @@ export default function ChatbotSettingsPage() {
               <table className="w-full">
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colDate}</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colStatus}</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colType}</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colDuration}</th>
-                    <th className="text-right p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colResults}</th>
+                    <th className="text-start p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colDate}</th>
+                    <th className="text-start p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colStatus}</th>
+                    <th className="text-start p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colType}</th>
+                    <th className="text-start p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colDuration}</th>
+                    <th className="text-start p-3 text-sm font-semibold" style={{ color: 'var(--dash-text)' }}>{t.chatbotSettings.colResults}</th>
                   </tr>
                 </thead>
                 <tbody>

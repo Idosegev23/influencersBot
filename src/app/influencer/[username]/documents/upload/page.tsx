@@ -40,6 +40,8 @@ import {
   DocumentTypeSelector,
   type DocumentType,
 } from '@/components/documents/DocumentTypeSelector';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 /** Map UI document types to AI parser document types */
 function mapDocumentType(uiType: DocumentType): string {
@@ -60,6 +62,8 @@ export default function DocumentUploadPage({
 }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const { lang } = useDashboardLang(username);
+  const t = getDashboardStrings(lang);
   const router = useRouter();
 
   // State
@@ -168,7 +172,7 @@ export default function DocumentUploadPage({
         {
           id: Date.now().toString(),
           type: 'ai_parsing',
-          message: error.message || 'AI לא הצליח לנתח את המסמך',
+          message: error.message || t.partnershipFlows.d_aiFailed,
           canRetry: true,
         },
       ]);
@@ -209,16 +213,10 @@ export default function DocumentUploadPage({
             className="inline-flex items-center gap-2 text-sm transition-colors mb-4"
             style={{ color: 'var(--dash-text-2)' }}
           >
-            <ArrowRight className="h-4 w-4" />
-            חזרה לשת"פים
-          </Link>
+            <ArrowRight className="h-4 w-4" />{t.partnershipFlows.d_backToPartnerships}</Link>
 
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>
-            העלאת מסמך חדש
-          </h1>
-          <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>
-            העלה מסמכים והמערכת תנתח אותם אוטומטית עם AI
-          </p>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--dash-text)' }}>{t.partnershipFlows.d_uploadTitle}</h1>
+          <p className="mt-2" style={{ color: 'var(--dash-text-2)' }}>{t.partnershipFlows.d_uploadSub}</p>
         </div>
 
         {/* Main Content */}
@@ -229,9 +227,7 @@ export default function DocumentUploadPage({
               <div className="flex items-center justify-center h-8 w-8 rounded-full text-sm font-bold" style={{ background: 'color-mix(in srgb, var(--color-primary) 20%, transparent)', color: 'var(--color-primary)' }}>
                 1
               </div>
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>
-                בחר סוג מסמך
-              </h2>
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>{t.partnershipFlows.d_pickType}</h2>
             </div>
 
             <DocumentTypeSelector
@@ -246,9 +242,7 @@ export default function DocumentUploadPage({
               <div className="flex items-center justify-center h-8 w-8 rounded-full text-sm font-bold" style={{ background: 'color-mix(in srgb, var(--color-primary) 20%, transparent)', color: 'var(--color-primary)' }}>
                 2
               </div>
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>
-                העלה קבצים
-              </h2>
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>{t.partnershipFlows.d_uploadFiles}</h2>
             </div>
 
             <FileUploader
@@ -292,17 +286,15 @@ export default function DocumentUploadPage({
                 <CheckCircle2 className="h-6 w-6 flex-shrink-0" style={{ color: 'var(--dash-positive)' }} />
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--dash-positive)' }}>
-                    {uploadedDocuments.length} מסמכים הועלו בהצלחה!
+                    {uploadedDocuments.length} {t.partnershipFlows.d_uploadedOk}
                   </h3>
                   <p className="text-sm mb-4" style={{ color: 'var(--dash-text-2)' }}>
-                    המסמכים נותחו והוזנו למערכת הצ&#39;אטבוט. התוכן יהיה זמין לשליפה כבר מהסשן הבא.
+                    {t.partnershipFlows.d_analysedNote}
                   </p>
                   <Link
                     href={`/influencer/${username}/documents/review`}
                     className="btn-teal inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors"
-                  >
-                    עבור לסקירה
-                    <ArrowRight className="h-4 w-4 rotate-180" />
+                  >{t.partnershipFlows.d_goToReview}<ArrowRight className="h-4 w-4 rotate-180" />
                   </Link>
                 </div>
               </div>
@@ -311,15 +303,13 @@ export default function DocumentUploadPage({
 
           {/* Instructions */}
           <div className="glass-card rounded-2xl p-4 animate-fade-in relative z-10" style={{ background: 'rgba(59, 130, 246, 0.1)', borderColor: 'var(--dash-glass-border)' }}>
-            <h3 className="text-sm font-medium mb-2" style={{ color: 'var(--color-info)' }}>
-              💡 טיפים:
-            </h3>
+            <h3 className="text-sm font-medium mb-2" style={{ color: 'var(--color-info)' }}>{t.partnershipFlows.d_tips}</h3>
             <ul className="text-sm space-y-1" style={{ color: 'var(--dash-text-2)' }}>
-              <li>• ניתן להעלות מספר קבצים בו-זמנית</li>
-              <li>• המערכת תנתח אוטומטית את המסמכים עם AI</li>
-              <li>• התוכן יוזן אוטומטית לצ&#39;אטבוט ויהיה זמין לשליפה</li>
-              <li>• תוכל לערוך את הנתונים לפני יצירת השת"פ</li>
-              <li>• קבצים נתמכים: PDF, Word, Excel, תמונות</li>
+              <li>{t.partnershipFlows.d_tip1}</li>
+              <li>{t.partnershipFlows.d_tip2}</li>
+              <li>{t.partnershipFlows.d_tip3}</li>
+              <li>{t.partnershipFlows.d_tip4}</li>
+              <li>{t.partnershipFlows.d_tip5}</li>
             </ul>
           </div>
         </div>

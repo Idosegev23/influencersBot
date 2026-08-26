@@ -13,22 +13,33 @@
 import { useEffect, useState } from 'react';
 import ValueProofView, { type ValueProofData } from './ValueProofView';
 import './value-proof.css';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 const HE_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
-function heDate(iso?: string): string {
+
+/** Report dates. Hebrew keeps its hand-written month names; English defers to Intl. */
+function reportDate(iso: string | undefined, isEn: boolean): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
+  if (isEn) {
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
   return `${d.getDate()} ב${HE_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export default function ValueProofReportPage({
   endpoint,
   audience,
+  language,
 }: {
   endpoint: string;
   audience: 'admin' | 'brand';
+  /** Account language. Defaults to Hebrew — the admin-side report is internal. */
+  language?: 'he' | 'en';
 }) {
+  const isEn = language === 'en';
+  const T = getDashboardStrings(isEn ? 'en' : 'he').valueProof;
   const [data, setData] = useState<ValueProofData | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
 
@@ -45,14 +56,14 @@ export default function ValueProofReportPage({
     return () => { alive = false; };
   }, [endpoint]);
 
-  if (state === 'loading') return <div className="vp-page"><p>טוען…</p></div>;
-  if (state === 'failed' || !data) return <div className="vp-page"><p>שגיאה בטעינת הדוח</p></div>;
+  if (state === 'loading') return <div className="vp-page"><p>{T.reportLoading}</p></div>;
+  if (state === 'failed' || !data) return <div className="vp-page"><p>{T.reportError}</p></div>;
 
   const brand = data.brand || {};
   const accent = brand.primaryColor || '#0c1013';
 
   return (
-    <div className="vp-page" dir="rtl" style={{ ['--vp-accent' as any]: accent }}>
+    <div className="vp-page" dir={isEn ? 'ltr' : 'rtl'} style={{ ['--vp-accent' as any]: accent }}>
       <header className="vp-report-head">
         <div className="vp-report-brand">
           {brand.logo ? (
@@ -60,27 +71,26 @@ export default function ValueProofReportPage({
             <img src={brand.logo} alt="" className="vp-report-logo" />
           ) : null}
           <div>
-            <h1 className="vp-report-title">הוכחת ערך</h1>
+            <h1 className="vp-report-title">{T.reportTitle}</h1>
             <p className="vp-report-sub">
               {brand.name || brand.username || ''}
-              {data.window?.since ? ` · ${heDate(data.window.since)} — ${heDate(data.window.until)}` : ''}
+              {data.window?.since ? ` · ${reportDate(data.window.since, isEn)} — ${reportDate(data.window.until, isEn)}` : ''}
             </p>
           </div>
         </div>
         <button type="button" className="vp-print-btn vp-no-print" onClick={() => window.print()}>
-          שמירה כ-PDF
+          {T.savePdf}
         </button>
       </header>
 
       <p className="vp-report-method">
-        כל מספר בדוח מחושב מנתוני האמת של החנות והשיחות. מדד שאין לו מקור נתונים מוצג
-        כ״לא נמדד״ יחד עם הסיבה — ולא כאפס. אחוז שנשען על פחות מ-30 מקרים מסומן כמדגם קטן.
+        {T.reportFooterNote}
       </p>
 
-      <ValueProofView data={data} audience={audience} />
+      <ValueProofView data={data} audience={audience} language={isEn ? 'en' : 'he'} />
 
       <footer className="vp-report-foot">
-        הופק על ידי Bestie · {heDate(new Date().toISOString())}
+        {T.generatedBy} · {reportDate(new Date().toISOString(), isEn)}
       </footer>
     </div>
   );

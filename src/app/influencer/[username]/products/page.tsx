@@ -334,7 +334,7 @@ function ProductCard({ product, onClick, t }: { product: Product; onClick: () =>
   return (
     <button
       onClick={onClick}
-      className="glass-card rounded-2xl p-3 text-right transition-all duration-200 hover:scale-[1.015]"
+      className="glass-card rounded-2xl p-3 text-start transition-all duration-200 hover:scale-[1.015]"
       style={{ border: '1px solid var(--dash-glass-border)' }}
     >
       <div

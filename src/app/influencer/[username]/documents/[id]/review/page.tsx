@@ -268,7 +268,7 @@ export default function DocumentReviewPage() {
             {/* Brief View - Special Display */}
             {document.document_type === 'brief' ? (
               <>
-                <h2 className="text-xl font-semibold mb-6 text-right animate-slide-up" style={{ color: 'var(--dash-text)' }}>
+                <h2 className="text-xl font-semibold mb-6 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>
                   סקירת בריף
                 </h2>
                 <BriefView data={editedData} />
@@ -330,7 +330,7 @@ export default function DocumentReviewPage() {
                   {/* Payment Schedule */}
                   {editedData.paymentTerms?.schedule?.length > 0 && (
                     <div className="mb-6 animate-slide-up">
-                      <p className="text-sm font-medium mb-3 text-right animate-slide-up" style={{ color: 'var(--dash-text)' }}>מועדי תשלום שזוהו:</p>
+                      <p className="text-sm font-medium mb-3 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>מועדי תשלום שזוהו:</p>
                       <div className="space-y-2 animate-slide-up">
                         {editedData.paymentTerms.schedule.map((payment: any, i: number) => (
                           <div
@@ -338,7 +338,7 @@ export default function DocumentReviewPage() {
                             className="flex items-center justify-between rounded-xl p-3 animate-slide-up"
                             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)' }}
                           >
-                            <div className="text-right flex-1 animate-slide-up">
+                            <div className="text-start flex-1 animate-slide-up">
                               <p className="font-bold animate-slide-up" style={{ color: 'var(--dash-positive)' }}>
                                 ₪{payment.amount?.toLocaleString()} ({payment.percentage}%)
                               </p>
@@ -358,7 +358,7 @@ export default function DocumentReviewPage() {
                   {/* Deliverables Details */}
                   {editedData.deliverables?.length > 0 && (
                     <div className="mb-6 animate-slide-up">
-                      <p className="text-sm font-medium mb-3 text-right animate-slide-up" style={{ color: 'var(--dash-text)' }}>דליברבלס שזוהו:</p>
+                      <p className="text-sm font-medium mb-3 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>דליברבלס שזוהו:</p>
                       <ul className="space-y-2 animate-slide-up">
                         {editedData.deliverables.map((d: any, i: number) => (
                           <li
@@ -367,7 +367,7 @@ export default function DocumentReviewPage() {
                             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)' }}
                           >
                             <span className="font-bold animate-slide-up" style={{ color: 'var(--color-info)' }}>{i + 1}.</span>
-                            <span className="flex-1 text-right animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
+                            <span className="flex-1 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
                               {d.quantity && <strong>{d.quantity}x </strong>}
                               {d.type && <span className="font-medium animate-slide-up">{d.type}</span>}
                               {d.description && <> - {d.description}</>}
@@ -386,11 +386,11 @@ export default function DocumentReviewPage() {
 
                   {/* Important Terms Preview */}
                   <div className="mb-6 animate-slide-up">
-                    <p className="text-sm font-medium mb-3 text-right animate-slide-up" style={{ color: 'var(--dash-text)' }}>תנאים חשובים:</p>
+                    <p className="text-sm font-medium mb-3 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>תנאים חשובים:</p>
                     <div className="space-y-2 animate-slide-up">
                       {editedData.exclusivity?.isExclusive && (
                         <div
-                          className="rounded-xl p-3 text-right animate-slide-up"
+                          className="rounded-xl p-3 text-start animate-slide-up"
                           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)' }}
                         >
                           <p className="text-sm font-bold animate-slide-up" style={{ color: 'var(--color-primary)' }}>חוזה אקסקלוסיבי</p>
@@ -404,7 +404,7 @@ export default function DocumentReviewPage() {
 
                       {editedData.terminationClauses?.[0] && (
                         <div
-                          className="rounded-xl p-3 text-right animate-slide-up"
+                          className="rounded-xl p-3 text-start animate-slide-up"
                           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)' }}
                         >
                           <p className="text-xs animate-slide-up" style={{ color: 'var(--color-warning)' }}>{editedData.terminationClauses[0]}</p>
@@ -416,7 +416,7 @@ export default function DocumentReviewPage() {
               </>
             ) : document.document_type === 'quote' ? (
               <>
-                <h2 className="text-xl font-semibold mb-6 text-right animate-slide-up" style={{ color: 'var(--dash-text)' }}>
+                <h2 className="text-xl font-semibold mb-6 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>
                   סקירת הצעת מחיר
                 </h2>
                 <QuoteView data={editedData} />
@@ -426,7 +426,7 @@ export default function DocumentReviewPage() {
             {/* Brand Name */}
             {editedData.brandName !== undefined && (
               <div>
-                <label className="block text-sm font-medium mb-2 text-right animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
+                <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
                   שם המותג
                 </label>
                 <input
@@ -435,7 +435,7 @@ export default function DocumentReviewPage() {
                   onChange={(e) =>
                     setEditedData({ ...editedData, brandName: e.target.value })
                   }
-                  className="w-full px-4 py-2 rounded-xl text-right animate-slide-up"
+                  className="w-full px-4 py-2 rounded-xl text-start animate-slide-up"
                   style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-glass-border)' }}
                 />
               </div>
@@ -444,7 +444,7 @@ export default function DocumentReviewPage() {
             {/* Campaign Name */}
             {editedData.campaignName !== undefined && (
               <div>
-                <label className="block text-sm font-medium mb-2 text-right animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
+                <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
                   שם הקמפיין
                 </label>
                 <input
@@ -453,7 +453,7 @@ export default function DocumentReviewPage() {
                   onChange={(e) =>
                     setEditedData({ ...editedData, campaignName: e.target.value })
                   }
-                  className="w-full px-4 py-2 rounded-xl text-right animate-slide-up"
+                  className="w-full px-4 py-2 rounded-xl text-start animate-slide-up"
                   style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-glass-border)' }}
                 />
               </div>
@@ -462,7 +462,7 @@ export default function DocumentReviewPage() {
             {/* Total Amount */}
             {editedData.totalAmount !== undefined && (
               <div>
-                <label className="block text-sm font-medium mb-2 text-right animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
+                <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
                   סכום כולל (₪)
                 </label>
                 <input
@@ -474,7 +474,7 @@ export default function DocumentReviewPage() {
                       totalAmount: parseFloat(e.target.value) || 0,
                     })
                   }
-                  className="w-full px-4 py-2 rounded-xl text-right animate-slide-up"
+                  className="w-full px-4 py-2 rounded-xl text-start animate-slide-up"
                   style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-glass-border)' }}
                 />
               </div>
@@ -484,7 +484,7 @@ export default function DocumentReviewPage() {
             {editedData.timeline && (
               <div className="grid grid-cols-2 gap-4 animate-slide-up">
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-right animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
+                  <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
                     תאריך התחלה
                   </label>
                   <input
@@ -499,12 +499,12 @@ export default function DocumentReviewPage() {
                         },
                       })
                     }
-                    className="w-full px-4 py-2 rounded-xl text-right animate-slide-up"
+                    className="w-full px-4 py-2 rounded-xl text-start animate-slide-up"
                     style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-glass-border)' }}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-right animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
+                  <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
                     תאריך סיום
                   </label>
                   <input
@@ -519,7 +519,7 @@ export default function DocumentReviewPage() {
                         },
                       })
                     }
-                    className="w-full px-4 py-2 rounded-xl text-right animate-slide-up"
+                    className="w-full px-4 py-2 rounded-xl text-start animate-slide-up"
                     style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--dash-glass-border)', color: 'var(--dash-text)', border: '1px solid var(--dash-glass-border)' }}
                   />
                 </div>
@@ -529,14 +529,14 @@ export default function DocumentReviewPage() {
             {/* Deliverables */}
             {editedData.deliverables && editedData.deliverables.length > 0 && (
               <div>
-                <label className="block text-sm font-medium mb-2 text-right animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
+                <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
                   דליברבלס
                 </label>
                 <div className="space-y-2 animate-slide-up">
                   {editedData.deliverables.map((item: any, index: number) => (
                     <div
                       key={index}
-                      className="p-3 rounded-xl text-right animate-slide-up"
+                      className="p-3 rounded-xl text-start animate-slide-up"
                       style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)' }}
                     >
                       <p className="text-sm animate-slide-up">
@@ -646,11 +646,11 @@ export default function DocumentReviewPage() {
             className="rounded-xl max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto animate-slide-up"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)' }}
           >
-            <h3 className="text-2xl font-bold mb-4 text-right animate-slide-up" style={{ color: 'var(--dash-text)' }}>
+            <h3 className="text-2xl font-bold mb-4 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>
               אישור יצירת משימות
             </h3>
 
-            <p className="mb-6 text-right animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
+            <p className="mb-6 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
               האם ליצור {editedData.tasks?.length || 0} משימות מה{document.document_type === 'brief' ? 'בריף' : 'הסכם'}?
             </p>
 
@@ -659,7 +659,7 @@ export default function DocumentReviewPage() {
               {editedData.tasks?.map((task: any, i: number) => (
                 <div
                   key={i}
-                  className="rounded-xl p-4 text-right animate-slide-up"
+                  className="rounded-xl p-4 text-start animate-slide-up"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)' }}
                 >
                   <div className="flex items-start justify-between mb-2 animate-slide-up">

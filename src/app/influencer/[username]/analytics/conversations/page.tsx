@@ -298,7 +298,7 @@ export default function ConversationAnalyticsPage({
                       {report.topics.slice(0, 15).map((tp) => (
                         <li key={tp.label} className="py-2 flex items-center justify-between gap-3">
                           <button
-                            className={`text-sm text-right hover:underline ${filters.topic === tp.label ? 'font-semibold' : ''}`}
+                            className={`text-sm text-start hover:underline ${filters.topic === tp.label ? 'font-semibold' : ''}`}
                             onClick={() => setFilter({ topic: filters.topic === tp.label ? null : tp.label })}
                           >
                             {tp.label}

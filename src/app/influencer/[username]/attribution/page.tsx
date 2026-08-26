@@ -172,14 +172,14 @@ export default function AttributionPage({ params }: { params: Promise<{ username
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
-                      <th className="px-4 py-3 text-right font-medium">{t.attribution.colSource}</th>
-                      <th className="px-4 py-3 text-right font-medium">{t.attribution.colClicks}</th>
-                      <th className="px-4 py-3 text-right font-medium">{t.attribution.colUnique}</th>
-                      <th className="px-4 py-3 text-right font-medium">{t.attribution.colSessions}</th>
-                      <th className="px-4 py-3 text-right font-medium">{t.attribution.colConversion}</th>
-                      <th className="px-4 py-3 text-right font-medium">{t.attribution.colTickets}</th>
-                      <th className="px-4 py-3 text-right font-medium">{t.attribution.colCouponCopies}</th>
-                      <th className="px-4 py-3 text-right font-medium">{t.attribution.colShareLink}</th>
+                      <th className="px-4 py-3 text-start font-medium">{t.attribution.colSource}</th>
+                      <th className="px-4 py-3 text-start font-medium">{t.attribution.colClicks}</th>
+                      <th className="px-4 py-3 text-start font-medium">{t.attribution.colUnique}</th>
+                      <th className="px-4 py-3 text-start font-medium">{t.attribution.colSessions}</th>
+                      <th className="px-4 py-3 text-start font-medium">{t.attribution.colConversion}</th>
+                      <th className="px-4 py-3 text-start font-medium">{t.attribution.colTickets}</th>
+                      <th className="px-4 py-3 text-start font-medium">{t.attribution.colCouponCopies}</th>
+                      <th className="px-4 py-3 text-start font-medium">{t.attribution.colShareLink}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">

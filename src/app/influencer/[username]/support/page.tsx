@@ -772,7 +772,7 @@ function TicketList({
           <button
             key={t.id}
             onClick={() => onSelect(t.id)}
-            className="w-full text-right p-4 rounded-xl transition-all"
+            className="w-full text-start p-4 rounded-xl transition-all"
             style={{
               background: isSelected ? 'rgba(136,63,226,0.15)' : 'rgba(255,255,255,0.04)',
               border: `1px solid ${isSelected ? '#883fe2' : 'rgba(255,255,255,0.08)'}`,

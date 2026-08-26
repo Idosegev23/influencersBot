@@ -701,9 +701,9 @@ export default function AnalyticsPage({
               <table className="w-full">
                 <thead>
                   <tr className="text-sm" style={{ borderBottom: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-2)' }}>
-                    <th className="text-right py-3 px-4">#</th>
-                    <th className="text-right py-3 px-4">{t.analytics.colProduct}</th>
-                    <th className="text-right py-3 px-4">{t.analytics.colBrand}</th>
+                    <th className="text-start py-3 px-4">#</th>
+                    <th className="text-start py-3 px-4">{t.analytics.colProduct}</th>
+                    <th className="text-start py-3 px-4">{t.analytics.colBrand}</th>
                     <th className="text-center py-3 px-4">{t.analytics.colClicks}</th>
                     <th className="text-center py-3 px-4">{t.analytics.couponsCopied}</th>
                     <th className="text-center py-3 px-4">{t.analytics.colTotalActivity}</th>
@@ -901,17 +901,17 @@ export default function AnalyticsPage({
                   <table className="w-full text-xs">
                     <thead style={{ color: 'var(--dash-text-3)' }}>
                       <tr>
-                        <th className="text-right pb-1">Query</th>
-                        <th className="text-right pb-1">Clicks</th>
-                        <th className="text-right pb-1">Pos.</th>
+                        <th className="text-start pb-1">Query</th>
+                        <th className="text-start pb-1">Clicks</th>
+                        <th className="text-start pb-1">Pos.</th>
                       </tr>
                     </thead>
                     <tbody>
                       {internalSummary.gsc.top_queries.slice(0, 10).map((r, i) => (
                         <tr key={i} style={{ borderTop: '1px solid var(--dash-border)' }}>
                           <td className="py-1 truncate max-w-[160px]" style={{ color: 'var(--dash-text)' }}>{r.query}</td>
-                          <td className="py-1 text-right font-mono" style={{ color: 'var(--dash-text)' }}>{r.clicks}</td>
-                          <td className="py-1 text-right font-mono" style={{ color: 'var(--dash-text-3)' }}>{Number(r.position).toFixed(1)}</td>
+                          <td className="py-1 text-start font-mono" style={{ color: 'var(--dash-text)' }}>{r.clicks}</td>
+                          <td className="py-1 text-start font-mono" style={{ color: 'var(--dash-text-3)' }}>{Number(r.position).toFixed(1)}</td>
                         </tr>
                       ))}
                     </tbody>
