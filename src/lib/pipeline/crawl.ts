@@ -94,7 +94,18 @@ export interface PageFallbacks {
   description?: string;
   ogImage?: string;
   structuredData?: unknown[];
+  /**
+   * Account language. Product fields are prefixed with labels that end up inside
+   * `page_content`, so they reach RAG and get rendered in content cards — an
+   * English account's crawled pages were showing "שם מוצר:" in their excerpts.
+   */
+  language?: 'he' | 'en';
 }
+
+const PRODUCT_LABELS = {
+  he: { name: 'שם מוצר', price: 'מחיר', sale: 'מחיר מבצע', category: 'קטגוריה', desc: 'תיאור', ingredients: 'רכיבים', volume: 'נפח' },
+  en: { name: 'Product', price: 'Price', sale: 'Sale price', category: 'Category', desc: 'Description', ingredients: 'Ingredients', volume: 'Size' },
+};
 
 /**
  * Parse one page's HTML and persist it to `instagram_bio_websites` (the same table
@@ -154,13 +165,14 @@ export async function persistPageHtml(
     // Main content — prefer product fields then rich content selectors, else body.
     let content = '';
     if (product.name) {
-      content += `שם מוצר: ${product.name}\n`;
-      if (product.price) content += `מחיר: ${product.price}\n`;
-      if (product.salePrice) content += `מחיר מבצע: ${product.salePrice}\n`;
-      if (product.category) content += `קטגוריה: ${product.category}\n`;
-      if (product.description) content += `תיאור: ${product.description}\n`;
-      if (product.ingredients) content += `רכיבים: ${product.ingredients}\n`;
-      if (product.volume) content += `נפח: ${product.volume}\n`;
+      const L = fallbacks?.language === 'en' ? PRODUCT_LABELS.en : PRODUCT_LABELS.he;
+      content += `${L.name}: ${product.name}\n`;
+      if (product.price) content += `${L.price}: ${product.price}\n`;
+      if (product.salePrice) content += `${L.sale}: ${product.salePrice}\n`;
+      if (product.category) content += `${L.category}: ${product.category}\n`;
+      if (product.description) content += `${L.desc}: ${product.description}\n`;
+      if (product.ingredients) content += `${L.ingredients}: ${product.ingredients}\n`;
+      if (product.volume) content += `${L.volume}: ${product.volume}\n`;
       content += '\n';
     }
     const contentSelectors = [
@@ -262,7 +274,8 @@ export async function persistPageHtml(
  */
 export async function crawlPageBatch(
   urls: string[],
-  accountId: string
+  accountId: string,
+  language?: 'he' | 'en',
 ): Promise<{ savedPages: number; discoveredLinks: string[] }> {
   const supabase = await createClient();
   let savedPages = 0;
@@ -288,6 +301,7 @@ export async function crawlPageBatch(
         await res.text(),
         accountId,
         supabase,
+        { language },
       );
       if (saved) savedPages++;
       links.push(...discoveredLinks);

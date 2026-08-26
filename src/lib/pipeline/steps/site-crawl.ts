@@ -35,7 +35,7 @@ export async function siteCrawlStep(ctx: StepContext): Promise<StepResult> {
   // and the remaining frontier is worked normally.
   let discoveredLinks: string[] = [];
   try {
-    ({ discoveredLinks } = await crawlPageBatch(batchUrls, ctx.accountId));
+    ({ discoveredLinks } = await crawlPageBatch(batchUrls, ctx.accountId, ctx.state.options?.language));
   } catch (e: any) {
     const message = e?.message || String(e);
     console.error(`[site-crawl] batch of ${batchUrls.length} failed for job ${ctx.jobId}: ${message}`);
@@ -162,6 +162,7 @@ async function apifyCrawlBatch(ctx: StepContext): Promise<StepResult> {
       description: page.description,
       ogImage: page.ogImage,
       structuredData: page.structuredData,
+      language: ctx.state.options?.language,
     });
     if (res.saved) saved++;
   }
