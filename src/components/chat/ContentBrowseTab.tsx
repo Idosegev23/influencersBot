@@ -91,7 +91,7 @@ export default function ContentBrowseTab({
       content_id: item.id,
       title: item.title,
     });
-    const question = `ספר/י לי על: ${item.title}`;
+    const question = `${ui.actions.tellMeAboutPrefix}: ${item.title}`;
     onAskAbout(question);
   };
 

@@ -130,6 +130,8 @@ const STRINGS = {
     actions: {
       loadMore: 'טען עוד',
       askAboutThis: 'שאל על זה',
+      // The message actually SENT to the bot when a content card is clicked.
+      tellMeAboutPrefix: 'ספר/י לי על',
       newConversation: 'שיחה חדשה',
       newConversationTitle: 'שיחה חדשה?',
       newConversationBody: 'השיחה הנוכחית תימחק ותתחיל שיחה חדשה',
@@ -261,6 +263,8 @@ const STRINGS = {
     actions: {
       loadMore: 'Load more',
       askAboutThis: 'Ask about this',
+      // The message actually SENT to the bot when a content card is clicked.
+      tellMeAboutPrefix: 'Tell me about',
       newConversation: 'New chat',
       newConversationTitle: 'Start a new chat?',
       newConversationBody: 'This conversation will be cleared and a new one will start.',
