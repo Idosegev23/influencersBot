@@ -120,6 +120,7 @@ export function ChatInput({
           <MediaAttachButton
             onFileSelected={(file) => media.processMedia(file, username)}
             disabled={disabled || media.isProcessing}
+            language={language === 'en' ? 'en' : 'he'}
           />
         )}
       </div>

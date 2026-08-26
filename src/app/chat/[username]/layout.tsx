@@ -156,7 +156,7 @@ export default async function ChatLayout({
   return (
     <div lang={lang} dir={dir} style={{ direction: dir }}>
       {/* Renders null for anything that isn't a timed demo. */}
-      <DemoCountdownBar access={demoAccess} surface="chat" />
+      <DemoCountdownBar access={demoAccess} surface="chat" language={lang === 'en' ? 'en' : 'he'} />
       {children}
     </div>
   );

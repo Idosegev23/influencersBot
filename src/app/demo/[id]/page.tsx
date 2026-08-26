@@ -103,9 +103,9 @@ export default function DemoPage() {
   const primaryColor = config.theme.primaryColor || '#6366f1';
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100" dir="rtl">
+    <div className="h-screen flex flex-col bg-gray-100" dir={(config as any).language === 'en' ? 'ltr' : 'rtl'}>
       {/* Renders null unless this is a timed demo. */}
-      {config.demo && <DemoCountdownBar access={config.demo} surface="widget" />}
+      {config.demo && <DemoCountdownBar access={config.demo} surface="widget" language={(config as any).language === 'en' ? 'en' : 'he'} />}
       {/* Top banner */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 bg-white border-b border-gray-200 shadow-sm z-20">
         <div className="flex items-center gap-3">

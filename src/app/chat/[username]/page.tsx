@@ -335,6 +335,30 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   // refresh / deep-link doesn't lose attribution. localStorage takes
   // priority unless the URL has a NEW ref (then URL wins and replaces).
   // This silently tags chat / support / coupon events with the slug.
+  // ── Page direction ──────────────────────────────────────────────────────────
+  // The root layout hardcodes <html lang="he" dir="rtl"> for the whole app, so an
+  // English account inherited a right-to-left page: text aligned right, the input
+  // caret on the wrong side, punctuation jumping around mid-sentence. Individual
+  // components had been papering over it with their own dir="ltr", which fixes the
+  // component and not the page.
+  //
+  // Setting it here fixes every descendant at once, and the cleanup restores the
+  // Hebrew default so navigating away from an English account does not leave the
+  // rest of the app LTR.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if ((influencer as any)?.language !== 'en') return;
+    const root = document.documentElement;
+    const prevDir = root.getAttribute('dir');
+    const prevLang = root.getAttribute('lang');
+    root.setAttribute('dir', 'ltr');
+    root.setAttribute('lang', 'en');
+    return () => {
+      root.setAttribute('dir', prevDir ?? 'rtl');
+      root.setAttribute('lang', prevLang ?? 'he');
+    };
+  }, [influencer]);
+
   const refSourceRef = useRef<string | null>(null);
   useEffect(() => {
     if (typeof window === 'undefined') return;

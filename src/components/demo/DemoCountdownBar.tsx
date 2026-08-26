@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * "נותרו N ימים להתנסות" — the slim bar above a live demo.
+ * "N days left in your trial" — the slim bar above a live demo.
  *
  * Renders NOTHING unless the account is a timed demo (`daysLeft !== null`), so
  * every paying account and every demo predating this feature is visually
@@ -16,31 +16,40 @@ interface Props {
   access: Pick<DemoAccess, 'state' | 'daysLeft'>;
   /** Chat page sits on Bestie purple; the widget demo sits on the brand's colour. */
   surface?: 'chat' | 'widget';
+  /** Account language. This bar sits at the very top of the demo — the first
+   *  thing an overseas client reads, and it was Hebrew-only and dir="rtl". */
+  language?: 'he' | 'en';
 }
 
-function label(daysLeft: number): string {
+function label(daysLeft: number, isEn: boolean): string {
+  if (isEn) {
+    if (daysLeft <= 0) return 'Your trial ends today';
+    if (daysLeft === 1) return '1 day left in your trial';
+    return `${daysLeft} days left in your trial`;
+  }
   if (daysLeft <= 0) return 'ההתנסות מסתיימת היום';
   if (daysLeft === 1) return 'נותר יום אחד להתנסות';
   return `נותרו ${daysLeft} ימים להתנסות`;
 }
 
-export function DemoCountdownBar({ access, surface = 'chat' }: Props) {
+export function DemoCountdownBar({ access, surface = 'chat', language }: Props) {
   // Not a timed demo, or already locked (the lock screen speaks for itself).
   if (access.daysLeft === null || access.state === 'locked') return null;
 
+  const isEn = language === 'en';
   const urgent = access.state === 'expiring';
   const bg = urgent ? '#FEF3C7' : surface === 'chat' ? '#F5EDFE' : '#F3F4F6';
   const fg = urgent ? '#92400E' : surface === 'chat' ? BESTIE_PRIMARY : '#374151';
 
   return (
     <div
-      dir="rtl"
+      dir={isEn ? 'ltr' : 'rtl'}
       role="status"
       className="flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-medium"
       style={{ background: bg, color: fg }}
     >
       <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span>{label(access.daysLeft)}</span>
+      <span>{label(access.daysLeft, isEn)}</span>
     </div>
   );
 }

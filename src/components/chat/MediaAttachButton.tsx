@@ -5,9 +5,12 @@ import { useRef } from 'react';
 interface MediaAttachButtonProps {
   onFileSelected: (file: File) => void;
   disabled?: boolean;
+  /** Account language. This is an icon-only button, so the aria-label is the ONLY
+   *  thing a screen reader announces — Hebrew here is not a cosmetic leak. */
+  language?: 'he' | 'en';
 }
 
-export function MediaAttachButton({ onFileSelected, disabled }: MediaAttachButtonProps) {
+export function MediaAttachButton({ onFileSelected, disabled, language }: MediaAttachButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -17,7 +20,7 @@ export function MediaAttachButton({ onFileSelected, disabled }: MediaAttachButto
         className="media-attach-btn"
         onClick={() => inputRef.current?.click()}
         disabled={disabled}
-        aria-label="צרף תמונה או סרטון"
+        aria-label={language === 'en' ? 'Attach a photo or video' : 'צרף תמונה או סרטון'}
       >
         <span className="media-attach-icon" aria-hidden />
       </button>
