@@ -74,6 +74,33 @@ export async function transcribeStep(ctx: StepContext): Promise<StepResult> {
     return { status: 'advance' };
   }
 
+  // ATTEMPT CEILING. A video that fails permanently — an expired fbcdn url, an
+  // unsupported codec, a clip the transcriber always rejects — never gets a
+  // 'completed' row, so `remaining` never reaches zero. Without a bound this step
+  // re-enqueues forever: a real ABA run reached batch 492 on a single stuck video,
+  // roughly 25 minutes of QStash messages, Vercel invocations and Gemini calls
+  // that could not have succeeded, with the job frozen at step 3 of 13 behind it.
+  //
+  // Three passes over the queue is generous for transient failures and still stops
+  // a poisoned item in under a minute.
+  const maxBatches = Math.ceil(total / BATCH_SIZES.transcribe) * 3 + 5;
+  if (ctx.batch >= maxBatches) {
+    const done = total - pending.length;
+    await setCount(ctx.jobId, 'transcribe', { done, total });
+    try {
+      const { getScanJobsRepo } = await import('@/lib/db/repositories/scanJobsRepo');
+      await getScanJobsRepo().addStepLog(
+        ctx.jobId, 'transcribe', 'completed', 100,
+        `תומללו ${done}/${total} סרטונים; ${pending.length} לא ניתנים לתמלול ונוותרו אחרי ${ctx.batch} ניסיונות`,
+      );
+    } catch { /* logging must never fail the job */ }
+    console.warn(
+      `[transcribe] giving up on ${pending.length}/${total} videos for job ${ctx.jobId} after ${ctx.batch} batches:`,
+      pending.map((p) => p.id).join(', '),
+    );
+    return { status: 'advance' };
+  }
+
   // Transcribe the next batch (transcribeVideo + saveTranscription, mirroring
   // content-processor-orchestrator.ts). Per-video failures are non-fatal and are
   // retried on the next re-enqueue.
