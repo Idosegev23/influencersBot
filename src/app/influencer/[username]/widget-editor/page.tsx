@@ -905,6 +905,7 @@ export default function WidgetEditorPage() {
         ) : null}
 
         <InlineMountSection
+          t={t}
           value={inlineDraft}
           onChange={handleInlineChange}
           onStartPicking={togglePicking}

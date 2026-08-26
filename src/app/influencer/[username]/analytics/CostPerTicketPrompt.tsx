@@ -5,7 +5,7 @@
  * have a person handle one support inquiry.
  *
  * It lives HERE, next to the metric it unlocks, rather than buried in settings —
- * a brand reading "חיסכון משוער · לא נמדד" should be one field away from fixing
+ * a brand reading "Estimated saving · Not measured" should be one field away from fixing
  * it. The same value is also editable on the settings page; both write to
  * accounts.config.support.cost_per_ticket.
  *
@@ -14,6 +14,8 @@
  */
 
 import { useState } from 'react';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 export default function CostPerTicketPrompt({
   username,
@@ -24,6 +26,9 @@ export default function CostPerTicketPrompt({
   current: number | null;
   onSaved: () => void;
 }) {
+  const { lang } = useDashboardLang(username);
+  const isEn = lang === 'en';
+  const T = getDashboardStrings(lang).valueProof;
   const [value, setValue] = useState(current === null ? '' : String(current));
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
 
@@ -51,17 +56,13 @@ export default function CostPerTicketPrompt({
   };
 
   return (
-    <div className="vp-cost-prompt vp-no-print" dir="rtl">
+    <div className="vp-cost-prompt vp-no-print" dir={isEn ? 'ltr' : 'rtl'}>
       <div className="vp-cost-copy">
-        <strong>{current === null ? 'רוצים לראות את החיסכון בשקלים?' : 'עלות טיפול בפנייה'}</strong>
-        <span>
-          כמה עולה לכם שאדם מטפל בפנייה אחת. חשבו את זה כעלות חודשית של שירות הלקוחות
-          חלקי מספר הפניות בחודש. המספר הזה שלכם — הוא מה שהופך את הפניות שנחסכו לשקלים.
-          כל עוד השדה ריק, החיסכון מוצג כ״לא נמדד״ ולא כאפס.
-        </span>
+        <strong>{current === null ? T.costPromptCta : T.costPromptTitle}</strong>
+        <span>{T.costPromptBody}</span>
       </div>
       <div className="vp-cost-row">
-        <span className="vp-cost-currency">₪</span>
+        <span className="vp-cost-currency">{isEn ? '$' : '₪'}</span>
         <input
           type="number"
           min={0}
@@ -72,13 +73,13 @@ export default function CostPerTicketPrompt({
           placeholder="12"
           onChange={(e) => { setValue(e.target.value); setState('idle'); }}
           onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
-          aria-label="עלות טיפול בפנייה בשקלים"
+          aria-label={T.costAria}
         />
         <button type="button" className="vp-cost-save" onClick={save} disabled={state === 'saving'}>
-          {state === 'saving' ? 'שומר…' : 'שמירה'}
+          {state === 'saving' ? T.saving : T.save}
         </button>
-        {state === 'saved' && <span className="vp-cost-ok">נשמר ✓</span>}
-        {state === 'failed' && <span className="vp-cost-err">לא נשמר — בדקו את הסכום</span>}
+        {state === 'saved' && <span className="vp-cost-ok">{T.savedOk}</span>}
+        {state === 'failed' && <span className="vp-cost-err">{T.saveErr}</span>}
       </div>
     </div>
   );

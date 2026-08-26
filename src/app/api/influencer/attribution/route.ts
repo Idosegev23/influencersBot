@@ -30,6 +30,8 @@ export async function GET(req: NextRequest) {
   const days = Math.min(180, Math.max(1, Number(url.searchParams.get('days') || '30')));
 
   const accountId = auth.influencer!.id;
+  // The one string this route renders itself; everything else is data.
+  const isEn = (auth.influencer as any)?.language === 'en';
   const sinceIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   const cfg = (auth.influencer as any)?._rawConfig || {};
@@ -40,7 +42,8 @@ export async function GET(req: NextRequest) {
     if (it.coupon_code) refLookup.set(it.coupon_code.toLowerCase(), it.display_name || it.slug);
   }
   const niceName = (slug: string | null) => {
-    if (!slug) return '— ישיר / לא ידוע —';
+    // Rendered verbatim in the attribution table, so it follows the account.
+    if (!slug) return isEn ? '— direct / unknown —' : '— ישיר / לא ידוע —';
     return refLookup.get(slug.toLowerCase()) || slug;
   };
 

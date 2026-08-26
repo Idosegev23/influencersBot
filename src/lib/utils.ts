@@ -26,7 +26,7 @@ export function formatDateTime(dateString: string): string {
 }
 
 // Format relative time (e.g., "2 hours ago")
-export function formatRelativeTime(dateString: string): string {
+export function formatRelativeTime(dateString: string, lang?: 'he' | 'en'): string {
   const now = new Date();
   const date = new Date(dateString);
   const diffMs = now.getTime() - date.getTime();
@@ -35,10 +35,21 @@ export function formatRelativeTime(dateString: string): string {
   const diffHours = Math.floor(diffMinutes / 60);
   const diffDays = Math.floor(diffHours / 24);
 
+  // Every "3 hours ago" on an English dashboard was rendering in Hebrew, on the
+  // one surface that is nothing but timestamps. Defaults to Hebrew so the ~40
+  // existing callers are unchanged.
+  if (lang === 'en') {
+    if (diffSeconds < 60) return 'just now';
+    if (diffMinutes < 60) return diffMinutes === 1 ? '1 minute ago' : `${diffMinutes} minutes ago`;
+    if (diffHours < 24) return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+    if (diffDays < 7) return diffDays === 1 ? 'yesterday' : `${diffDays} days ago`;
+    return formatDate(dateString);
+  }
+
   if (diffSeconds < 60) return 'עכשיו';
   if (diffMinutes < 60) return `לפני ${diffMinutes} דקות`;
   if (diffHours < 24) return `לפני ${diffHours} שעות`;
-  if (diffDays < 7) return `לפני ${diffDays} ימים`;
+  if (diffDays < 7) return diffDays === 1 ? 'אתמול' : `לפני ${diffDays} ימים`;
 
   return formatDate(dateString);
 }

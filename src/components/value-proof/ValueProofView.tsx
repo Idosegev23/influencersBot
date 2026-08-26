@@ -50,7 +50,12 @@ export interface ValueProofData {
   clientUsage?: Metric<number>;
 }
 
+// Currency follows the account. A US trade association being shown its support
+// saving in shekels is not a cosmetic problem. The stored value is a plain
+// number; only the display symbol and grouping change.
 export const ils = (n: number) => `₪${Math.round(n).toLocaleString('he-IL')}`;
+export const money = (n: number, isEn?: boolean) =>
+  isEn ? `$${Math.round(n).toLocaleString('en-US')}` : ils(n);
 export const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 // These take the bundle rather than closing over one: they are module-level, and
 // the same module renders both a Hebrew admin view and an English brand view.
@@ -118,10 +123,10 @@ export default function ValueProofView({
         title={T.revenueFromChats}
         note={T.attributionNote}
       >
-        <Stat label={T.totalAttributed}><MetricCell T={T} m={d.revenue.total} render={ils} /></Stat>
-        <Stat label={T.fromBotLink}><MetricCell T={T} m={d.revenue.byTier.direct} render={ils} /></Stat>
-        <Stat label={T.talkedThenBought}><MetricCell T={T} m={d.revenue.byTier.assisted} render={ils} /></Stat>
-        <Stat label={T.matchedByContact}><MetricCell T={T} m={d.revenue.byTier.influenced} render={ils} /></Stat>
+        <Stat label={T.totalAttributed}><MetricCell T={T} m={d.revenue.total} render={(v) => money(v, language === 'en')} /></Stat>
+        <Stat label={T.fromBotLink}><MetricCell T={T} m={d.revenue.byTier.direct} render={(v) => money(v, language === 'en')} /></Stat>
+        <Stat label={T.talkedThenBought}><MetricCell T={T} m={d.revenue.byTier.assisted} render={(v) => money(v, language === 'en')} /></Stat>
+        <Stat label={T.matchedByContact}><MetricCell T={T} m={d.revenue.byTier.influenced} render={(v) => money(v, language === 'en')} /></Stat>
         <Stat label={T.ordersFromLink}><MetricCell T={T} m={d.revenue.orders.direct} render={String} /></Stat>
         <Stat label={T.ordersTalked}><MetricCell T={T} m={d.revenue.orders.assisted} render={String} /></Stat>
         <Stat label={T.ordersContact}><MetricCell T={T} m={d.revenue.orders.influenced} render={String} /></Stat>
@@ -136,7 +141,7 @@ export default function ValueProofView({
           <MetricCell T={T} m={d.aov} render={(v: Comparison) => `${ils(v.withChat)} {T.versus} ${ils(v.without)} · ${v.deltaPct > 0 ? '+' : ''}${v.deltaPct.toFixed(1)}%`} />
         </Stat>
         <Stat label={T.cartRecovery}><MetricCell T={T} m={d.carts.recoveryRate} render={pct} /></Stat>
-        <Stat label={T.recoveredCartValue}><MetricCell T={T} m={d.carts.recoveredValue} render={ils} /></Stat>
+        <Stat label={T.recoveredCartValue}><MetricCell T={T} m={d.carts.recoveredValue} render={(v) => money(v, language === 'en')} /></Stat>
         <Stat label={T.ofThoseBestieTouched}><MetricCell T={T} m={d.carts.bestieTouched} render={String} /></Stat>
         <Stat label={T.platformRecovery}><MetricCell T={T} m={d.carts.platformBaseline} render={String} /></Stat>
       </Section>
@@ -146,7 +151,7 @@ export default function ValueProofView({
         note={T.deflectionNote}
       >
         <Stat label={T.closedWithoutHuman}><MetricCell T={T} m={d.deflection.rate} render={pct} /></Stat>
-        <Stat label={T.estimatedSaving}><MetricCell T={T} m={d.deflection.value_ils} render={ils} /></Stat>
+        <Stat label={T.estimatedSaving}><MetricCell T={T} m={d.deflection.value_ils} render={(v) => money(v, language === 'en')} /></Stat>
         <Stat label={T.firstResponseTime}><MetricCell T={T} m={d.responseTime.firstResponse} render={(v) => ms(v, T)} /></Stat>
         <Stat label={T.medianResolution}><MetricCell T={T} m={d.responseTime.timeToClose} render={(v) => hours(v, T)} /></Stat>
         <Stat label={T.escalatedToHuman}><MetricCell T={T} m={d.escalation.gaveUpRate} render={pct} /></Stat>

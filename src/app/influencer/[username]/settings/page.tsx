@@ -29,6 +29,8 @@ export default function SettingsPage({
   const username = resolvedParams.username;
   const { lang } = useDashboardLang(username);
   const t = getDashboardStrings(lang).settings;
+  const tAll = getDashboardStrings(lang);
+  const isEn = lang === 'en';
   const router = useRouter();
 
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
@@ -396,15 +398,12 @@ export default function SettingsPage({
 
         {/* ──── Cost per support ticket ──── */}
         <div className="glass-card rounded-2xl p-6">
-          <h2 className="text-base font-semibold mb-1">עלות טיפול בפנייה</h2>
+          <h2 className="text-base font-semibold mb-1">{tAll.valueProof.costPromptTitle}</h2>
           <p className="text-xs opacity-70 leading-relaxed mb-4 max-w-xl">
-            כמה עולה לכם שאדם מטפל בפנייה אחת, בשקלים. המספר הזה שלכם — הוא מה שהופך את
-            הפניות שנחסכו לשקלים בדוח הוכחת הערך. אפשר לחשב אותו כעלות חודשית של שירות
-            הלקוחות חלקי מספר הפניות בחודש. כל עוד השדה ריק, החיסכון מוצג כ״לא נמדד״
-            ולא כאפס.
+            {tAll.valueProof.costPromptBody}
           </p>
           <div className="flex items-center gap-2 max-w-[220px]">
-            <span className="text-sm opacity-70">₪</span>
+            <span className="text-sm opacity-70">{isEn ? '$' : '₪'}</span>
             <input
               type="number"
               min={0}

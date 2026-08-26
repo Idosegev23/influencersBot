@@ -670,7 +670,7 @@ export default function InfluencerDashboardPage({
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm truncate" style={{ color: 'var(--dash-text)' }}>{post.caption || `${post.type} post`}</p>
-                          <p className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{formatRelativeTime(post.postedAt)}</p>
+                          <p className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{formatRelativeTime(post.postedAt, isEn ? 'en' : 'he')}</p>
                         </div>
                         <div className="flex items-center gap-3 text-[11px] tabular-nums flex-shrink-0" style={{ color: 'var(--dash-text-3)' }}>
                           {post.likes > 0 && <span className="flex items-center gap-1"><Heart className="w-3 h-3" />{formatNumber(post.likes)}</span>}
@@ -709,7 +709,7 @@ export default function InfluencerDashboardPage({
                         </div>
                         <span className="text-sm" style={{ color: 'var(--dash-text)' }}>{s.messageCount} {t.dashboard.messages}</span>
                       </div>
-                      <span className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{formatRelativeTime(s.createdAt)}</span>
+                      <span className="text-[11px]" style={{ color: 'var(--dash-text-3)' }}>{formatRelativeTime(s.createdAt, isEn ? 'en' : 'he')}</span>
                       </div>
                     </div>
                   ))}

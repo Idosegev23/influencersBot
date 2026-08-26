@@ -15,20 +15,20 @@ import type { InlineEnabled, InlinePreset, InlineTreatment } from '@/lib/widget/
 // require rendering a component (see inline-draft.ts's file header).
 export type { InlineMountDraft, PendingInlinePick };
 
-const ENABLED_OPTIONS: { value: InlineEnabled; label: string }[] = [
-  { value: 'preview', label: 'תצוגה מקדימה (רק עם קישור)' },
-  { value: true, label: 'פעיל לכל המבקרים' },
+const enabledOptions = (t: any): { value: InlineEnabled; label: string }[] => [
+  { value: 'preview', label: t.widgetEditor.im_previewLinkOnly },
+  { value: true, label: t.widgetEditor.im_liveForEveryone },
 ];
 
-const PRESET_OPTIONS: { value: InlinePreset; label: string }[] = [
-  { value: 'hero', label: 'מסך פתיחה מלא (Hero)' },
-  { value: 'bar', label: 'רצועה קצרה (Bar)' },
+const presetOptions = (t: any): { value: InlinePreset; label: string }[] => [
+  { value: 'hero', label: t.widgetEditor.im_presetHero },
+  { value: 'bar', label: t.widgetEditor.im_presetBar },
 ];
 
-const SURFACE_OPTIONS: { value: InlineTreatment; label: string }[] = [
-  { value: 'bare', label: 'שקוף — בלי רקע משלו' },
-  { value: 'glass', label: 'זכוכית — רקע מטושטש עדין' },
-  { value: 'solid', label: 'מלא — רקע אחיד' },
+const surfaceOptions = (t: any): { value: InlineTreatment; label: string }[] => [
+  { value: 'bare', label: t.widgetEditor.im_transparent },
+  { value: 'glass', label: t.widgetEditor.im_glass },
+  { value: 'solid', label: t.widgetEditor.im_solid },
 ];
 
 const cardStyle = {
@@ -64,7 +64,10 @@ export default function InlineMountSection({
   pickFailed,
   unrepresentable,
   domain,
+  t,
 }: {
+  /** Dashboard strings bundle, handed down by the widget editor that owns this. */
+  t: any;
   value: InlineMountDraft | null;
   onChange: (next: InlineMountDraft | null) => void;
   /** Toggles picking on/off — see widget-editor/page.tsx, which owns the flag itself. */
@@ -118,9 +121,7 @@ export default function InlineMountSection({
   // One notice, two picking branches (nothing configured yet, and re-picking
   // an existing mount) — the refusal reads the same in both.
   const pickFailedNotice = pickFailed ? (
-    <p className="text-xs" style={{ color: '#dc2626' }}>
-      לא ניתן לבחור את האלמנט הזה — נסו ללחוץ על האזור שמסביבו.
-    </p>
+    <p className="text-xs" style={{ color: '#dc2626' }}>{t.widgetEditor.im_cantPickElement}</p>
   ) : null;
 
   const previewLink = domain
@@ -130,19 +131,17 @@ export default function InlineMountSection({
   return (
     <div className="rounded-xl border p-6 space-y-4" style={cardStyle}>
       <div>
-        <h2 className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>
-          איפה בסטי יושב באתר
-        </h2>
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.im_sectionTitle}</h2>
         <p className="mt-1 text-sm" style={{ color: 'var(--dash-text-2)' }}>
-          היום בסטי מופיע כבועה בפינה. אפשר להושיב אותו גם בתוך הדף עצמו — בתוך
-          אזור שאתם בוחרים באתר שלכם.
+          {t.widgetEditor.im_introA}
+          {t.widgetEditor.im_introB}
         </p>
       </div>
 
       {!value && unrepresentable ? (
         <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-          קיים מיקום שהוגדר עבורכם על ידי הצוות ולא ניתן לעריכה מכאן. שמירה
-          במסך הזה לא תסיר אותו — לפרטים או לשינוי פנו אלינו.
+          {t.widgetEditor.im_managedPlacementA}
+          {t.widgetEditor.im_managedPlacementB}
         </p>
       ) : null}
 
@@ -153,11 +152,11 @@ export default function InlineMountSection({
             style={{ borderColor: 'var(--color-primary)', background: 'var(--dash-bar)' }}
           >
             <p className="text-sm font-medium" style={{ color: 'var(--dash-text)' }}>
-              לחצו על האלמנט באתר…
+              {t.widgetEditor.im_clickElementEllipsis}
             </p>
             <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-              עברו לתצוגה המקדימה מימין ולחצו על האזור שבו בסטי צריך לשבת. אפשר
-              לבטל בכל שלב.
+              {t.widgetEditor.im_pickHintA}
+              {t.widgetEditor.im_pickHintB}
             </p>
             {pickFailedNotice}
             <button
@@ -165,9 +164,7 @@ export default function InlineMountSection({
               onClick={onStartPicking}
               className="px-3 py-1.5 rounded-lg text-xs font-medium"
               style={{ background: 'var(--dash-bar)', color: 'var(--dash-text)', border: '1px solid var(--dash-glass-border)' }}
-            >
-              ביטול
-            </button>
+            >{t.widgetEditor.im_cancel}</button>
           </div>
         ) : (
           <button
@@ -175,9 +172,7 @@ export default function InlineMountSection({
             onClick={onStartPicking}
             className="px-4 py-2.5 rounded-lg text-sm font-medium"
             style={{ background: 'var(--color-primary)', color: '#fff' }}
-          >
-            בחרו מקום באתר
-          </button>
+          >{t.widgetEditor.im_choosePlace}</button>
         )
       ) : (
         <div className="space-y-4">
@@ -185,14 +180,13 @@ export default function InlineMountSection({
             className="rounded-lg border p-3 space-y-1.5"
             style={{ borderColor: 'var(--dash-glass-border)', background: 'var(--dash-bar)' }}
           >
-            <p className="text-sm" style={{ color: 'var(--dash-text)' }}>
-              מקום שנבחר: <span dir="ltr" className="font-mono">{value.label || value.selector}</span>
+            <p className="text-sm" style={{ color: 'var(--dash-text)' }}>{t.widgetEditor.im_chosenPlace}<span dir="ltr" className="font-mono">{value.label || value.selector}</span>
             </p>
             {value.measured ? (
               <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                גובה האזור שנבחר: {value.measured.desktop}px
+                {t.widgetEditor.im_chosenHeight}{value.measured.desktop}px
                 {value.measured.mobile && value.measured.mobile !== value.measured.desktop
-                  ? ` (בנייד: ${value.measured.mobile}px)`
+                  ? ` (${t.widgetEditor.im_onMobile}${value.measured.mobile}px)`
                   : ''}
               </p>
             ) : null}
@@ -203,7 +197,7 @@ export default function InlineMountSection({
                   className="inline-block w-3.5 h-3.5 rounded-full border"
                   style={{ background: value.theme.accent, borderColor: 'var(--dash-glass-border)' }}
                 />
-                גוון שזוהה באתר: {value.theme.accent}
+                {t.widgetEditor.im_detectedTint}{value.theme.accent}
               </span>
             ) : null}
 
@@ -216,7 +210,7 @@ export default function InlineMountSection({
                   className="mt-1 text-xs font-medium"
                   style={{ color: 'var(--dash-text)' }}
                 >
-                  לחצו על האלמנט באתר… (ביטול)
+                  {t.widgetEditor.im_clickElementCancel}
                 </button>
               </>
             ) : (
@@ -225,16 +219,14 @@ export default function InlineMountSection({
                 onClick={onStartPicking}
                 className="mt-1 text-xs font-medium"
                 style={{ color: 'var(--color-primary)' }}
-              >
-                בחרו מקום אחר
-              </button>
+              >{t.widgetEditor.im_chooseAnother}</button>
             )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                איך בסטי מתפרס באזור
+                {t.widgetEditor.im_spreadLabel}
               </label>
               <select
                 value={value.preset}
@@ -242,14 +234,14 @@ export default function InlineMountSection({
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                 style={selectStyle}
               >
-                {PRESET_OPTIONS.map((opt) => (
+                {presetOptions(t).map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
             <div>
               <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-2)' }}>
-                עיצוב המשטח
+                {t.widgetEditor.im_surfaceLabel}
               </label>
               <select
                 value={value.surface}
@@ -257,20 +249,18 @@ export default function InlineMountSection({
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                 style={selectStyle}
               >
-                {SURFACE_OPTIONS.map((opt) => (
+                {surfaceOptions(t).map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          <div role="radiogroup" aria-label="למי מוצג בסטי במקום הזה" className="space-y-1.5">
+          <div role="radiogroup" aria-label={t.widgetEditor.im_audienceLabel} className="space-y-1.5">
             <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-              אין צורך במצב &quot;כבוי&quot;: תצוגה מקדימה היא מצב ההשהיה — המקום
-              שבחרתם, העיצוב והמידות נשמרים, ואף מבקר רגיל לא רואה אותם. הסרה
-              לעומת זאת מוחקת את הבחירה לגמרי.
+              {t.widgetEditor.im_noOffNeeded}
             </p>
-            {ENABLED_OPTIONS.map((opt) => (
+            {enabledOptions(t).map((opt) => (
               <label key={String(opt.value)} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--dash-text)' }}>
                 <input
                   type="radio"
@@ -285,9 +275,8 @@ export default function InlineMountSection({
 
           {value.enabled === 'preview' ? (
             <p className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-              בתצוגה מקדימה בסטי מוצג רק למי שמגיע עם קישור מיוחד — כדי לבדוק
-              את זה בעצמכם, פתחו את האתר שלכם עם <code dir="ltr">?bestie=1</code>
-              {' '}בסוף הכתובת
+              {t.widgetEditor.im_previewExplainA} <code dir="ltr">?bestie=1</code>
+              {' '}{t.widgetEditor.im_previewExplainB}
               {previewLink ? <>: <span dir="ltr" className="font-mono">{previewLink}</span></> : '.'}
             </p>
           ) : null}
@@ -299,7 +288,7 @@ export default function InlineMountSection({
               className="px-2.5 py-1 rounded-lg text-xs font-medium"
               style={{ color: '#dc2626', border: '1px solid var(--dash-glass-border)' }}
             >
-              הסרה
+              {t.widgetEditor.remove}
             </button>
           </div>
         </div>
