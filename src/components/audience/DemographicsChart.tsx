@@ -41,11 +41,11 @@ export function DemographicsChart({ ageGroups, gender, locations }: Demographics
                 backgroundColor: '#ffffff',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                direction: 'rtl',
+                direction: 'inherit',
               }}
             />
             <Legend
-              wrapperStyle={{ direction: 'rtl', fontSize: '12px' }}
+              wrapperStyle={{ direction: 'inherit', fontSize: '12px' }}
               iconSize={10}
             />
           </PieChart>
@@ -76,11 +76,11 @@ export function DemographicsChart({ ageGroups, gender, locations }: Demographics
                 backgroundColor: '#ffffff',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                direction: 'rtl',
+                direction: 'inherit',
               }}
             />
             <Legend
-              wrapperStyle={{ direction: 'rtl', fontSize: '12px' }}
+              wrapperStyle={{ direction: 'inherit', fontSize: '12px' }}
               iconSize={10}
             />
           </PieChart>
@@ -111,11 +111,11 @@ export function DemographicsChart({ ageGroups, gender, locations }: Demographics
                 backgroundColor: '#ffffff',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                direction: 'rtl',
+                direction: 'inherit',
               }}
             />
             <Legend
-              wrapperStyle={{ direction: 'rtl', fontSize: '12px' }}
+              wrapperStyle={{ direction: 'inherit', fontSize: '12px' }}
               iconSize={10}
             />
           </PieChart>

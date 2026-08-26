@@ -64,7 +64,7 @@ export function PipelineChart({ data }: { data: PipelineData[] }) {
               backgroundColor: '#ffffff',
               border: '1px solid #e5e7eb',
               borderRadius: '8px',
-              direction: 'rtl',
+              direction: 'inherit',
             }}
           />
           <Bar dataKey="count" radius={[0, 8, 8, 0]}>

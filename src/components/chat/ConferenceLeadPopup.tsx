@@ -267,7 +267,7 @@ export function ConferenceLeadPopup({
 
                 <label
                   className="flex items-start gap-3 mt-2 cursor-pointer select-none"
-                  style={{ direction: 'rtl' }}
+                  style={{ direction: 'inherit' }}
                 >
                   <input
                     type="checkbox"

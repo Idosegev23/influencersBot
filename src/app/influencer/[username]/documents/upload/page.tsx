@@ -231,6 +231,7 @@ export default function DocumentUploadPage({
             </div>
 
             <DocumentTypeSelector
+              language={lang === 'en' ? 'en' : 'he'}
               value={documentType}
               onChange={setDocumentType}
             />
@@ -246,6 +247,7 @@ export default function DocumentUploadPage({
             </div>
 
             <FileUploader
+              language={lang === 'en' ? 'en' : 'he'}
               accountId={accountId || ''}
               username={username}
               documentType={mapDocumentType(documentType)}

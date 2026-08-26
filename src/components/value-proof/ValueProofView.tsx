@@ -118,7 +118,7 @@ export default function ValueProofView({
   const T = getDashboardStrings(language === 'en' ? 'en' : 'he').valueProof;
   const d = data;
   return (
-    <div className="vp-root" dir="rtl">
+    <div className="vp-root" dir={language === 'en' ? 'ltr' : 'rtl'}>
       <Section
         title={T.revenueFromChats}
         note={T.attributionNote}

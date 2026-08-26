@@ -134,7 +134,7 @@ export function QuestionsView({ data, loading, onBack, onSubmit, onVote }: Quest
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             placeholder="מה תמיד רציתם לדעת?"
             className="flex-1 rounded-[60px] px-5 py-3 text-[14px] outline-none focus:ring-2 focus:ring-purple-200 transition-all"
-            style={{ border: '1px solid #e5e5ea', direction: 'rtl', backgroundColor: '#ffffff' }}
+            style={{ border: '1px solid #e5e5ea', direction: 'inherit', backgroundColor: '#ffffff' }}
             disabled={submitting || (data && !data.canSubmitToday)}
           />
           <button

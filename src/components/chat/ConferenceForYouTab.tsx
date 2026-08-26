@@ -439,7 +439,7 @@ export function ConferenceForYouTab({ onAskAbout }: ConferenceForYouTabProps) {
   return (
     <div
       className="h-full overflow-y-auto px-4 py-5 pb-32"
-      style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
+      style={{ direction: 'inherit', backgroundColor: '#ffffff' }}
     >
       <div className="mb-5 text-right">
         <h2 className="text-[20px] font-bold mb-1" style={{ color: '#0c1013' }}>

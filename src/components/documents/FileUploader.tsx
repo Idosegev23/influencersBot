@@ -24,6 +24,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Upload, X, FileText, Image, AlertCircle } from 'lucide-react';
 import { supabaseClient } from '@/lib/supabase-client';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 export interface UploadedFile {
   id: string;
@@ -92,7 +93,9 @@ export function FileUploader({
   acceptedTypes = DEFAULT_ACCEPTED_TYPES,
   maxSize = DEFAULT_MAX_SIZE,
   multiple = true,
-}: FileUploaderProps) {
+  language,
+}: FileUploaderProps & { language?: 'he' | 'en' }) {
+  const t = getDashboardStrings(language === 'en' ? 'en' : 'he').partnershipFlows;
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<FilePreview[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -103,12 +106,12 @@ export function FileUploader({
     // Check size
     const fileSizeMB = file.size / (1024 * 1024);
     if (fileSizeMB > maxSize) {
-      return `הקובץ גדול מדי (${fileSizeMB.toFixed(1)}MB). גודל מקסימלי: ${maxSize}MB`;
+      return t.fu_tooBig.replace('{size}', fileSizeMB.toFixed(1)).replace('{max}', String(maxSize));
     }
 
     // Check type
     if (!acceptedTypes.includes(file.type)) {
-      return `סוג קובץ לא נתמך: ${file.type}`;
+      return t.fu_badType.replace('{type}', file.type);
     }
 
     return null;
@@ -180,7 +183,7 @@ export function FileUploader({
 
         if (uploadError) {
           console.error(`[FileUploader] Failed to upload ${file.name}:`, uploadError);
-          onError?.(`העלאת ${file.name} נכשלה: ${uploadError.message}`);
+          onError?.(t.fu_uploadFailed.replace('{name}', file.name).replace('{err}', uploadError.message));
           continue;
         }
 
@@ -203,7 +206,7 @@ export function FileUploader({
         if (!metadataResponse.ok) {
           const error = await metadataResponse.json();
           console.error(`[FileUploader] Failed to save metadata for ${file.name}:`, error);
-          onError?.(`שמירת ${file.name} נכשלה`);
+          onError?.(t.fu_saveFailed.replace('{name}', file.name));
           continue;
         }
 
@@ -231,7 +234,7 @@ export function FileUploader({
       );
     } catch (error: any) {
       console.error('[FileUploader] Upload error:', error);
-      onError?.(error.message || 'העלאה נכשלה');
+      onError?.(error.message || t.fu_genericFail);
     } finally {
       setIsUploading(false);
     }
@@ -317,19 +320,19 @@ export function FileUploader({
 
           {isDragging ? (
             <p className="text-lg font-medium text-blue-600">
-              שחרר את הקבצים כאן...
+              {t.fu_dropHere}
             </p>
           ) : (
             <>
               <p className="text-lg font-medium text-gray-700">
-                גרור קבצים לכאן או לחץ לבחירה
+                {t.fu_dragHere}
               </p>
               <p className="text-sm text-gray-500">
-                PDF, Word, Excel, תמונות (עד {maxSize}MB)
+                {t.fu_accepted.replace('{max}', String(maxSize))}
               </p>
               {multiple && (
                 <p className="text-xs text-gray-400">
-                  ניתן להעלות מספר קבצים בו-זמנית
+                  {t.fu_multiple}
                 </p>
               )}
             </>
@@ -341,7 +344,7 @@ export function FileUploader({
             <div className="flex items-center gap-2">
               <div className="h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm font-medium text-gray-700">
-                מעלה קבצים...
+                {t.fu_uploading}
               </span>
             </div>
           </div>
@@ -351,10 +354,11 @@ export function FileUploader({
       {/* File Preview List */}
       {files.length > 0 && (
         <div className="mt-4 space-y-2">
-          <h3 className="text-sm font-medium text-gray-700">קבצים לעיון:</h3>
+          <h3 className="text-sm font-medium text-gray-700">{t.fu_filesToReview}</h3>
           
           {files.map((filePreview) => (
             <FilePreviewItem
+              removeLabel={t.fu_removeFile}
               key={filePreview.file.name + filePreview.file.size}
               filePreview={filePreview}
               onRemove={() => removeFile(filePreview.file)}
@@ -368,9 +372,12 @@ export function FileUploader({
 
 // File Preview Item Component
 function FilePreviewItem({
+  removeLabel,
   filePreview,
   onRemove,
 }: {
+  /** Localised label for the remove button — this sub-component has no bundle. */
+  removeLabel: string;
   filePreview: FilePreview;
   onRemove: () => void;
 }) {
@@ -420,7 +427,7 @@ function FilePreviewItem({
       <button
         onClick={onRemove}
         className="flex-shrink-0 p-1 hover:bg-gray-100 rounded transition-colors"
-        title="הסר קובץ"
+        title={removeLabel}
       >
         <X className="h-5 w-5 text-gray-400" />
       </button>

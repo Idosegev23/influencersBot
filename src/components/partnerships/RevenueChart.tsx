@@ -52,14 +52,14 @@ export function RevenueChart({ data }: { data: MonthlyRevenue[] }) {
               backgroundColor: '#ffffff',
               border: '1px solid #e5e7eb',
               borderRadius: '8px',
-              direction: 'rtl',
+              direction: 'inherit',
             }}
           />
           <Legend
             formatter={(value) =>
               value === 'revenue' ? 'הכנסות' : 'כמות שת"פים'
             }
-            wrapperStyle={{ direction: 'rtl', paddingTop: '20px' }}
+            wrapperStyle={{ direction: 'inherit', paddingTop: '20px' }}
           />
           <Bar dataKey="revenue" fill="#3b82f6" radius={[8, 8, 0, 0]} />
           <Bar dataKey="count" fill="#10b981" radius={[8, 8, 0, 0]} />

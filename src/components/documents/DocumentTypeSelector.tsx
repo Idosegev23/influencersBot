@@ -19,6 +19,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, FileText, Receipt, Clipboard, DollarSign, File } from 'lucide-react';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 export type DocumentType = 
   | 'partnership_agreement'
@@ -34,37 +35,12 @@ export interface DocumentTypeOption {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const DOCUMENT_TYPES: DocumentTypeOption[] = [
-  {
-    value: 'partnership_agreement',
-    label: 'חוזה שת"פ',
-    description: 'הסכם שיתוף פעולה עם מותג',
-    icon: FileText,
-  },
-  {
-    value: 'proposal',
-    label: 'הצעת מחיר',
-    description: 'הצעת מחיר או הצעת שת"פ',
-    icon: DollarSign,
-  },
-  {
-    value: 'invoice',
-    label: 'חשבונית / דרישת תשלום',
-    description: 'חשבונית, קבלה או דרישת תשלום',
-    icon: Receipt,
-  },
-  {
-    value: 'brief',
-    label: 'בריף',
-    description: 'בריף קמפיין או דרישות תוכן',
-    icon: Clipboard,
-  },
-  {
-    value: 'general',
-    label: 'מסמך כללי',
-    description: 'AI ינחש את סוג המסמך',
-    icon: File,
-  },
+const documentTypes = (t: any): DocumentTypeOption[] => [
+  { value: 'partnership_agreement', label: t.partnershipFlows.dt_agreement, description: t.partnershipFlows.dt_agreementDesc, icon: FileText },
+  { value: 'proposal', label: t.partnershipFlows.dt_proposal, description: t.partnershipFlows.dt_proposalDesc, icon: DollarSign },
+  { value: 'invoice', label: t.partnershipFlows.dt_invoice, description: t.partnershipFlows.dt_invoiceDesc, icon: Receipt },
+  { value: 'brief', label: t.partnershipFlows.dt_brief, description: t.partnershipFlows.dt_briefDesc, icon: Clipboard },
+  { value: 'general', label: t.partnershipFlows.dt_general, description: t.partnershipFlows.dt_generalDesc, icon: File },
 ];
 
 export interface DocumentTypeSelectorProps {
@@ -79,17 +55,20 @@ export function DocumentTypeSelector({
   onChange,
   disabled = false,
   className = '',
-}: DocumentTypeSelectorProps) {
+  language,
+}: DocumentTypeSelectorProps & { language?: 'he' | 'en' }) {
   const [isOpen, setIsOpen] = useState(false);
-  
-  const selectedOption = DOCUMENT_TYPES.find((opt) => opt.value === value) || DOCUMENT_TYPES[4];
+  const t = getDashboardStrings(language === 'en' ? 'en' : 'he');
+  const DOCUMENT_TYPES = documentTypes(t);
+
+  const selectedOption = DOCUMENT_TYPES.find((opt) => opt.value === value) || documentTypes(getDashboardStrings("he"))[4];
   const SelectedIcon = selectedOption.icon;
 
   return (
     <div className={`relative ${className}`}>
       {/* Label */}
       <label className="block text-sm font-medium text-gray-700 mb-2">
-        סוג המסמך
+        {t.partnershipFlows.dt_label}
       </label>
 
       {/* Select Button */}
@@ -189,7 +168,7 @@ export interface DocumentTypeTagProps {
 }
 
 export function DocumentTypeTag({ type, className = '' }: DocumentTypeTagProps) {
-  const option = DOCUMENT_TYPES.find((opt) => opt.value === type) || DOCUMENT_TYPES[4];
+  const option = documentTypes(getDashboardStrings("he")).find((opt) => opt.value === type) || documentTypes(getDashboardStrings("he"))[4];
   const Icon = option.icon;
 
   return (

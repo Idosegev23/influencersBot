@@ -131,7 +131,7 @@ export function AskItamarButton({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4"
-            style={{ direction: 'rtl' }}
+            style={{ direction: 'inherit' }}
             onClick={(e) => e.target === e.currentTarget && close()}
           >
             <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={close} />

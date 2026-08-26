@@ -237,7 +237,7 @@ function MiniBriefForm({
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ direction: 'rtl' }}>
+    <div className="flex flex-col h-full" style={{ direction: 'inherit' }}>
       <div className="flex items-center gap-2 mb-5 px-1">
         {[1, 2].map((s) => (
           <div key={s} className="flex items-center gap-2 flex-1">
@@ -483,7 +483,7 @@ function ServiceModal({
           exit={{ y: 60, opacity: 0 }}
           transition={{ type: 'spring', damping: 28, stiffness: 320 }}
           className="relative w-full sm:max-w-md max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col"
-          style={{ direction: 'rtl', boxShadow: '0 20px 60px -10px rgba(0,0,0,0.18)' }}
+          style={{ direction: 'inherit', boxShadow: '0 20px 60px -10px rgba(0,0,0,0.18)' }}
         >
           {/* Top bar with close */}
           <div className="flex items-center justify-end px-5 pt-4 pb-1">
@@ -848,7 +848,7 @@ export default function ServicesCatalogTab({
     return (
       <div
         className="h-full overflow-y-auto px-5 py-8 pb-32"
-        style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
+        style={{ direction: 'inherit', backgroundColor: '#ffffff' }}
       >
         <div className="space-y-8">
           <div>
@@ -876,7 +876,7 @@ export default function ServicesCatalogTab({
     return (
       <div
         className="h-full flex items-center justify-center px-6 py-10"
-        style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
+        style={{ direction: 'inherit', backgroundColor: '#ffffff' }}
       >
         <div className="text-center">
           <div
@@ -899,7 +899,7 @@ export default function ServicesCatalogTab({
     return (
       <div
         className="h-full overflow-y-auto pb-32"
-        style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
+        style={{ direction: 'inherit', backgroundColor: '#ffffff' }}
       >
         <header className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 text-right">
           <h1
@@ -948,7 +948,7 @@ export default function ServicesCatalogTab({
   return (
     <div
       className="h-full overflow-y-auto px-5 py-8 pb-32"
-      style={{ direction: 'rtl', backgroundColor: '#ffffff' }}
+      style={{ direction: 'inherit', backgroundColor: '#ffffff' }}
     >
       {/* Header */}
       <header className="mb-9">

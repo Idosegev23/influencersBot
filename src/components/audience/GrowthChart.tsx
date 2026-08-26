@@ -48,12 +48,12 @@ export function GrowthChart({ data }: { data: GrowthData[] }) {
               border: '1px solid #e5e7eb',
               borderRadius: '8px',
               padding: '8px 12px',
-              direction: 'rtl',
+              direction: 'inherit',
             }}
           />
           <Legend
             formatter={(value: string) => (value === 'followers' ? 'עוקבים' : 'צמיחה יומית')}
-            wrapperStyle={{ direction: 'rtl', paddingTop: '20px' }}
+            wrapperStyle={{ direction: 'inherit', paddingTop: '20px' }}
           />
           <Line
             type="monotone"
