@@ -734,7 +734,11 @@ async function classifyChunkTopics(
   accountId: string,
   dryRun?: boolean
 ): Promise<number> {
-  const BATCH_SIZE = 30; // Gemini can handle larger batches for simple classification
+  // 15, not 30. The model pretty-prints one topic per line, so a 30-item batch is
+  // ~35 lines of output and sat right at the truncation edge. Halving the batch
+  // doubles the call count and removes the cliff — classification that silently
+  // returns nothing is far more expensive than an extra request.
+  const BATCH_SIZE = 15;
   let classified = 0;
   let offset = 0;
   const PAGE_SIZE = 1000;
@@ -859,10 +863,12 @@ async function classifyTopicsWithLLM(
         required: ['topics'],
       },
       temperature: 0,
-      // 30 chunks × a short topic string needs far less than this, but a thinking
-      // model spends budget before it emits anything, and running out mid-thought
-      // returns empty text. That is the most likely reason this has been silently
-      // falling back platform-wide.
+      // gemini-3.5-flash is a THINKING model: it spends output budget on thoughts
+      // before emitting a token of answer. Left on, a 30-item classification came
+      // back truncated mid-array — "Unterminated string in JSON" — with the
+      // classification itself perfectly good up to the cut. Nothing here needs
+      // reasoning; it is a labelling task against a fixed vocabulary.
+      thinkingConfig: { thinkingBudget: 0 },
       maxOutputTokens: 4000,
     },
     contents: `Classify each text into exactly ONE topic.
