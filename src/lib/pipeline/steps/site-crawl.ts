@@ -111,8 +111,24 @@ async function apifyCrawlBatch(ctx: StepContext): Promise<StepResult> {
   // The run route re-enqueues without a ceiling of its own, so a crawl that never
   // finishes would push itself around this loop forever. At a 20s poll this is
   // well over an hour — far past any legitimate crawl of the sizes we cap at.
+  //
+  // Hitting the ceiling ADVANCES with whatever was crawled rather than failing.
+  // Failing here would discard the pages already saved along with the Instagram,
+  // Facebook and transcription work of every earlier step, to punish a crawl for
+  // being slow. A short website is a worse demo; no demo is a worse outcome. What
+  // was cut is named in the step log so it is not silently a "complete" scan.
   if (ctx.batch > APIFY_MAX_BATCHES) {
-    return { status: 'failed', error: `Apify crawl ${runId} did not finish within ${APIFY_MAX_BATCHES} batches` };
+    const done = ctx.state.counts?.crawl?.done ?? 0;
+    await setCount(ctx.jobId, 'crawl', { done, total: done });
+    try {
+      const { getScanJobsRepo } = await import('@/lib/db/repositories/scanJobsRepo');
+      await getScanJobsRepo().addStepLog(
+        ctx.jobId, 'site-crawl', 'completed', 100,
+        `הזחילה נעצרה על ${done} עמודים אחרי ${ctx.batch} מנות — ריצת ${runId} לא הסתיימה בזמן`,
+      );
+    } catch { /* logging must never fail the job */ }
+    console.warn(`[site-crawl/apify] ceiling reached for run ${runId} at ${done} pages`);
+    return { status: 'advance' };
   }
 
   const offset = await getCursor(ctx.jobId, 'site-crawl');
