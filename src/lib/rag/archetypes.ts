@@ -20,6 +20,7 @@ export type AccountArchetype =
   | 'influencer'
   | 'brand'
   | 'service_provider'
+  | 'association'
   | 'government_ministry'
   | 'media_news'
   | 'local_business'
@@ -124,6 +125,48 @@ export const ARCHETYPE_CONFIGS: Record<AccountArchetype, ArchetypeConfig> = {
       highlight: 3,
     },
     docCap: 4,
+  },
+
+  /**
+   * Trade association / membership organisation (e.g. American Bus Association)
+   * The website carries everything a member or prospective member actually needs —
+   * membership tiers and dues, the annual event, policy positions, industry research —
+   * so it outranks everything else. Social posts still matter more than they do for a
+   * ministry: an association campaigns in public, and its advocacy wins, event promos
+   * and member spotlights live on Instagram and Facebook.
+   *
+   * No coupons and no partnerships: an association sells membership, not products, and
+   * its sponsors are not influencer partnerships. Both are pushed down hard so a stray
+   * chunk can never surface as an offer.
+   *
+   * Recency is raised but not to media levels — an event date or a bill in committee
+   * goes stale fast, while a membership tier stays true for years.
+   */
+  association: {
+    typeWeights: {
+      website: +0.12,
+      knowledge_base: +0.08,
+      post: +0.06,
+      document: +0.05,
+      transcription: +0.03,
+      highlight: 0,
+      partnership: -0.10,
+      coupon: -0.20,
+      product: -0.20,
+    },
+    typeCaps: {
+      website: 10,
+      post: 6,
+      knowledge_base: 5,
+      document: 4,
+      transcription: 3,
+      highlight: 2,
+      partnership: 0,
+      coupon: 0,
+      product: 0,
+    },
+    docCap: 4,
+    recencyMultiplier: 1.4,
   },
 
   /**

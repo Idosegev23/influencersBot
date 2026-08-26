@@ -646,7 +646,12 @@ ${chunks.map((c, i) => `[${i}] (${c.entityType}) ${c.text.substring(0, 400)}`).j
 // ============================================
 
 /** Valid topics for chunk classification */
-export const VALID_TOPICS = [
+/**
+ * The retail taxonomy. Every account that existed before archetype-scoped topics
+ * was classified with exactly this list, and it stays the default, so no existing
+ * account's chunks change meaning.
+ */
+export const RETAIL_TOPICS = [
   'food',      // Recipes, cooking, ingredients, kitchen
   'beauty',    // Hair care, skincare, makeup, cosmetics
   'fashion',   // Clothing, shoes, accessories, shapewear
@@ -658,7 +663,67 @@ export const VALID_TOPICS = [
   'coupon',    // Coupon codes, discounts (entity_type based)
 ] as const;
 
+/**
+ * A trade association's content does not divide into retail categories. Forced
+ * through the retail list, every page of an association — dues tiers, a bill in
+ * committee, an annual convention — collapses into 'business', which makes any
+ * topic-filtered surface either empty or a duplicate of its neighbour.
+ */
+export const ASSOCIATION_TOPICS = [
+  'membership', // Tiers, dues, benefits, joining, renewing, member directory
+  'events',     // Conventions, expos, webinars, regional meetings
+  'advocacy',   // Legislation, regulation, lobbying, government affairs
+  'safety',     // Safety standards, compliance, inspections, driver rules
+  'tourism',    // Group travel, tour operators, destinations, itineraries
+  'industry',   // Research, statistics, industry news, awards, suppliers
+  'business',   // Operations, hiring, running a member company
+] as const;
+
+export const VALID_TOPICS = [
+  ...RETAIL_TOPICS,
+  ...ASSOCIATION_TOPICS.filter((t) => !(RETAIL_TOPICS as readonly string[]).includes(t)),
+] as const;
+
 export type ChunkTopic = (typeof VALID_TOPICS)[number];
+
+/** One-line meaning per topic, fed to the classifier so the prompt stays in sync. */
+const TOPIC_RULES: Record<string, string> = {
+  food: 'recipes, cooking, ingredients, kitchen tools, restaurants',
+  beauty: 'hair care, skincare, makeup, cosmetics, beauty treatments',
+  fashion: 'clothing, shoes, accessories, shapewear, tights, sunglasses',
+  home: 'furniture, mattresses, bedding, home decor, cleaning',
+  health: 'dental care, toothbrush, fitness, supplements, medical',
+  tech: 'electronics, gadgets, apps, phones',
+  lifestyle: 'general lifestyle, travel, parenting, entertainment, general tips',
+  business: 'B2B services, marketing, agency work, case studies, hiring, running a company',
+  coupon: 'discount codes, promotions, sales',
+  membership: 'joining, renewing, dues, membership tiers and benefits, the member directory',
+  events: 'conventions, expos, marketplaces, webinars, regional and annual meetings',
+  advocacy: 'legislation, regulation, lobbying, government affairs, policy positions',
+  safety: 'safety standards, compliance, inspections, driver and vehicle rules',
+  tourism: 'group travel, tour operators, destinations, itineraries, passenger experience',
+  industry: 'industry research, statistics, news, awards, suppliers and manufacturers',
+};
+
+/** Where an unparseable classification lands, per topic set. */
+const TOPIC_FALLBACK: Record<string, string> = {
+  retail: 'lifestyle',
+  association: 'industry',
+};
+
+/**
+ * The topic vocabulary an account may be classified into. Archetypes that have no
+ * vocabulary of their own get the retail list, which is what they have always had.
+ */
+export function topicsForArchetype(archetype: string | null | undefined): {
+  topics: readonly string[];
+  fallback: string;
+} {
+  if (archetype === 'association') {
+    return { topics: ASSOCIATION_TOPICS, fallback: TOPIC_FALLBACK.association };
+  }
+  return { topics: RETAIL_TOPICS, fallback: TOPIC_FALLBACK.retail };
+}
 
 /**
  * Classify chunks by topic using Gemini Flash.
@@ -673,6 +738,18 @@ async function classifyChunkTopics(
   let classified = 0;
   let offset = 0;
   const PAGE_SIZE = 1000;
+
+  // The vocabulary depends on the archetype: an association's pages classify into
+  // membership/events/advocacy, a shop's into food/beauty/fashion. Reading it here
+  // (once) keeps every caller of this function unchanged.
+  const { data: acct } = await supabase
+    .from('accounts')
+    .select('config')
+    .eq('id', accountId)
+    .maybeSingle();
+  const { topics: vocabulary, fallback } = topicsForArchetype(
+    (acct?.config as Record<string, any> | null)?.archetype,
+  );
 
   while (true) {
     const { data: chunks } = await supabase
@@ -695,9 +772,11 @@ async function classifyChunkTopics(
       const autoClassified: Array<{ id: string; topic: ChunkTopic }> = [];
 
       for (const c of batch) {
-        if (c.entity_type === 'coupon') {
+        // Only auto-classify into a topic this account's vocabulary actually has —
+        // otherwise the shortcut writes a topic no surface can ever filter on.
+        if (c.entity_type === 'coupon' && vocabulary.includes('coupon')) {
           autoClassified.push({ id: c.id, topic: 'coupon' });
-        } else if (c.entity_type === 'knowledge_base') {
+        } else if (c.entity_type === 'knowledge_base' && vocabulary.includes('business')) {
           autoClassified.push({ id: c.id, topic: 'business' });
         } else {
           needsLLM.push(c);
@@ -719,15 +798,16 @@ async function classifyChunkTopics(
 
       // LLM classification
       try {
-        const topics = await classifyTopicsWithLLM(needsLLM.map(c => ({
-          text: c.chunk_text,
-          entityType: c.entity_type,
-        })));
+        const topics = await classifyTopicsWithLLM(
+          needsLLM.map(c => ({ text: c.chunk_text, entityType: c.entity_type })),
+          vocabulary,
+          fallback,
+        );
 
         if (!dryRun) {
           for (let j = 0; j < needsLLM.length; j++) {
             const topic = topics[j];
-            if (topic && VALID_TOPICS.includes(topic as ChunkTopic)) {
+            if (topic && vocabulary.includes(topic)) {
               await supabase
                 .from('document_chunks')
                 .update({ topic })
@@ -736,7 +816,7 @@ async function classifyChunkTopics(
             }
           }
         } else {
-          classified += topics.filter(t => t && VALID_TOPICS.includes(t as ChunkTopic)).length;
+          classified += topics.filter(t => t && vocabulary.includes(t)).length;
         }
       } catch (err: any) {
         log.warn('Topic classification batch failed', { error: err.message }, accountId);
@@ -751,35 +831,35 @@ async function classifyChunkTopics(
  * Classify chunk topics using Gemini Flash.
  */
 async function classifyTopicsWithLLM(
-  chunks: Array<{ text: string; entityType: string }>
+  chunks: Array<{ text: string; entityType: string }>,
+  vocabulary: readonly string[] = RETAIL_TOPICS,
+  fallback: string = TOPIC_FALLBACK.retail,
 ): Promise<string[]> {
   const { GoogleGenAI } = await import('@google/genai');
   const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+  // The rules are generated from the same list the caller validates against, so a
+  // vocabulary change can never leave the prompt offering a topic that gets rejected.
+  const rules = vocabulary.map((t) => `- ${t}: ${TOPIC_RULES[t] ?? t}`).join('\n');
 
   const response = await genai.models.generateContent({
     model: 'gemini-3.5-flash',
     contents: `Classify each text into exactly ONE topic.
 
-Topics: food, beauty, fashion, home, health, tech, lifestyle, business, coupon
+Topics: ${vocabulary.join(', ')}
 
 Rules:
-- food: recipes, cooking, ingredients, kitchen tools, restaurants
-- beauty: hair care, skincare, makeup, cosmetics, beauty treatments
-- fashion: clothing, shoes, accessories, shapewear, tights, sunglasses
-- home: furniture, mattresses, bedding, home decor, cleaning
-- health: dental care, toothbrush, fitness, supplements, medical
-- tech: electronics, gadgets, apps, phones
-- lifestyle: general lifestyle, travel, parenting, entertainment, general tips
-- business: B2B services, marketing, agency work, case studies, hiring
-- coupon: discount codes, promotions, sales
+${rules}
 
 IMPORTANT: Classify by the PRIMARY topic of the text, not secondary mentions.
 - A recipe that mentions a kitchen brand → "food" (not "business")
 - A partnership with a hair product → "beauty" (not "business")
 - A coupon for a fashion brand → "coupon"
 - כנאפה/קדאיף recipe → "food" (NOT beauty, even though קדאיף sounds like hair)
+- A convention session about new safety rules → "events" (the text is about the event)
+- A press release urging Congress to act → "advocacy" (not "industry")
 
-Return ONLY a JSON array of topic strings. One per input.
+Only use a topic from the list above. Return ONLY a JSON array of topic strings, one per input.
 
 Texts:
 ${chunks.map((c, i) => `[${i}] (${c.entityType}) ${c.text.substring(0, 250)}`).join('\n\n')}`,
@@ -799,7 +879,7 @@ ${chunks.map((c, i) => `[${i}] (${c.entityType}) ${c.text.substring(0, 250)}`).j
     log.warn('Failed to parse topic classification response', { raw: raw.substring(0, 200) });
   }
 
-  return chunks.map(() => 'lifestyle'); // Safe default
+  return chunks.map(() => fallback); // Safe default, inside this account's vocabulary
 }
 
 // ============================================

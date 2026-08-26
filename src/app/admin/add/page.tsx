@@ -612,6 +612,7 @@ export default function AddAccountPage() {
               <option value="influencer">משפיען (influencer)</option>
               <option value="local_business">עסק מקומי (local_business)</option>
               <option value="service_provider">נותן שירות (service_provider)</option>
+              <option value="association">איגוד מקצועי (association)</option>
               <option value="government_ministry">משרד ממשלתי (government_ministry)</option>
               <option value="media_news">מדיה/חדשות (media_news)</option>
               <option value="tech_creator">יוצר טק (tech_creator)</option>

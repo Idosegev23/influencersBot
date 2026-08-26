@@ -9,6 +9,7 @@
  *   b2b_saas:            Chat  | Discover | Features | Pricing | Get demo  (en-only)
  *   media_news:          צ׳אט | גלו | [קופונים]
  *   service_provider:    צ׳אט | גלו | שירותים
+ *   association:         Chat  | Discover | Membership | Events | Advocacy
  *   government_ministry: צ׳אט | גלו | שירותים ומידע
  *   local_business:      צ׳אט | גלו | מוצרים | [הטבות] | [בעיה במוצר]
  *   tech_creator:        צ׳אט | גלו | סקירות
@@ -83,6 +84,11 @@ const STATIC_LABELS = {
   demo: L('דמו', 'Demo'),
   platform: L('פלטפורמה', 'Platform'),
   customers: L('לקוחות', 'Customers'),
+  // association-specific — the three things a trade association actually sells:
+  // belonging, the annual gathering, and representation in front of legislators.
+  membership: L('חברות', 'Membership'),
+  events: L('אירועים', 'Events'),
+  advocacy: L('רגולציה', 'Advocacy'),
 };
 
 // Support tab — only for influencer, brand, local_business, b2b_saas.
@@ -113,6 +119,7 @@ const SUBTITLE_TEMPLATES: Record<Lang, Record<string, Record<string, string>>> =
     },
     media_news: { _default: 'אני כאן לעזור עם חדשות, עדכונים ובידור' },
     service_provider: { _default: 'אני כאן לעזור בכל עניין ונושא מקצועי' },
+    association: { _default: 'אני כאן לעזור עם חברות, אירועים ורגולציה' },
     government_ministry: { _default: 'אני כאן לעזור עם מידע, שירותים ופרסומים' },
     local_business: {
       food: 'אני כאן לעזור עם מוצרים, הזמנות ומידע',
@@ -143,6 +150,7 @@ const SUBTITLE_TEMPLATES: Record<Lang, Record<string, Record<string, string>>> =
     },
     media_news: { _default: 'Here to help with news, updates, and entertainment' },
     service_provider: { _default: 'Here to help with anything about our services' },
+    association: { _default: 'Here to help with membership, events, and advocacy' },
     government_ministry: { _default: 'Here to help with information, services, and publications' },
     local_business: {
       food: 'Here to help with menu, orders, and info',
@@ -163,6 +171,7 @@ const HEADER_LABELS: Record<Lang, Record<string, Record<string, string>>> = {
     brand: { home: 'בית ועיצוב', fashion: 'סניקרס ואופנה', _default: 'מותג' },
     media_news: { _default: 'חדשות ומדיה' },
     service_provider: { _default: 'Assistant' },
+    association: { _default: 'האיגוד' },
     government_ministry: { _default: 'שירותים ומידע' },
     local_business: { food: 'אוכל ומעדנייה', _default: 'עסק מקומי' },
     tech_creator: { _default: 'טכנולוגיה וסקירות' },
@@ -177,6 +186,7 @@ const HEADER_LABELS: Record<Lang, Record<string, Record<string, string>>> = {
     brand: { home: 'Home & Decor', fashion: 'Fashion', _default: 'Brand' },
     media_news: { _default: 'News & Media' },
     service_provider: { _default: 'Assistant' },
+    association: { _default: 'The Association' },
     government_ministry: { _default: 'Services & Info' },
     local_business: { food: 'Food & Deli', _default: 'Local Business' },
     tech_creator: { _default: 'Tech & Reviews' },
@@ -207,6 +217,8 @@ function generateGreeting(displayName: string, archetype: string, lang: Lang): s
         return `Hi, I'm the ${firstName} assistant. Ask me about news, entertainment, and updates.`;
       case 'service_provider':
         return `Hi, I'm the ${firstName} assistant. Ask me about our services, work, and team.`;
+      case 'association':
+        return `Hi, I'm the ${displayName} assistant. Ask me about membership, our events, and where we stand on the issues.`;
       case 'government_ministry':
         return `Hello, I'm the ${displayName} assistant. Ask me about services, publications, and procedures.`;
       case 'local_business':
@@ -224,6 +236,8 @@ function generateGreeting(displayName: string, archetype: string, lang: Lang): s
       return `היי, אני העוזר של ${firstName}. שאלו אותי על חדשות, בידור ועדכונים`;
     case 'service_provider':
       return `היי, אני העוזר של ${firstName}. שאלו אותי על השירותים, הפרויקטים והניסיון שלנו`;
+    case 'association':
+      return `שלום, אני העוזר של ${displayName}. שאלו אותי על חברות, אירועים ורגולציה`;
     case 'government_ministry':
       return `שלום, אני העוזר החכם של ${displayName}. שאלו אותי על שירותים, פרסומים ונהלים`;
     case 'local_business':
@@ -291,6 +305,16 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
     tabs.push({ id: 'topics', label: STATIC_LABELS.products[lang], type: 'topics' });
   } else if (archetype === 'service_provider') {
     tabs.push({ id: 'topics', label: STATIC_LABELS.services[lang], type: 'topics' });
+  } else if (archetype === 'association') {
+    // Three surfaces rather than one "Services" tab, because a member and a
+    // prospective member arrive wanting different things: how do I join, what is
+    // the annual event, and what are you doing about the rules I operate under.
+    // Each filters on its own topic from the association vocabulary
+    // (src/lib/rag/enrich.ts ASSOCIATION_TOPICS), so the three never render the
+    // same list.
+    tabs.push({ id: 'membership', label: STATIC_LABELS.membership[lang], type: 'topics', topic: 'membership' });
+    tabs.push({ id: 'events', label: STATIC_LABELS.events[lang], type: 'topics', topic: 'events' });
+    tabs.push({ id: 'advocacy', label: STATIC_LABELS.advocacy[lang], type: 'topics', topic: 'advocacy' });
   } else if (archetype === 'government_ministry') {
     tabs.push({ id: 'topics', label: STATIC_LABELS.govServices[lang], type: 'topics' });
   } else if (archetype === 'tech_creator') {

@@ -38,6 +38,11 @@ const ContentFeedTab = dynamic(() => import('@/components/chat/content-feed/Cont
 const ProductsCatalogTab = dynamic(() => import('@/components/chat/ProductsCatalogTab'), { ssr: false });
 const BrandSupportTab = dynamic(() => import('@/components/chat/BrandSupportTab'), { ssr: false });
 const ServicesCatalogTab = dynamic(() => import('@/components/chat/ServicesCatalogTab'), { ssr: false });
+const ContentBrowseTab = dynamic(() => import('@/components/chat/ContentBrowseTab'), { ssr: false });
+
+// The `association` archetype's three content surfaces. Kept in sync with the tab
+// ids emitted by src/lib/chat-ui/generate-tab-config.ts.
+const ASSOCIATION_TAB_IDS = ['membership', 'events', 'advocacy'];
 const PlatformTab = dynamic(() => import('@/components/chat/PlatformTab'), { ssr: false });
 const CustomersTab = dynamic(() => import('@/components/chat/CustomersTab'), { ssr: false });
 const DemoTab = dynamic(() => import('@/components/chat/DemoTab'), { ssr: false });
@@ -3275,6 +3280,41 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                     : question;
                   sendStreamMessage({
                     message: apiMessage,
+                    username,
+                    sessionId: sessionId || undefined,
+                    previousResponseId: responseId || undefined,
+                    clientMessageId: assistantMessageId,
+                  });
+                }}
+              />
+            ) : ASSOCIATION_TAB_IDS.includes(activeTab) ? (
+              // Association tabs (Membership / Events / Advocacy) are one component
+              // parameterised by the tab's own topic filter, not three components.
+              // The topic comes from accounts.config.tabs so the vocabulary stays
+              // owned by generate-tab-config, not duplicated here.
+              <ContentBrowseTab
+                key={activeTab}
+                username={username}
+                tabLabel={
+                  (influencer.tabs || defaultTabsForLang((influencer as any).language))
+                    .find((t: { id: string }) => t.id === activeTab)?.label || activeTab
+                }
+                topics={[
+                  (influencer.tabs || []).find((t: { id: string; topic?: string }) => t.id === activeTab)?.topic
+                    || activeTab,
+                ]}
+                onAskAbout={(question: string) => {
+                  setActiveTab('chat');
+                  maybeShowLeadPopup();
+                  const userMsg = { id: Date.now().toString(), role: 'user' as const, content: question };
+                  setMessages(prev => [...prev, userMsg]);
+                  setIsTyping(true);
+                  const assistantMessageId = (Date.now() + 1).toString();
+                  setStreamingMessageId(assistantMessageId);
+                  setMessages(prev => [...prev, { id: assistantMessageId, role: 'assistant' as const, content: '' }]);
+                  setIsTyping(false);
+                  sendStreamMessage({
+                    message: question,
                     username,
                     sessionId: sessionId || undefined,
                     previousResponseId: responseId || undefined,

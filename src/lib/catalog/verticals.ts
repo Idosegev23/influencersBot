@@ -462,6 +462,9 @@ export function categoryLabel(
 export function verticalForArchetype(archetype: string | null | undefined): VerticalId {
   switch (archetype) {
     case 'service_provider':
+    case 'association':
+      // An association has no catalog at all; 'services' keeps the extractor from
+      // hunting for retail products on membership and policy pages.
       return 'services';
     case 'tech_creator':
       return 'saas';

@@ -198,6 +198,15 @@ export class SandwichBot {
       classification.confidence = 0.8;
     }
 
+    // association accounts: same reasoning again. The classifier reads "group tours
+    // to Nashville" as travel and "driver hours" as fitness; both are association
+    // business, and a retail archetype would answer them in a retail voice.
+    if (accountArchetype === 'association' && classification.primaryArchetype !== 'general') {
+      console.log(`   → Override: ${classification.primaryArchetype} → general (association account)`);
+      classification.primaryArchetype = 'general';
+      classification.confidence = 0.8;
+    }
+
     // ==========================================
     // Retrieve Knowledge Base (skip if cached)
     // ==========================================
