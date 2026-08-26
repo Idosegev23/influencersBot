@@ -44,9 +44,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   // before this passes.
   try {
     await assertWabaOwnership(accessToken, String(wabaId));
-  } catch (e) {
-    console.warn('[wa-connect] ownership rejected', { accountId: draft.id, wabaId, e });
-    return NextResponse.json({ error: 'waba_not_owned' }, { status: 403 });
+  } catch (e: any) {
+    console.warn('[wa-connect] ownership rejected', { accountId: draft.id, wabaId, detail: e?.ownershipDetail ?? String(e) });
+    return NextResponse.json({ error: 'waba_not_owned', detail: e?.ownershipDetail ?? null }, { status: 403 });
   }
 
   if (!phoneNumberId) {

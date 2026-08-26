@@ -89,11 +89,28 @@ export async function assertWabaOwnership(token: string, wabaId: string): Promis
   const url = `${GRAPH}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(token)}`;
   const res = await fetch(url);
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(`debug_token failed (status ${res.status})`);
 
-  const granted: string[] = (data?.data?.granular_scopes ?? []).flatMap((g: any) => g?.target_ids ?? []);
+  const scopes: any[] = data?.data?.granular_scopes ?? [];
+  const granted = scopes.flatMap((g: any) => g?.target_ids ?? []);
+
+  // Scope names and target ids are identifiers, not secrets. Without them a rejection here is
+  // indistinguishable from a genuine ownership failure — and the claimed id may simply live
+  // under a scope shape we did not anticipate.
+  console.log('[wa-connect] ownership check', {
+    claimedWabaId: wabaId,
+    tokenType: data?.data?.type ?? null,
+    appId: data?.data?.app_id ?? null,
+    isValid: data?.data?.is_valid ?? null,
+    scopeNames: scopes.map((g: any) => g?.scope),
+    grantedTargetIds: granted,
+    plainScopes: data?.data?.scopes ?? null,
+    debugError: data?.error ?? data?.data?.error ?? null,
+  });
+
   if (!granted.includes(wabaId)) {
-    throw new Error(`token does not grant access to WABA ${wabaId}`);
+    const err: any = new Error(`token does not grant access to WABA ${wabaId}`);
+    err.ownershipDetail = { claimedWabaId: wabaId, grantedTargetIds: granted, scopeNames: scopes.map((g: any) => g?.scope) };
+    throw err;
   }
 }
 
