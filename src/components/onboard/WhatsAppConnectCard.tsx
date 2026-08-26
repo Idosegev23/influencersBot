@@ -20,6 +20,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const SDK_ID = 'facebook-jssdk';
 
+const FB_ORIGINS = [
+  'https://www.facebook.com',
+  'https://web.facebook.com',
+  'https://business.facebook.com',
+  'https://staticxx.facebook.com',
+];
+
 type Status =
   | { kind: 'idle' }
   | { kind: 'loading' }
@@ -53,7 +60,10 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
   // a cancellation tells us which step the customer stopped on.
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      if (!/facebook\.com$/.test(new URL(event.origin).hostname)) return;
+      // Plain string comparison, never `new URL(...)`: the page receives postMessages from
+      // extensions, Vercel Live and embedded frames, and an opaque origin ("null") makes the
+      // URL constructor THROW. That throw was uncaught and killed this handler's invocation.
+      if (!FB_ORIGINS.includes(event.origin)) return;
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (data?.type !== 'WA_EMBEDDED_SIGNUP') return;
