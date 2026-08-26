@@ -44,6 +44,23 @@ export function useDashboardLang(username: string | null | undefined): {
   const [lang, setLang] = useState<Lang>(initial);
   const [loading, setLoading] = useState<boolean>(!readCached(username || ''));
 
+  // Force one render after mount.
+  //
+  // The server cannot read localStorage, so it renders 'he' while the client's
+  // first render already has the cached 'en'. That is a hydration mismatch, and
+  // React does not repair mismatched ATTRIBUTES — it keeps the server's. Since
+  // the fetch below then resolves to the value we already hold, setLang is a
+  // no-op and no re-render ever corrects them.
+  //
+  // The visible symptom: the Bestie launcher's aria-label and alt stayed Hebrew
+  // on an English dashboard forever, while the panel inside it — rendered later,
+  // after a real state change — was correctly English.
+  //
+  // Flipping this flag guarantees exactly one post-hydration render. Values are
+  // identical across it, so nothing flickers; only the stale attributes are fixed.
+  const [, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
+
   useEffect(() => {
     if (!username) return;
     let cancelled = false;
