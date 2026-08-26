@@ -844,6 +844,27 @@ async function classifyTopicsWithLLM(
 
   const response = await genai.models.generateContent({
     model: 'gemini-3.5-flash',
+    config: {
+      // Structured output, matching the pattern that works elsewhere in this
+      // codebase (complaint-classifier, image-analyzer). The old call asked for a
+      // JSON array in prose and regex-matched it back out of free text; when that
+      // match failed — which it evidently did, constantly — every chunk in the
+      // batch silently took the fallback topic.
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'object',
+        properties: {
+          topics: { type: 'array', items: { type: 'string', enum: [...vocabulary] } },
+        },
+        required: ['topics'],
+      },
+      temperature: 0,
+      // 30 chunks × a short topic string needs far less than this, but a thinking
+      // model spends budget before it emits anything, and running out mid-thought
+      // returns empty text. That is the most likely reason this has been silently
+      // falling back platform-wide.
+      maxOutputTokens: 4000,
+    },
     contents: `Classify each text into exactly ONE topic.
 
 Topics: ${vocabulary.join(', ')}
@@ -863,23 +884,34 @@ Only use a topic from the list above. Return ONLY a JSON array of topic strings,
 
 Texts:
 ${chunks.map((c, i) => `[${i}] (${c.entityType}) ${c.text.substring(0, 250)}`).join('\n\n')}`,
-    config: {
-      temperature: 0,
-      maxOutputTokens: 500,
-    },
   });
 
   const raw = response.text || '';
   try {
-    const jsonMatch = raw.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(raw);
+    const topics = Array.isArray(parsed) ? parsed : parsed?.topics;
+    if (Array.isArray(topics) && topics.length > 0) {
+      return topics.map((t: unknown) => String(t));
     }
-  } catch {
-    log.warn('Failed to parse topic classification response', { raw: raw.substring(0, 200) });
+    throw new Error(`no topics array in response (${raw.length} chars)`);
+  } catch (err: any) {
+    // DO NOT fall back to a default topic here.
+    //
+    // The previous version returned `chunks.map(() => fallback)` on any parse
+    // failure. Because the caller writes whatever comes back, an unparseable
+    // response wrote one plausible-looking topic onto every chunk in the batch —
+    // indistinguishable from real classification. That is how nearly every
+    // account on the platform ended up 100% 'lifestyle' without anyone noticing.
+    //
+    // Throwing leaves `topic` NULL instead, which is visibly unclassified and can
+    // be re-run, and it surfaces in the logs the moment it happens.
+    log.warn('Topic classification failed — leaving chunks unclassified', {
+      error: err?.message || String(err),
+      raw: raw.substring(0, 200),
+      batchSize: chunks.length,
+    });
+    throw err;
   }
-
-  return chunks.map(() => fallback); // Safe default, inside this account's vocabulary
 }
 
 // ============================================
