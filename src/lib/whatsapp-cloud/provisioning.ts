@@ -86,7 +86,15 @@ export async function exchangeEsCode(code: string, redirectUri?: string): Promis
  * unexpected response must never be read as "probably fine".
  */
 export async function assertWabaOwnership(token: string, wabaId: string): Promise<void> {
-  const url = `${GRAPH}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(token)}`;
+  // debug_token must be AUTHENTICATED BY THE APP, not by the token under inspection: Meta
+  // answers "(#100) You must provide an app access token, or a user access token that is an
+  // owner or developer of the app" otherwise. Inspecting a customer's token with itself works
+  // only for our own system-user token, which is why it passed by hand and failed in the flow.
+  const appId = (process.env.NEXT_PUBLIC_FB_APP_ID || '').trim();
+  const appSecret = (process.env.WHATSAPP_APP_SECRET || '').trim();
+  const appToken = `${appId}|${appSecret}`;
+
+  const url = `${GRAPH}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(appToken)}`;
   const res = await fetch(url);
   const data = await res.json().catch(() => null);
 

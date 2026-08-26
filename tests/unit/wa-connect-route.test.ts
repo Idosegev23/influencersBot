@@ -95,3 +95,21 @@ describe('credentials are trimmed before they reach Meta', () => {
     expect(url).not.toContain('%0A');   // the newline, percent-encoded
   });
 });
+
+describe('debug_token is authenticated by the APP, not by the inspected token', () => {
+  it('sends an app access token as the verifier', async () => {
+    // Using the customer's own token as the verifier returns
+    // "(#100) You must provide an app access token..." — it only appears to work when the
+    // inspected token happens to belong to our own app.
+    process.env.NEXT_PUBLIC_FB_APP_ID = '1297141655644794';
+    process.env.WHATSAPP_APP_SECRET = 'realsecret';
+    mockJson({ data: { granular_scopes: [{ scope: 'whatsapp_business_management', target_ids: ['W1'] }] } });
+
+    await assertWabaOwnership('CUSTOMER_TOKEN', 'W1');
+
+    const url = String((fetch as any).mock.calls[0][0]);
+    expect(url).toContain('input_token=CUSTOMER_TOKEN');
+    expect(url).toContain(`access_token=${encodeURIComponent('1297141655644794|realsecret')}`);
+    expect(url).not.toContain('access_token=CUSTOMER_TOKEN');
+  });
+});
