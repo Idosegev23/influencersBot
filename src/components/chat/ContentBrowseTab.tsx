@@ -184,7 +184,7 @@ export default function ContentBrowseTab({
                   {/* Action hint */}
                   <div className="px-2.5 pb-2 flex items-center gap-1 text-purple-500">
                     <ChevronLeft className="w-3 h-3" />
-                    <span className="text-[10px] font-medium">שאל על זה</span>
+                    <span className="text-[10px] font-medium">{ui.actions.askAboutThis}</span>
                   </div>
                 </motion.button>
               ))}

@@ -129,6 +129,7 @@ const STRINGS = {
     // --- Buttons and browse chrome ---
     actions: {
       loadMore: 'טען עוד',
+      askAboutThis: 'שאל על זה',
       newConversation: 'שיחה חדשה',
       newConversationTitle: 'שיחה חדשה?',
       newConversationBody: 'השיחה הנוכחית תימחק ותתחיל שיחה חדשה',
@@ -259,6 +260,7 @@ const STRINGS = {
     // --- Buttons and browse chrome ---
     actions: {
       loadMore: 'Load more',
+      askAboutThis: 'Ask about this',
       newConversation: 'New chat',
       newConversationTitle: 'Start a new chat?',
       newConversationBody: 'This conversation will be cleared and a new one will start.',
