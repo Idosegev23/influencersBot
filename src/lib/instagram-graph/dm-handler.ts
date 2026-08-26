@@ -24,7 +24,8 @@ import {
   type GenericTemplateElement,
 } from './client';
 import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
-import { claimDmMessage, resolveSenderIdentity, formatContactLabel } from './dm-guards';
+import { resolveCardAction } from './dm-rich-cards';
+import { claimDmMessage, resolveSenderIdentity, formatContactLabel, buildDmTurnRows } from './dm-guards';
 import { runEscalationCheck } from '@/engines/escalation/dispatch';
 import { runLeadCaptureCheck, leadDiggingInstruction } from '@/engines/escalation/lead-capture';
 
@@ -51,6 +52,9 @@ export async function processInstagramGraphDM(
   event: IGMessagingEvent,
   igAccountId: string,
 ): Promise<DMProcessResult> {
+  // When the DM actually reached us. Used to stamp the user row so it is always
+  // stored before the reply it triggered — see buildDmTurnRows.
+  const turnReceivedAt = Date.now();
   const senderId = event.sender.id;
   const recipientId = event.recipient.id; // Our IG account
   const messageText = event.message?.text;
@@ -287,6 +291,7 @@ export async function processInstagramGraphDM(
     // 6c. Send rich cards based on archetype or postback (Phase 2+3+5)
     await sendRichCardsIfRelevant({
       archetype,
+      accountArchetype: config.archetype,
       messageText,
       postbackPayload,
       senderId,
@@ -320,20 +325,22 @@ export async function processInstagramGraphDM(
       contact,
     }).catch((e: any) => console.error('[lead-capture] dm hook failed:', e?.message || e));
 
-    // 7. Save messages + update session
+    // 7. Save messages + update session.
+    // Timestamps are explicit: with the default now() the two concurrent inserts
+    // raced and the reply was regularly stored before the message it answered,
+    // which then replayed inverted into the model's history.
     const msgCount = (session?.message_count || 0) + 2;
+    const { userRow, assistantRow } = buildDmTurnRows({
+      sessionId: sessionUUID,
+      messageText,
+      messageId,
+      replyText: fullText,
+      receivedAtMs: turnReceivedAt,
+      completedAtMs: Date.now(),
+    });
     await Promise.all([
-      supabase.from('chat_messages').insert({
-        session_id: sessionUUID,
-        role: 'user',
-        content: messageText,
-        ...(messageId ? { meta_mid: messageId } : {}),
-      }),
-      supabase.from('chat_messages').insert({
-        session_id: sessionUUID,
-        role: 'assistant',
-        content: fullText,
-      }),
+      supabase.from('chat_messages').insert(userRow),
+      supabase.from('chat_messages').insert(assistantRow),
       supabase
         .from('chat_sessions')
         .update({
@@ -545,27 +552,10 @@ function truncateForIG(text: string, limit: number): string {
 // ============================================
 // Rich Cards — Coupons, Products, Issues
 // ============================================
-
-/** Keywords that indicate a product issue */
-const ISSUE_KEYWORDS = ['בעיה', 'לא עובד', 'שבור', 'החלפה', 'החזרה', 'תקלה', 'פגום', 'לא מרוצ', 'נהרס'];
-
-/** Keywords that indicate product discovery */
-const PRODUCT_KEYWORDS = ['מוצר', 'ממליצ', 'שווה', 'לקנות', 'אהבת', 'גלו', 'המלצ', 'הכי טוב', 'מומלץ'];
-
-/** Postback payloads from persistent menu & ice breakers that force specific rich cards */
-const MENU_POSTBACK_MAP: Record<string, 'discover' | 'coupons' | 'issue' | 'brand_select'> = {
-  menu_discover: 'discover',
-  menu_coupons: 'coupons',
-  menu_products: 'discover',
-  menu_product_issue: 'brand_select', // Show brand selection first (like social chat)
-  menu_chat: 'discover',
-  icebreaker_coupon: 'coupons',
-  icebreaker_best_product: 'discover',
-  icebreaker_whats_new: 'discover',
-  icebreaker_product_issue: 'brand_select', // Show brand selection first
-  product_issue_return: 'issue',
-  product_issue_quality: 'issue',
-};
+//
+// The keyword tables and the postback map live in dm-rich-cards.ts together with
+// the account-archetype gate — see the header there for why an agency must never
+// reach any of this.
 
 /**
  * Send rich cards (Generic Template) based on archetype, message content, or postback payload
@@ -573,6 +563,7 @@ const MENU_POSTBACK_MAP: Record<string, 'discover' | 'coupons' | 'issue' | 'bran
  */
 async function sendRichCardsIfRelevant(params: {
   archetype: string;
+  accountArchetype?: string | null;
   messageText: string;
   postbackPayload?: string;
   senderId: string;
@@ -581,15 +572,20 @@ async function sendRichCardsIfRelevant(params: {
   accessToken?: string;
   supabase: any;
 }): Promise<void> {
-  const { archetype, messageText, postbackPayload, senderId, accountId, igAccountId, accessToken, supabase } = params;
-  const lowerMessage = messageText.toLowerCase();
+  const { archetype, accountArchetype, messageText, postbackPayload, senderId, accountId, igAccountId, accessToken, supabase } = params;
 
-  // --- Menu / Ice Breaker postback: force specific rich cards ---
-  // Check for dynamic brand_issue_* payload first
+  // Single decision point — includes the account-archetype gate, so a business
+  // with no catalogue (agency, ministry, association) reaches none of the
+  // branches below no matter what the sender typed or tapped.
+  const forcedAction = resolveCardAction({
+    accountArchetype,
+    botArchetype: archetype,
+    messageText,
+    postbackPayload,
+  });
+  if (!forcedAction) return;
+
   const isBrandIssue = postbackPayload?.startsWith('brand_issue_');
-  const forcedAction = isBrandIssue
-    ? 'issue' as const
-    : (postbackPayload ? MENU_POSTBACK_MAP[postbackPayload] : undefined);
 
   if (forcedAction === 'discover') {
     const productElements = await buildProductCarousel(supabase, accountId);
@@ -637,42 +633,6 @@ async function sendRichCardsIfRelevant(params: {
       await sendGenericTemplate(senderId, issueElements, igAccountId, accessToken);
     }
     return;
-  }
-
-  // --- Keyword-based detection (organic messages, not postbacks) ---
-
-  // Product Issue — show brand selection (like social chat's problem tab)
-  const isProductIssue = ISSUE_KEYWORDS.some(kw => lowerMessage.includes(kw));
-  if (isProductIssue) {
-    const brandElements = await buildBrandSelectionForIssue(supabase, accountId);
-    if (brandElements.length > 0) {
-      await sendGenericTemplate(senderId, brandElements, igAccountId, accessToken);
-    } else {
-      // No brands — show generic issue card
-      const elements = await buildProductIssueCards(supabase, accountId);
-      if (elements.length > 0) {
-        await sendGenericTemplate(senderId, elements, igAccountId, accessToken);
-      }
-    }
-    return;
-  }
-
-  // Coupon Cards
-  if (archetype === 'coupons') {
-    const couponElements = await buildCouponCards(supabase, accountId);
-    if (couponElements.length > 0) {
-      await sendGenericTemplate(senderId, couponElements, igAccountId, accessToken);
-    }
-    return;
-  }
-
-  // Product Discovery Carousel
-  const isProductQuery = PRODUCT_KEYWORDS.some(kw => lowerMessage.includes(kw));
-  if (isProductQuery) {
-    const productElements = await buildProductCarousel(supabase, accountId);
-    if (productElements.length > 0) {
-      await sendGenericTemplate(senderId, productElements, igAccountId, accessToken);
-    }
   }
 }
 

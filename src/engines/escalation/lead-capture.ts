@@ -281,6 +281,39 @@ async function classifyLeadLLM(input: {
 
 // ── Helpers ──
 
+/**
+ * Contact details, pulled straight out of the raw message.
+ *
+ * WHY THIS IS NOT LEFT TO THE MODEL: a phone number is not a judgement call, and
+ * the cheap router-lane classifier kept losing it. Both real inbound IG leads on
+ * ldrs_group reached the sales inbox with no way to call the person back —
+ * אביחי מזרחי typed "0507723585" (2026-08-16) and פז טוויק typed
+ * "פז טוויק - 0526894662 | מייל- paztwik@gmail.com" (2026-08-20); both briefs went
+ * out with contact_phone/contact_email null and `customer_phone` null on the row.
+ *
+ * Deterministic first, classifier on top: this can only ADD a detail, never
+ * remove one the model did find.
+ */
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+/**
+ * Israeli mobile / landline, in the shapes people actually type: 0501234567,
+ * 054-766-7775, 052 883 1122, +972547667775. Anchored on non-digits at both ends
+ * so it cannot slice a phone out of a follower count, a budget or a year — the
+ * numbers that dominate these conversations ("תקציב 250 אלף", "9,000 עוקבים",
+ * "כמעט 100000 צפיות").
+ */
+const PHONE_RE = /(?<!\d)(?:\+?972[-.\s]?|0)(?:5\d|[2-489])[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)/;
+
+export function extractContactDetails(text: string): { phone?: string; email?: string } {
+  const out: { phone?: string; email?: string } = {};
+  const src = text || '';
+  const email = src.match(EMAIL_RE)?.[0];
+  if (email) out.email = email;
+  const phone = src.match(PHONE_RE)?.[0];
+  if (phone) out.phone = phone.trim();
+  return out;
+}
+
 function mergeFields(prior: LeadFields, next: LeadFields): LeadFields {
   const merged: LeadFields = { ...prior };
   for (const k of Object.keys(next || {}) as (keyof LeadFields)[]) {
@@ -422,7 +455,13 @@ export async function runLeadCaptureCheck(
   if (!verdict) return { isLead: !!row, skipped: 'classifier_unavailable' };
   if (!verdict.is_lead && !row) return { isLead: false };
 
-  const fields = mergeFields(priorFields, verdict.fields || {});
+  // Deterministic contact details from the raw message go on top of whatever the
+  // classifier returned — it kept losing them (see extractContactDetails).
+  const detected = extractContactDetails(input.userMessage);
+  const fields = mergeFields(mergeFields(priorFields, verdict.fields || {}), {
+    contact_phone: detected.phone,
+    contact_email: detected.email,
+  });
   const leadType = mergeLeadType(priorType, verdict.lead_type);
   const fieldsChanged =
     JSON.stringify(fields) !== JSON.stringify(priorFields) || leadType !== priorType;
@@ -444,6 +483,9 @@ export async function runLeadCaptureCheck(
               last_activity_at: nowIso,
             },
           },
+          // Keep the inbox column in step — a phone that arrives after the brief
+          // used to stay invisible in the support list.
+          ...(fields.contact_phone ? { customer_phone: fields.contact_phone } : {}),
           updated_at: nowIso,
         })
         .eq('id', row.id);
@@ -479,7 +521,11 @@ export async function runLeadCaptureCheck(
   if (row) {
     await supabase
       .from('support_requests')
-      .update({ metadata: { ...(row.metadata || {}), lead: leadMeta }, updated_at: nowIso })
+      .update({
+        metadata: { ...(row.metadata || {}), lead: leadMeta },
+        ...(fields.contact_phone ? { customer_phone: fields.contact_phone } : {}),
+        updated_at: nowIso,
+      })
       .eq('id', row.id);
     leadRow = { ...row, metadata: { ...(row.metadata || {}), lead: leadMeta } };
   } else {

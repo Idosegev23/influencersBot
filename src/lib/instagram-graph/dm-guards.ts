@@ -75,3 +75,46 @@ export async function resolveSenderIdentity(
     return null; // resolution is best-effort — never block the reply
   }
 }
+
+/**
+ * The two `chat_messages` rows for one DM turn, with explicit timestamps.
+ *
+ * WHY EXPLICIT: both rows used to be inserted in one `Promise.all` relying on
+ * `created_at`'s default now(), so the order came down to which statement reached
+ * Postgres first. On ldrs_group the bot's reply landed before the message it
+ * answered in 20 of 33 threads. History is read back `order by created_at`, so
+ * every prior exchange was replayed to the model inverted — the model saw its own
+ * answer, then the question.
+ *
+ * `receivedAtMs` is when the webhook delivered the DM and `completedAtMs` is when
+ * the reply was ready, which also gives the real latency instead of the
+ * write-artifact gap described in analytics/value-proof/timings.ts. The +1ms floor
+ * keeps the ordering strict even when a reply comes back inside the same
+ * millisecond (a cached or canned answer).
+ */
+export function buildDmTurnRows(input: {
+  sessionId: string;
+  messageText: string;
+  messageId?: string;
+  replyText: string;
+  receivedAtMs: number;
+  completedAtMs: number;
+}): { userRow: Record<string, any>; assistantRow: Record<string, any> } {
+  const assistantAtMs = Math.max(input.completedAtMs, input.receivedAtMs + 1);
+  return {
+    userRow: {
+      session_id: input.sessionId,
+      role: 'user',
+      content: input.messageText,
+      created_at: new Date(input.receivedAtMs).toISOString(),
+      ...(input.messageId ? { meta_mid: input.messageId } : {}),
+    },
+    assistantRow: {
+      session_id: input.sessionId,
+      role: 'assistant',
+      content: input.replyText,
+      created_at: new Date(assistantAtMs).toISOString(),
+      metadata: { latency_ms: Math.max(0, Math.round(input.completedAtMs - input.receivedAtMs)) },
+    },
+  };
+}

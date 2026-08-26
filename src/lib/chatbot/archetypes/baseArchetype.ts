@@ -15,6 +15,7 @@ import type { ResponseStreamEvent } from 'openai/resources/responses/responses';
 import { buildPersonalityFromDB, type PersonalityConfig } from '../personality-wrapper';
 import { compactKnowledgeContext } from '@/lib/rag/compact-knowledge-context';
 import { recordBotGaveUp } from '@/lib/telemetry/bot-quality';
+import { outputLanguageDirective } from './output-language';
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -630,11 +631,13 @@ export abstract class BaseArchetype {
       // Build archetype-specific instructions (replaces system prompt)
       const accountLanguage = (input.accountContext.language || 'he').toLowerCase();
       const isEnglish = accountLanguage === 'en';
-      // Authoritative output-language directive — overrides any Hebrew phrasing
-      // in the prompts below. The prompt scaffolding stays in Hebrew (one source
-      // of truth for tone & structure); only the *output language* flips.
-      const LANG_DIRECTIVE_EN = '🌍 OUTPUT LANGUAGE: Respond to the user ONLY in English. The instructions below are written in Hebrew for internal authoring convenience — translate the *intent*, never the *output*. Hebrew tags such as <<SUGGESTIONS>> / <<INTENT>> remain literal, but the human-facing strings inside them and every visible word in your reply MUST be English. Do not transliterate, do not mix languages.\n\n';
-      const langDirective = isEnglish ? LANG_DIRECTIVE_EN : '';
+      // Authoritative output-language directive — overrides any phrasing in the
+      // prompts below. The prompt scaffolding stays in Hebrew (one source of
+      // truth for tone & structure); only the *output language* flips.
+      // BOTH sides are pinned: a Hebrew account used to get no directive at all,
+      // so a single English turn flipped the thread permanently. See
+      // archetypes/output-language.ts for the ldrs_group evidence.
+      const langDirective = outputLanguageDirective(accountLanguage);
       const todayDate = isEnglish
         ? new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
         : new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });

@@ -7,6 +7,7 @@ import {
   mergeLeadType,
   LEAD_SOURCES,
   LEAD_SOURCE_BY_CHANNEL,
+  extractContactDetails,
 } from '@/engines/escalation/lead-capture';
 import type { LeadVerdict } from '@/engines/escalation/lead-capture';
 import { buildLeadBriefEmail } from '@/engines/escalation/lead-email-template';
@@ -577,5 +578,136 @@ describe('leadDiggingInstruction lanes', () => {
     expect(s).toContain('מה סדר גודל התקציב');       // lane (א)
     expect(s).toContain('מה גודל הקהל/מספר העוקבים'); // lane (ב)
     expect(s).toContain('אל תשאל/י על תקציב לעולם');
+  });
+});
+
+/**
+ * Contact details are not a judgement call — they are literally in the text.
+ *
+ * Both real inbound IG leads on ldrs_group reached sales with no way to phone
+ * the person back, because the router-lane classifier simply did not return them:
+ *   • אביחי מזרחי, 2026-08-16 — typed "0507723585"; brief `contact_phone: null`.
+ *   • פז טוויק,   2026-08-20 — typed "פז טוויק - 0526894662 | מייל- paztwik@gmail.com";
+ *     brief `contact_phone: null`, `contact_email: null`.
+ * `support_requests.customer_phone` was null on both. So a deterministic pass
+ * runs over the raw message and the classifier can only ADD to it, never lose it.
+ */
+describe('extractContactDetails', () => {
+  it('pulls the two real messages that were dropped in production', () => {
+    expect(extractContactDetails('0507723585')).toEqual({ phone: '0507723585' });
+    expect(extractContactDetails('פז טוויק - 0526894662\nמייל- paztwik@gmail.com')).toEqual({
+      phone: '0526894662',
+      email: 'paztwik@gmail.com',
+    });
+  });
+
+  it('handles the ways Israelis actually type a number', () => {
+    expect(extractContactDetails('054-766-7775').phone).toBe('054-766-7775');
+    expect(extractContactDetails('הטלפון שלי 052 883 1122').phone).toBe('052 883 1122');
+    expect(extractContactDetails('+972547667775').phone).toBe('+972547667775');
+    expect(extractContactDetails('אפשר לחזור אליי ל‑0523550870 תודה').phone).toBe('0523550870');
+  });
+
+  it('does not invent a phone out of other numbers in the conversation', () => {
+    // Presence first, so this test cannot pass vacuously.
+    expect(extractContactDetails('תקציב 250000 שח, הטלפון 0541234567').phone).toBe('0541234567');
+    // …and these carry no contact detail at all:
+    expect(extractContactDetails('מהלך הוליסטי רחב תקציב 250 אלף שח').phone).toBeUndefined();
+    expect(extractContactDetails('יש לי 9,000 עוקבים').phone).toBeUndefined();
+    expect(extractContactDetails('כרגע 2,000+').phone).toBeUndefined();
+    expect(extractContactDetails('סרטונים שהגיעו לכמעט 100000 צפיות').phone).toBeUndefined();
+    expect(extractContactDetails('נדבר ב-2026').phone).toBeUndefined();
+    expect(extractContactDetails('').phone).toBeUndefined();
+  });
+
+  it('finds an email anywhere in the sentence but ignores handles and urls', () => {
+    expect(extractContactDetails('אפשר במייל noahshilo@gmail.com').email).toBe('noahshilo@gmail.com');
+    expect(extractContactDetails('קו"ח ל jobs@ldrsgroup.com בבקשה').email).toBe('jobs@ldrsgroup.com');
+    expect(extractContactDetails('האינסטגרם שלי @noki_coffe').email).toBeUndefined();
+    expect(extractContactDetails('תראו באתר https://ldrsgroup.com').email).toBeUndefined();
+  });
+});
+
+describe('contact details survive a classifier that misses them', () => {
+  it("אביחי's post-brief phone number flags an updated brief instead of being dropped", async () => {
+    const supabase = makeSupabase({
+      config: routedConfig,
+      existingLeadRow: {
+        id: 'r1',
+        session_id: 'sess',
+        metadata: { lead: { state: 'sent', lead_type: 'talent', fields: { contact_name: 'אביחי' } } },
+      },
+    });
+    const sendEmail = vi.fn();
+    const out = await runLeadCaptureCheck(
+      { ...baseInput, userMessage: '0507723585' },
+      {
+        supabase: supabase as any,
+        sendEmail: sendEmail as any,
+        // the production classifier returned nothing for this bare-number turn
+        classify: async () => verdict('gathering', {}, 'talent'),
+      },
+    );
+
+    expect(out.isLead).toBe(true);
+    expect(out.skipped).not.toBe('already_sent'); // it used to stop right here
+    const upd = supabase.updates.find((u) => u.table === 'support_requests');
+    expect(upd.patch.metadata.lead.fields.contact_phone).toBe('0507723585');
+    expect(upd.patch.metadata.lead.fields.contact_name).toBe('אביחי'); // preserved
+    expect(upd.patch.metadata.lead.fields_changed_after_brief).toBe(true);
+    expect(upd.patch.customer_phone).toBe('0507723585'); // the row column too
+  });
+
+  it("פז's name + phone + email land in the gathering row the flush will send", async () => {
+    const supabase = makeSupabase({ config: routedConfig });
+    const out = await runLeadCaptureCheck(
+      { ...baseInput, userMessage: 'פז טוויק - 0526894662\nמייל- paztwik@gmail.com' },
+      {
+        supabase: supabase as any,
+        sendEmail: vi.fn() as any,
+        classify: async () => verdict('gathering', { contact_name: 'פי סושיאל' }, 'talent'),
+      },
+    );
+
+    expect(out.isLead).toBe(true);
+    const ins = supabase.inserts.find((i) => i.table === 'support_requests');
+    expect(ins.row.metadata.lead.fields.contact_phone).toBe('0526894662');
+    expect(ins.row.metadata.lead.fields.contact_email).toBe('paztwik@gmail.com');
+    expect(ins.row.customer_phone).toBe('0526894662');
+  });
+
+  it('the classifier still wins when it extracted something the regex cannot see', async () => {
+    const supabase = makeSupabase({ config: routedConfig });
+    await runLeadCaptureCheck(
+      { ...baseInput, userMessage: 'אפשר לחזור אליי? השארתי את המספר קודם' },
+      {
+        supabase: supabase as any,
+        sendEmail: vi.fn() as any,
+        classify: async () => verdict('gathering', { contact_phone: '050-1112222' }, 'brand'),
+      },
+    );
+    const ins = supabase.inserts.find((i) => i.table === 'support_requests');
+    expect(ins.row.metadata.lead.fields.contact_phone).toBe('050-1112222');
+  });
+
+  it('a turn with no contact detail leaves a known one alone', async () => {
+    const supabase = makeSupabase({
+      config: routedConfig,
+      existingLeadRow: {
+        id: 'r1',
+        session_id: 'sess',
+        metadata: { lead: { state: 'sent', lead_type: 'brand', fields: { contact_phone: '050-9998887' } } },
+      },
+    });
+    const out = await runLeadCaptureCheck(
+      { ...baseInput, userMessage: 'תודה רבה!' },
+      {
+        supabase: supabase as any,
+        sendEmail: vi.fn() as any,
+        classify: async () => verdict('gathering', {}, 'brand'),
+      },
+    );
+    expect(out.skipped).toBe('already_sent');
+    expect(supabase.updates).toHaveLength(0);
   });
 });

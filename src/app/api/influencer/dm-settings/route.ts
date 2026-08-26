@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { setIceBreakers, setPersistentMenu, getIceBreakers, getPersistentMenu } from '@/lib/instagram-graph/client';
+import { defaultIceBreakers, defaultPersistentMenu } from '@/lib/instagram-graph/dm-menu-defaults';
 import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { requireAdminAuth } from '@/lib/auth/admin-auth';
 
@@ -42,19 +43,9 @@ async function authorizeDmSettings(
 // ============================================
 // Default Configurations
 // ============================================
-
-const DEFAULT_ICE_BREAKERS = [
-  { question: 'יש לך קופון? 🎁', payload: 'icebreaker_coupon' },
-  { question: 'מה המוצר הכי שווה?', payload: 'icebreaker_best_product' },
-  { question: 'מה חדש? ✨', payload: 'icebreaker_whats_new' },
-  { question: 'יש בעיה במוצר', payload: 'icebreaker_product_issue' },
-];
-
-const DEFAULT_PERSISTENT_MENU = [
-  { type: 'postback' as const, title: 'גלו מוצרים ⭐', payload: 'menu_discover' },
-  { type: 'postback' as const, title: 'קופונים והנחות 🎁', payload: 'menu_coupons' },
-  { type: 'postback' as const, title: 'בעיה במוצר 🛍️', payload: 'menu_product_issue' },
-];
+//
+// The defaults are archetype-aware — see lib/instagram-graph/dm-menu-defaults.ts
+// for why (an agency was offering coupons for five months).
 
 // ============================================
 // POST — Configure DM Settings
@@ -89,17 +80,22 @@ export async function POST(req: NextRequest) {
     const igAccountId = connection.ig_business_account_id;
     const accessToken = connection.access_token;
 
-    // Determine which config to use
-    const iceBreakersConfig = use_defaults ? DEFAULT_ICE_BREAKERS : (ice_breakers || DEFAULT_ICE_BREAKERS);
-    const menuConfig = use_defaults ? DEFAULT_PERSISTENT_MENU : (persistent_menu || DEFAULT_PERSISTENT_MENU);
-
-    // Optionally add website link to persistent menu
     const { data: accountData } = await supabase
       .from('accounts')
       .select('config')
       .eq('id', accountId)
       .single();
 
+    // Determine which config to use. The defaults follow the archetype: an
+    // agency / ministry / association has no coupons and no catalogue, so it must
+    // not be handed the shop menu (LDRS ran exactly that for five months).
+    const archetype = accountData?.config?.archetype;
+    const iceBreakerDefaults = defaultIceBreakers(archetype);
+    const menuDefaults = defaultPersistentMenu(archetype);
+    const iceBreakersConfig = use_defaults ? iceBreakerDefaults : (ice_breakers || iceBreakerDefaults);
+    const menuConfig = use_defaults ? menuDefaults : (persistent_menu || menuDefaults);
+
+    // Optionally add website link to persistent menu
     const websiteUrl = accountData?.config?.website;
     const finalMenu = [...menuConfig];
     if (websiteUrl && !finalMenu.some((m: any) => m.type === 'web_url')) {
@@ -221,8 +217,8 @@ export async function GET(req: NextRequest) {
       connected: true,
     } : { connected: false },
     defaults: {
-      ice_breakers: DEFAULT_ICE_BREAKERS,
-      persistent_menu: DEFAULT_PERSISTENT_MENU,
+      ice_breakers: defaultIceBreakers(accountData?.config?.archetype),
+      persistent_menu: defaultPersistentMenu(accountData?.config?.archetype),
     },
     ...(liveConfig ? { live_config: liveConfig } : {}),
   });
