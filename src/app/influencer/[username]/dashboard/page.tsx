@@ -24,6 +24,7 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
+import ContentInsightsSection from '@/components/dashboard/ContentInsightsSection';
 
 // ─── Types ──────────────────────────────────────────
 
@@ -496,6 +497,17 @@ export default function InfluencerDashboardPage({
         </div>
       ) : (
         <>
+        {/* ── Content insights ──
+            Placed above the metrics strip on purpose: on a freshly scanned
+            account every metric below is zero and every list is empty, and these
+            are the only thing on the page with something to say. Renders nothing
+            at all when there are no evidence-backed insights. */}
+        <ContentInsightsSection
+          username={username}
+          t={t.dashboard as unknown as Record<string, string>}
+          isEn={isEn}
+        />
+
         {/* ── Metrics strip ── */}
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 stagger-children">
           {[

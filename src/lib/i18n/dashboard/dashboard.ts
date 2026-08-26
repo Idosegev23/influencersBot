@@ -103,6 +103,18 @@ export const dashboard = {
     quickNav: 'ניווט מהיר',
     settings: 'הגדרות',
     qrShare: 'QR + שיתוף',
+
+    // Content insights — derived from the scan, so they exist before any traffic
+    contentInsights: 'תובנות מהתוכן',
+    contentInsightsSub: 'מה שהסריקה מצאה בתוכן שלך',
+    insightsEmpty: 'עוד אין תובנות מגובות בראיות. הן נוצרות בסוף כל סריקה.',
+    insightsEvidence: 'הראיות',
+    insightsShowEvidence: 'הצג ראיות',
+    insightsHideEvidence: 'הסתר ראיות',
+    insightTypeTopPerformers: 'מה עובד',
+    insightTypeContentGaps: 'פערי תוכן',
+    insightTypeTopicMap: 'מפת נושאים',
+    insightTypeCadence: 'קצב פרסום',
   },
   en: {
     pageTitle: 'Dashboard',
@@ -207,5 +219,17 @@ export const dashboard = {
     quickNav: 'Quick nav',
     settings: 'Settings',
     qrShare: 'QR + share',
+
+    // Content insights — derived from the scan, so they exist before any traffic
+    contentInsights: 'Content insights',
+    contentInsightsSub: 'What the scan found in your content',
+    insightsEmpty: 'No evidence-backed insights yet. These are generated at the end of every scan.',
+    insightsEvidence: 'Evidence',
+    insightsShowEvidence: 'Show evidence',
+    insightsHideEvidence: 'Hide evidence',
+    insightTypeTopPerformers: 'What works',
+    insightTypeContentGaps: 'Content gaps',
+    insightTypeTopicMap: 'Topic map',
+    insightTypeCadence: 'Publishing rhythm',
   },
 } as const;

@@ -1,6 +1,6 @@
 export const SCAN_STEPS = [
   'create-account', 'ig-scan', 'transcribe', 'fb-scan', 'youtube-scan', 'tiktok-scan', 'site-discover', 'site-crawl',
-  'rag-ingest', 'product-extract', 'persona-build', 'finalize',
+  'rag-ingest', 'product-extract', 'persona-build', 'insights-build', 'finalize',
 ];
 
 export interface StepLog { step: string; status: string; progress?: number; message?: string; timestamp: string }

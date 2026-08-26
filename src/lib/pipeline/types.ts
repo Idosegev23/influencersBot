@@ -1,15 +1,15 @@
 export type PipelineStep =
   | 'create-account' | 'ig-scan' | 'transcribe' | 'fb-scan' | 'youtube-scan' | 'tiktok-scan' | 'site-discover'
-  | 'site-crawl' | 'rag-ingest' | 'product-extract' | 'persona-build' | 'finalize';
+  | 'site-crawl' | 'rag-ingest' | 'product-extract' | 'persona-build' | 'insights-build' | 'finalize';
 
 export const STEP_ORDER: PipelineStep[] = [
   'create-account', 'ig-scan', 'transcribe', 'fb-scan', 'youtube-scan', 'tiktok-scan', 'site-discover',
-  'site-crawl', 'rag-ingest', 'product-extract', 'persona-build', 'finalize',
+  'site-crawl', 'rag-ingest', 'product-extract', 'persona-build', 'insights-build', 'finalize',
 ];
 
 export const BATCH_SIZES: Record<PipelineStep, number> = {
   'create-account': 0, 'ig-scan': 0, 'transcribe': 5, 'fb-scan': 0, 'youtube-scan': 0, 'tiktok-scan': 0, 'site-discover': 0,
-  'site-crawl': 15, 'rag-ingest': 20, 'product-extract': 20, 'persona-build': 0, 'finalize': 0,
+  'site-crawl': 15, 'rag-ingest': 20, 'product-extract': 20, 'persona-build': 0, 'insights-build': 0, 'finalize': 0,
 };
 
 export interface PipelineOptions {

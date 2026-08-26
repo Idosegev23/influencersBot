@@ -10,6 +10,7 @@ import { siteCrawlStep } from './site-crawl';
 import { ragIngestStep } from './rag-ingest';
 import { productExtractStep } from './product-extract';
 import { personaBuildStep } from './persona-build';
+import { insightsBuildStep } from './insights-build';
 import { finalizeStep } from './finalize';
 
 export type StepResult =
@@ -61,5 +62,6 @@ export const STEP_HANDLERS: Record<PipelineStep, StepHandler> = {
   'rag-ingest': ragIngestStep,
   'product-extract': productExtractStep,
   'persona-build': personaBuildStep,
+  'insights-build': insightsBuildStep,
   'finalize': finalizeStep,
 };
