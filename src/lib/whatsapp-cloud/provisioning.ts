@@ -196,6 +196,8 @@ export async function runProvisioningChain(args: {
     .upsert({
       account_id: accountId, waba_id: wabaId, phone_number_id: phoneNumberId,
       token_secret_id: secretId, onboarding_mode: 'coexistence', status: 'pending',
+      display_phone_number: numberMeta.display_phone_number ?? null,
+      verified_name: numberMeta.verified_name ?? null,
       connected_at: new Date().toISOString(), provision_state: state,
     }, { onConflict: 'account_id' })
     .select('id')
@@ -209,6 +211,8 @@ export async function runProvisioningChain(args: {
 
   // 4. Coexistence sync — mandatory and time-boxed: Meta offboards the customer if the business
   //    does not initiate within 24h. The payloads that come back are ACKed and DISCARDED (D6).
+  // The 24h deadline makes a silent failure here the most expensive one in the chain, so
+  // Meta's reason is recorded rather than collapsed into a boolean.
   const syncs = await Promise.all([
     graph(`/${phoneNumberId}/smb_app_data`, accessToken, {
       method: 'POST', body: JSON.stringify({ messaging_product: 'whatsapp', sync_type: 'smb_app_state_sync' }),
@@ -218,6 +222,12 @@ export async function runProvisioningChain(args: {
     }),
   ]);
   state.coexistence_sync = syncs.every((s) => s.ok);
+  if (!state.coexistence_sync) {
+    console.error('[wa-connect] coexistence sync REJECTED — 24h deadline is running', {
+      phoneNumberId,
+      responses: syncs.map((s) => ({ ok: s.ok, error: (s.data as any)?.error ?? null })),
+    });
+  }
   await supabase.from('whatsapp_channels')
     // Only stamp the clock when it actually started. A false stamp would hide a missed deadline.
     .update({ sync_initiated_at: state.coexistence_sync ? new Date().toISOString() : null, provision_state: { ...state } })

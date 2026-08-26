@@ -24,25 +24,28 @@ export const CS_TEMPLATES: CsTemplateDef[] = [
   {
     name: 'cs_followup',
     category: 'UTILITY',
-    he: { text: 'שלום {{1}}, פנייתך אל {{2}} עודכנה. אפשר להמשיך מכאן.',
+    he: { text: 'שלום {{1}}, יש עדכון בפנייה ששלחת אל {{2}}.\n\nאפשר להשיב להודעה הזו כדי להמשיך את השיחה מהנקודה שבה עצרנו.',
           example: { body_text: [['דנה', 'המותג']] } },
-    en: { text: 'Hello {{1}}, your request to {{2}} has been updated. You can continue here.',
+    en: { text: 'Hello {{1}}, there is an update on the request you sent to {{2}}.\n\nYou can reply to this message to continue the conversation where it left off.',
           example: { body_text: [['Dana', 'the business']] } },
   },
   {
     name: 'cs_order_update',
     category: 'UTILITY',
-    he: { text: 'שלום {{1}}, הזמנה {{2}} אצל {{3}} עודכנה. הסטטוס הנוכחי: {{4}}.',
-          example: { body_text: [['דנה', '10432', 'המותג', 'נשלחה']] } },
-    en: { text: 'Hello {{1}}, order {{2}} at {{3}} has been updated. Current status: {{4}}.',
-          example: { body_text: [['Dana', '10432', 'the business', 'shipped']] } },
+    // Three variables, not four, and enough surrounding text: Meta rejects a body whose
+    // variables dominate its length (error_subcode 2388293). The brand name was dropped —
+    // the number the message arrives from already identifies it.
+    he: { text: 'שלום {{1}}, יש עדכון בנוגע להזמנה שלך.\n\nמספר ההזמנה: {{2}}\nהסטטוס העדכני: {{3}}\n\nאפשר להשיב להודעה הזו ונשמח לעזור בכל שאלה.',
+          example: { body_text: [['דנה', '10432', 'נשלחה']] } },
+    en: { text: 'Hello {{1}}, there is an update regarding your order.\n\nOrder number: {{2}}\nCurrent status: {{3}}\n\nYou can reply to this message and we will be glad to help.',
+          example: { body_text: [['Dana', '10432', 'shipped']] } },
   },
   {
     name: 'cs_human_reply',
     category: 'UTILITY',
-    he: { text: 'שלום {{1}}, נציג מ{{2}} השיב לפנייתך.',
+    he: { text: 'שלום {{1}}, נציג מטעם {{2}} השיב לפנייה שלך.\n\nהתשובה ממתינה לך כאן, ואפשר להמשיך את השיחה בהודעה חוזרת.',
           example: { body_text: [['דנה', 'המותג']] } },
-    en: { text: 'Hello {{1}}, a representative from {{2}} has replied to your request.',
+    en: { text: 'Hello {{1}}, a representative from {{2}} has replied to your request.\n\nThe reply is waiting here, and you can continue the conversation by replying to this message.',
           example: { body_text: [['Dana', 'the business']] } },
   },
 ];

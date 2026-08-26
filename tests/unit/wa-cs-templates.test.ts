@@ -43,3 +43,20 @@ describe('CS templates stay UTILITY', () => {
     }
   });
 });
+
+describe('variables never dominate the body', () => {
+  it('keeps Meta\'s variable-to-length ratio in range (error_subcode 2388293)', () => {
+    // cs_order_update was rejected live for having 4 variables in one short sentence.
+    // Meta does not publish the exact ratio, so this asserts a conservative floor: at least
+    // 25 characters of real text per variable.
+    for (const t of CS_TEMPLATES) {
+      for (const lang of ['he', 'en'] as const) {
+        const body = t[lang];
+        const vars = (body.text.match(/\{\{\d+\}\}/g) ?? []).length;
+        const staticChars = body.text.replace(/\{\{\d+\}\}/g, '').trim().length;
+        expect(vars, `${t.name}/${lang} variable count`).toBeLessThanOrEqual(3);
+        expect(staticChars / Math.max(vars, 1), `${t.name}/${lang} chars per variable`).toBeGreaterThan(25);
+      }
+    }
+  });
+});
