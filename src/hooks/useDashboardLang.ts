@@ -16,7 +16,11 @@
  * Hebrew accounts never flicker into English.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
+
+// useLayoutEffect warns when it runs during SSR; this hook is used inside client
+// components that are still server-rendered, so fall back to useEffect there.
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 type Lang = 'he' | 'en';
 
@@ -40,26 +44,27 @@ export function useDashboardLang(username: string | null | undefined): {
   lang: Lang;
   loading: boolean;
 } {
-  const initial: Lang = username ? readCached(username) || 'he' : 'he';
-  const [lang, setLang] = useState<Lang>(initial);
+  // Start where the SERVER starts.
+  //
+  // Reading the cache during the first render looks free, but the server cannot
+  // read localStorage, so it renders 'he' while the client's first render has
+  // 'en'. React hydrates, its virtual DOM now says 'en', and the real DOM still
+  // says 'he' — and because the two vDOMs agree from then on, React never writes
+  // the attribute again. The Bestie launcher's aria-label and alt stayed Hebrew
+  // on an English dashboard permanently, while the panel inside it (rendered
+  // later, after a genuine state change) was correctly English.
+  //
+  // Matching the server on render 1 and applying the cache in a layout effect
+  // makes it a REAL state change, which React does write to the DOM. The layout
+  // effect runs before paint, so there is still no visible flicker.
+  const [lang, setLang] = useState<Lang>('he');
   const [loading, setLoading] = useState<boolean>(!readCached(username || ''));
 
-  // Force one render after mount.
-  //
-  // The server cannot read localStorage, so it renders 'he' while the client's
-  // first render already has the cached 'en'. That is a hydration mismatch, and
-  // React does not repair mismatched ATTRIBUTES — it keeps the server's. Since
-  // the fetch below then resolves to the value we already hold, setLang is a
-  // no-op and no re-render ever corrects them.
-  //
-  // The visible symptom: the Bestie launcher's aria-label and alt stayed Hebrew
-  // on an English dashboard forever, while the panel inside it — rendered later,
-  // after a real state change — was correctly English.
-  //
-  // Flipping this flag guarantees exactly one post-hydration render. Values are
-  // identical across it, so nothing flickers; only the stale attributes are fixed.
-  const [, setHydrated] = useState(false);
-  useEffect(() => { setHydrated(true); }, []);
+  useIsomorphicLayoutEffect(() => {
+    if (!username) return;
+    const cached = readCached(username);
+    if (cached) setLang(cached);
+  }, [username]);
 
   useEffect(() => {
     if (!username) return;
