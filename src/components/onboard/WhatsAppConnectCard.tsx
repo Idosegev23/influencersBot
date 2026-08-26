@@ -224,6 +224,10 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
       <p className="text-xs text-gray-400 mb-3">
         חברו את מספר הוואטסאפ העסקי שלכם. תמשיכו להשתמש באפליקציה בטלפון כרגיל — הבוט פשוט יענה על אותו מספר.
       </p>
+      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+        <strong>חשוב לדעת מראש:</strong> בסוף התהליך תתבקשו לחבר אמצעי תשלום בחשבון של מטא.
+        בלעדיו מטא חוסמת הודעות יוצאות והבוט לא יוכל לענות ללקוחות שלכם.
+      </p>
 
       {status.kind === 'loading' && <p className="text-xs text-gray-400">טוען…</p>}
 
@@ -251,20 +255,25 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
           {billing?.paymentReady ? (
             <p className="text-sm font-medium text-green-600">✅ אמצעי התשלום פעיל. הכל מוכן.</p>
           ) : (
-            <div className="rounded-xl bg-gray-50 border border-gray-200 p-3 space-y-2">
-              <div className="text-sm font-semibold text-gray-900">נשאר שלב אחד: אמצעי תשלום</div>
-              <p className="text-xs text-gray-500">
-                מטא מחייבת אתכם ישירות על ההודעות — אנחנו לא מעורבים בתשלום ולא רואים את הכרטיס.
-                בלי אמצעי תשלום מטא תחסום הודעות יוצאות.
+            <div className="rounded-xl bg-amber-50 border-2 border-amber-300 p-3 space-y-2">
+              <div className="text-sm font-bold text-amber-900">
+                ⚠️ עוד לא סיימתם — חסר אמצעי תשלום
+              </div>
+              <p className="text-xs text-amber-800">
+                <strong>עד שתחברו כרטיס, הבוט לא ישלח אף הודעה.</strong> המספר מחובר, אבל מטא
+                חוסמת הודעות יוצאות מחשבון בלי אמצעי תשלום — הלקוחות שלכם יכתבו ולא יקבלו מענה.
+              </p>
+              <p className="text-xs text-amber-700">
+                מטא מחייבת אתכם ישירות. אנחנו לא מעורבים בתשלום ולא רואים את פרטי הכרטיס.
               </p>
               {billing?.wabaId && (
                 <a
                   href={`https://business.facebook.com/settings/whatsapp-business-accounts/${billing.wabaId}`}
                   target="_blank" rel="noopener noreferrer"
-                  className="inline-block px-4 py-2 rounded-xl text-sm font-semibold text-white transition"
-                  style={{ background: '#883fe2' }}
+                  className="inline-block px-4 py-2 rounded-xl text-sm font-bold text-white transition"
+                  style={{ background: '#b45309' }}
                 >
-                  פתח את הגדרות התשלום במטא
+                  חברו אמצעי תשלום עכשיו ←
                 </a>
               )}
               <p className="text-xs text-gray-400">
