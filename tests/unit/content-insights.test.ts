@@ -154,23 +154,42 @@ describe('the evidence rule', () => {
 });
 
 describe('audience questions', () => {
-  it('keeps questions and drops applause', () => {
+  const c = (text: string) => ({ text, postUrl: null, platform: 'facebook' });
+
+  it('keeps real questions and drops applause', () => {
     const found = extractAudienceQuestions([
-      { text: 'See you there', postUrl: null, platform: 'facebook' },
-      { text: 'Well deserved!', postUrl: null, platform: 'facebook' },
-      { text: 'How much does membership cost for a small operator?', postUrl: null, platform: 'facebook' },
-      { text: 'When is Marketplace 2027', postUrl: null, platform: 'instagram' },
+      c('See you there'),
+      c('Well deserved!'),
+      c('How much does membership cost for a small operator?'),
+      c('Does ABA offer any discount for first-year members?'),
     ]);
     // Presence first — a filter that drops everything would satisfy "no applause".
     expect(found).toHaveLength(2);
     expect(found.map((f) => f.text).join(' ')).toContain('membership cost');
-    expect(found.map((f) => f.text).join(' ')).toContain('Marketplace 2027');
+  });
+
+  it("drops \"Can't wait!\" — an apostrophe is a word boundary", () => {
+    // This shipped into a live run labelled "asked by a real visitor" because the
+    // interrogative-opener rule matched \bcan\b inside "Can't".
+    expect(extractAudienceQuestions([c("Can't wait!")])).toHaveLength(0);
+    expect(extractAudienceQuestions([c('Can anyone tell me when registration opens?')])).toHaveLength(1);
+  });
+
+  it('drops comments carrying a link', () => {
+    expect(
+      extractAudienceQuestions([c("What's new in Virginia? https://www.virginia.org/group-tours/")]),
+    ).toHaveLength(0);
+  });
+
+  it('requires a question mark and enough words to act on', () => {
+    expect(extractAudienceQuestions([c('When is Marketplace 2027')])).toHaveLength(0); // no '?'
+    expect(extractAudienceQuestions([c('How much?')])).toHaveLength(0); // too short to act on
   });
 
   it('deduplicates repeats of the same question', () => {
     const found = extractAudienceQuestions([
-      { text: 'How do I join?', postUrl: null, platform: 'facebook' },
-      { text: 'how do i join??', postUrl: null, platform: 'instagram' },
+      c('How do I join as a tour operator?'),
+      c('how do i join as a tour operator??'),
     ]);
     expect(found).toHaveLength(1);
   });

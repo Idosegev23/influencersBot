@@ -56,22 +56,33 @@ function openai(): OpenAI {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
-const QUESTION_STARTERS =
-  /^(what|when|where|who|why|how|is|are|do|does|did|can|could|should|would|will|any|anyone|has|have)\b/i;
-
-/** Comments that are actually asking something, not applauding. */
+/**
+ * Comments that are actually asking something, not applauding.
+ *
+ * These get shown to the owner labelled "asked by a real visitor", so the bar is
+ * high: a false positive puts words in a customer's audience's mouth. Every rule
+ * below is here because a live ABA run tripped over it.
+ */
 export function extractAudienceQuestions(comments: { text: string; postUrl: string | null; platform: string }[]) {
   const seen = new Set<string>();
   return comments
     .filter((c) => {
       const t = c.text.trim();
-      if (t.length < 8 || t.length > 300) return false;
-      // A comment carrying a link is the account promoting itself or somebody
-      // dropping a reference — not a member asking something. A live ABA run put
-      // "What's new in Virginia? https://virginia.org/..." and a Freedom Riders
-      // link-drop into the results as though a visitor had asked them.
+      if (t.length < 12 || t.length > 200) return false;
+
+      // A link is promotion or a citation, not a member asking something. The
+      // first run surfaced "What's new in Virginia? https://virginia.org/..." and
+      // a Freedom Riders link-drop as though visitors had asked them.
       if (/https?:\/\/|\bwww\./i.test(t)) return false;
-      if (!t.includes('?') && !QUESTION_STARTERS.test(t)) return false;
+
+      // A question mark is required. Matching interrogative openers instead let
+      // "Can't wait!" through — \b sits happily between "can" and the apostrophe.
+      if (!t.includes('?')) return false;
+
+      // Four words is not a question anyone can act on, and it is where the
+      // enthusiasm ("Any more info?") outnumbers the substance.
+      if (t.split(/\s+/).filter(Boolean).length < 5) return false;
+
       const key = t.toLowerCase().replace(/\W+/g, ' ').trim();
       if (seen.has(key)) return false;
       seen.add(key);
