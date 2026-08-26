@@ -202,9 +202,35 @@ costly per page load, and non-deterministic in front of a client.
 | Type | Derived from |
 |---|---|
 | `top_performers` | Real cross-platform engagement ranking (IG + FB), each claim carrying the specific posts and their numbers |
-| `content_gaps` | **Real comments** from IG and Facebook, matched against what the RAG corpus can actually answer |
+| `content_gaps` | A **coverage audit** — see the revision below |
 | `topic_map` | The association's topic system with relative weight — Advocacy, Marketplace, safety, membership, group tourism |
 | `cadence` | Posting frequency, day/hour, length, media use — measured against actual performance |
+
+### Revision: `content_gaps` is a coverage audit, not an audience transcript
+
+The design above read gaps out of what the audience asked in comments. Measured
+against the real corpus, that source does not carry the weight:
+
+- Instagram: **27 comments across 100 posts**.
+- Facebook: `topComments` came back populated on 1 post in 12 on first sampling;
+  the full scan collected **60 comments total** across 400 posts.
+- The comments that do exist are overwhelmingly congratulations — *"See you
+  there"*, *"Well deserved!"* — not questions.
+
+A headline insight built on that would have meant inventing an audience. So
+`content_gaps` is now a **coverage audit**: the model is asked for the questions a
+real visitor to this specific account would arrive with, grounded in the
+account's own topic map so it cannot invent a line of business, and every one of
+them is put through the same `retrieveContext` the live assistant uses. A
+question whose best match scores below the floor is a genuine hole — the
+assistant will be asked it and will have to hedge. The evidence is the retrieval
+result itself (score plus closest match), so any claim can be re-run and checked.
+
+Real audience questions are still extracted and **rank first** when they exist,
+because somebody actually typing a question outranks any simulation of one. The
+generator also emits the reassuring half — what the assistant *does* answer well
+— and refuses to report "gaps" at all when more than 80% of probes come back
+uncovered, since that is a broken index rather than a content-strategy finding.
 
 **The evidence rule.** Every row carries `evidence jsonb`: an array of
 `{platform, post_id, url, metric, value}`. **An insight that cannot cite evidence is not
@@ -263,3 +289,29 @@ change**.
   codebase has shipped two real bugs behind vacuously-passing absence assertions.
 - End-to-end: the scan is judged on real counts (pages, IG posts, FB posts, RAG chunks,
   insight rows), not on the job reporting success.
+
+---
+
+## 9. What the production run actually showed
+
+Recorded after the fact, because several estimates in this document were wrong in
+ways worth keeping.
+
+**Vercel is blocked, confirmed.** Once the account row existed with
+`config.widget.domain`, `/api/demo/proxy` fetched buses.org from Vercel's own
+egress and returned `Failed to fetch: 403`. The Apify transport was not an
+improvement on the fetch path; it was the only way in. In the live scan
+`crawlTransport` flipped to `apify` on its own and the browser run crawled the
+site that answers every plain request with a challenge.
+
+**Facebook is ABA's stronger channel, by a wide margin.** 300 posts carrying
+2,900 reactions and 219 comments, against 100 Instagram posts with 614 reactions
+and 27 comments. The first twelve-post sample suggested Facebook was the quiet
+one; at full scale it is the opposite, which is exactly what the per-platform
+comparison in `top_performers` exists to surface.
+
+**A pre-existing infinite loop surfaced under this scan.** `transcribe` had no
+attempt ceiling, so one video that could never be transcribed re-enqueued the
+step 492 times — about 25 minutes of QStash messages, Vercel invocations and
+Gemini calls that could not have succeeded, with the job frozen at step 3 of 13
+behind it. Fixed separately; the fix released this scan immediately.
