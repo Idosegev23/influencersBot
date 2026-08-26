@@ -1,14 +1,14 @@
 export type PipelineStep =
-  | 'create-account' | 'ig-scan' | 'transcribe' | 'youtube-scan' | 'tiktok-scan' | 'site-discover'
+  | 'create-account' | 'ig-scan' | 'transcribe' | 'fb-scan' | 'youtube-scan' | 'tiktok-scan' | 'site-discover'
   | 'site-crawl' | 'rag-ingest' | 'product-extract' | 'persona-build' | 'finalize';
 
 export const STEP_ORDER: PipelineStep[] = [
-  'create-account', 'ig-scan', 'transcribe', 'youtube-scan', 'tiktok-scan', 'site-discover',
+  'create-account', 'ig-scan', 'transcribe', 'fb-scan', 'youtube-scan', 'tiktok-scan', 'site-discover',
   'site-crawl', 'rag-ingest', 'product-extract', 'persona-build', 'finalize',
 ];
 
 export const BATCH_SIZES: Record<PipelineStep, number> = {
-  'create-account': 0, 'ig-scan': 0, 'transcribe': 5, 'youtube-scan': 0, 'tiktok-scan': 0, 'site-discover': 0,
+  'create-account': 0, 'ig-scan': 0, 'transcribe': 5, 'fb-scan': 0, 'youtube-scan': 0, 'tiktok-scan': 0, 'site-discover': 0,
   'site-crawl': 15, 'rag-ingest': 20, 'product-extract': 20, 'persona-build': 0, 'finalize': 0,
 };
 
@@ -29,13 +29,14 @@ export interface PipelineOptions {
   // `categories` / `maxPages` caps. Needed for SPA storefronts whose sitemap lists only
   // category pages, leaving product detail pages reachable solely via listing-page links.
   seedUrls?: string[];
+  facebook?: string; // Facebook page URL, slug or @handle (optional extra source)
   youtube?: string; // YouTube channel URL or @handle (optional extra source)
   tiktok?: string;  // TikTok @handle or URL (optional extra source)
   hasIg?: boolean;  // true = `username` is a real IG handle to scrape (even if it equals the domain, e.g. @buyme.co.il); false = domain/social anchor only
   // Incremental enrichment: when set, ONLY these sources are (re)scraped; the other
   // scrape steps skip, while rag-ingest / persona-build / finalize still run so the
   // new content folds into the existing account data. Undefined = full scan.
-  enrichSources?: ('instagram' | 'website' | 'youtube' | 'tiktok')[];
+  enrichSources?: ('instagram' | 'website' | 'youtube' | 'tiktok' | 'facebook')[];
 }
 
 export interface PipelineState {

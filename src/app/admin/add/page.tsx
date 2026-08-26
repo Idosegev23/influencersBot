@@ -46,6 +46,7 @@ export default function AddAccountPage() {
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [youtube, setYoutube] = useState('');
   const [tiktok, setTiktok] = useState('');
+  const [facebook, setFacebook] = useState('');
   const [archetype, setArchetype] = useState('brand');
   // Catalog market — drives the product taxonomy AND the extraction prompt.
   // Follows the archetype until the admin overrides it, then stays put.
@@ -163,13 +164,20 @@ export default function AddAccountPage() {
     const site = websiteUrl.trim();
     const yt = youtube.trim();
     const tt = tiktok.trim();
+    const fb = facebook.trim();
 
     // The account row needs a username. Prefer IG, then site domain, then a YT/TikTok handle.
     let accountUsername = igUsername;
     if (!accountUsername && site) {
       try { accountUsername = new URL(site.startsWith('http') ? site : `https://${site}`).host; } catch { setError('כתובת אתר לא תקינה'); return; }
     }
-    if (!accountUsername && (tt || yt)) accountUsername = (tt || yt).replace(/^@/, '').slice(0, 60);
+    if (!accountUsername && (tt || yt || fb)) {
+      accountUsername = (tt || yt || fb)
+        .replace(/^https?:\/\/(www\.)?facebook\.com\//i, '')
+        .replace(/^@/, '')
+        .split(/[/?#]/)[0]
+        .slice(0, 60);
+    }
 
     if (scanMode === 'quote') {
       // At least one source — Instagram, website, YouTube, or TikTok.
@@ -228,6 +236,7 @@ export default function AddAccountPage() {
           categories: scanMode === 'quote' ? selectedCategories : undefined,
           youtube: youtube.trim() || undefined,
           tiktok: tiktok.trim() || undefined,
+          facebook: facebook.trim() || undefined,
         }),
       });
 
@@ -347,11 +356,11 @@ export default function AddAccountPage() {
     );
   }
 
-  const hasAnySource = !!(username.trim() || selectedCategories.length > 0 || youtube.trim() || tiktok.trim());
+  const hasAnySource = !!(username.trim() || selectedCategories.length > 0 || youtube.trim() || tiktok.trim() || facebook.trim());
   const primaryDisabled = isLoading || (scanMode === 'quote'
     // Quote needs at least one source: Instagram, website categories, YouTube, or TikTok.
     ? !hasAnySource
-    : !(username.trim() || youtube.trim() || tiktok.trim()));
+    : !(username.trim() || youtube.trim() || tiktok.trim() || facebook.trim()));
 
   return (
     <div className="max-w-lg mx-auto">
@@ -504,6 +513,19 @@ export default function AddAccountPage() {
                 value={tiktok}
                 onChange={(e) => setTiktok(e.target.value)}
                 placeholder="@handle"
+                className="neon-input w-full"
+                style={{ direction: 'ltr' }}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+                Facebook <span className="font-normal" style={{ color: '#817a6c' }}>(אופציונלי)</span>
+              </label>
+              <input
+                type="text"
+                value={facebook}
+                onChange={(e) => setFacebook(e.target.value)}
+                placeholder="שם העמוד או כתובת מלאה"
                 className="neon-input w-full"
                 style={{ direction: 'ltr' }}
               />

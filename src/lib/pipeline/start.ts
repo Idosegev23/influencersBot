@@ -22,7 +22,8 @@ export interface StartPipelineInput {
   seedUrls?: string[];
   youtube?: string;
   tiktok?: string;
-  enrichSources?: ('instagram' | 'website' | 'youtube' | 'tiktok')[];
+  facebook?: string;
+  enrichSources?: ('instagram' | 'website' | 'youtube' | 'tiktok' | 'facebook')[];
   requestedBy?: string;
 }
 
@@ -51,6 +52,7 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     seedUrls,
     youtube,
     tiktok,
+    facebook,
     enrichSources,
     requestedBy = 'admin:pipeline',
   } = input;
@@ -75,10 +77,16 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     }
   }
   // No IG and no website but a YouTube/TikTok source given — anchor on that handle.
-  if (!uname && (youtube || tiktok)) uname = String(tiktok || youtube).replace(/^@/, '').slice(0, 60);
+  if (!uname && (youtube || tiktok || facebook)) {
+    uname = String(tiktok || youtube || facebook)
+      .replace(/^https?:\/\/(www\.)?facebook\.com\//i, '')
+      .replace(/^@/, '')
+      .split(/[/?#]/)[0]
+      .slice(0, 60);
+  }
 
   if (!uname || !accountId) {
-    return { error: 'username (or websiteUrl / youtube / tiktok) and accountId required', status: 400 };
+    return { error: 'username (or websiteUrl / youtube / tiktok / facebook) and accountId required', status: 400 };
   }
 
   const repo = getScanJobsRepo();
@@ -95,7 +103,7 @@ export async function startPipeline(input: StartPipelineInput): Promise<StartPip
     counts: {},
     cursors: {},
     websiteUrl: websiteUrl || undefined,
-    options: { transcribe, maxPages, postsLimit, isDemo, language, archetype, productVertical, scanMode, categories, seedUrls, youtube, tiktok, hasIg, enrichSources },
+    options: { transcribe, maxPages, postsLimit, isDemo, language, archetype, productVertical, scanMode, categories, seedUrls, youtube, tiktok, facebook, hasIg, enrichSources },
   };
   await saveState(job.id, state);
   await publishStep({ jobId: job.id, step: 'create-account', batch: 0 });

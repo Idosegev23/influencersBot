@@ -2,6 +2,7 @@ import type { PipelineStep, StepContext } from '../types';
 import { createAccountStep } from './create-account';
 import { igScanStep } from './ig-scan';
 import { transcribeStep } from './transcribe';
+import { fbScanStep } from './fb-scan';
 import { youtubeScanStep } from './youtube-scan';
 import { tiktokScanStep } from './tiktok-scan';
 import { siteDiscoverStep } from './site-discover';
@@ -29,7 +30,10 @@ export type StepHandler = (ctx: StepContext) => Promise<StepResult>;
  * persona-build / finalize do NOT call this, so they always run and fold the newly
  * scraped source into the existing account content. No enrichSources = full scan.
  */
-export function enrichSkips(ctx: StepContext, source: 'instagram' | 'website' | 'youtube' | 'tiktok'): boolean {
+export function enrichSkips(
+  ctx: StepContext,
+  source: 'instagram' | 'website' | 'youtube' | 'tiktok' | 'facebook',
+): boolean {
   const enrich = ctx.state.options?.enrichSources;
   if (!enrich || enrich.length === 0) return false;
   return !enrich.includes(source);
@@ -49,6 +53,7 @@ export const STEP_HANDLERS: Record<PipelineStep, StepHandler> = {
   'create-account': createAccountStep,
   'ig-scan': igScanStep,
   'transcribe': transcribeStep,
+  'fb-scan': fbScanStep,
   'youtube-scan': youtubeScanStep,
   'tiktok-scan': tiktokScanStep,
   'site-discover': siteDiscoverStep,
