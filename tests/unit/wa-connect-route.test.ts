@@ -77,3 +77,21 @@ describe('ES code exchange', () => {
     await expect(exchangeEsCode('CODE')).resolves.toBe('EAAG-from-variant-2');
   });
 });
+
+describe('credentials are trimmed before they reach Meta', () => {
+  it('a trailing newline on the app secret does not reach the request', async () => {
+    // This is not hypothetical: signature.ts already trims for exactly this reason, and
+    // because the exchange did not, webhooks verified while every exchange came back
+    // "Error validating client secret".
+    process.env.WHATSAPP_APP_SECRET = 'realsecret\n';
+    process.env.NEXT_PUBLIC_FB_APP_ID = '1297141655644794\n';
+    mockJson({ access_token: 'T' });
+
+    await exchangeEsCode('CODE');
+
+    const url = String((fetch as any).mock.calls[0][0]);
+    expect(url).toContain('client_secret=realsecret&');
+    expect(url).toContain('client_id=1297141655644794&');
+    expect(url).not.toContain('%0A');   // the newline, percent-encoded
+  });
+});

@@ -85,7 +85,7 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
   }, []);
 
   useEffect(() => {
-    const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
+    const appId = (process.env.NEXT_PUBLIC_FB_APP_ID || '').trim();
     if (!appId) { setStatus({ kind: 'error', message: 'החיבור לוואטסאפ אינו מוגדר. פנו אלינו.' }); return; }
 
     (window as any).fbAsyncInit = function () {
@@ -146,7 +146,7 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
   }, [token, refreshBilling]);
 
   const launch = useCallback(() => {
-    const configId = process.env.NEXT_PUBLIC_WA_ES_CONFIG_ID;
+    const configId = (process.env.NEXT_PUBLIC_WA_ES_CONFIG_ID || '').trim();
     const FB = (window as any).FB;
     if (!configId) {
       console.error('[wa-connect] NEXT_PUBLIC_WA_ES_CONFIG_ID is missing from the build');

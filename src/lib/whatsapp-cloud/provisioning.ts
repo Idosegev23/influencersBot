@@ -23,8 +23,12 @@ const GRAPH = `https://graph.facebook.com/${process.env.WHATSAPP_GRAPH_VERSION |
  * tells us the answer, collapse this back to the single winning form.
  */
 export async function exchangeEsCode(code: string, redirectUri?: string): Promise<string> {
-  const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
-  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  // TRIM. Vercel persists env values with a trailing newline often enough that
+  // src/lib/whatsapp-cloud/signature.ts already defends against it — and because that file
+  // trimmed and this one did not, webhook signatures verified perfectly while every code
+  // exchange came back "Error validating client secret". The same secret, two behaviours.
+  const appId = (process.env.NEXT_PUBLIC_FB_APP_ID || '').trim();
+  const appSecret = (process.env.WHATSAPP_APP_SECRET || '').trim();
   if (!appId || !appSecret) {
     throw new Error('NEXT_PUBLIC_FB_APP_ID and WHATSAPP_APP_SECRET are required to exchange an ES code');
   }
@@ -38,6 +42,8 @@ export async function exchangeEsCode(code: string, redirectUri?: string): Promis
     hasEquals: code.includes('='), hasPercent: code.includes('%'), hasHash: code.includes('#'),
     redirectUri: redirectUri ?? null,
     appId,
+    secretTrimmed: (process.env.WHATSAPP_APP_SECRET || '').length !== appSecret.length,
+    appIdTrimmed: (process.env.NEXT_PUBLIC_FB_APP_ID || '').length !== appId.length,
   });
 
   const base: Record<string, string> = { client_id: appId, client_secret: appSecret, code };
