@@ -19,6 +19,17 @@ interface DiscoveryRow {
   items: DiscoveryItem[];
 }
 
+/** Hebrew metric labels from data-queries.ts → English, for `accounts.language = 'en'`. */
+const EN_METRIC_LABELS: Record<string, string> = {
+  'צפיות': 'views',
+  'לייקים': 'likes',
+  'תגובות': 'comments',
+  'מעורבות': 'engagement',
+  '% מעורבות': '% engagement',
+  'שיתופים': 'shares',
+  'שמירות': 'saves',
+};
+
 export async function GET(req: NextRequest) {
   const username = req.nextUrl.searchParams.get('username');
   if (!username) {
@@ -133,6 +144,12 @@ export async function GET(req: NextRequest) {
         }
 
         if (items.length === 0) return null;
+
+        // The metric labels are authored in Hebrew inside src/lib/discovery/
+        // data-queries.ts and passed down as plain strings, so an English account
+        // rendered cards reading "לייקים" and "צפיות" under English titles.
+        // Translating at this boundary keeps the Hebrew accounts byte-identical.
+        if (isEn) items = items.map((it) => ({ ...it, metricLabel: EN_METRIC_LABELS[it.metricLabel] ?? it.metricLabel }));
 
         return {
           category: {
