@@ -1849,7 +1849,7 @@ h1, h2, h3, h4, h5, h6 {
   color: #1a1a2e;
   outline: none;
   transition: all 0.3s ease;
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
 }
 
 .problem-input:focus {
@@ -1875,7 +1875,7 @@ h1, h2, h3, h4, h5, h6 {
   outline: none;
   resize: none;
   transition: all 0.3s ease;
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
 }
 
 .problem-textarea:focus {
@@ -2420,7 +2420,7 @@ a.support-card {
   box-shadow: 0 8px 17px rgba(0, 0, 0, 0.1), 0 31px 31px rgba(0, 0, 0, 0.09),
     0 69px 41px rgba(0, 0, 0, 0.05), 0 123px 49px rgba(0, 0, 0, 0.01);
   position: relative;
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
 }
 
 .support-modal-close {
@@ -4004,7 +4004,7 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
   box-shadow: 0 8px 20px rgba(136,63,226,0.12);
 }
 .cf-recipe-card {
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
 }
 .cf-recipe-card__inner {
   display: flex;
@@ -4172,7 +4172,7 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
   gap: 12px;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
 }
 .cf-beauty-card:hover {
   transform: translateY(-2px);
@@ -4295,7 +4295,7 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
   height: 88dvh;
   max-height: 88dvh;
   background: #ffffff;
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
   display: flex; flex-direction: column;
   overflow: hidden;
   border-radius: 26px 26px 0 0;
@@ -4536,7 +4536,7 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
    ═══════════════════════════════════════════ */
 
 .pcat-tab {
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
   height: 100%;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -4564,7 +4564,7 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
   font-weight: 300;
   color: #676767;
   outline: none;
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
   text-align: start;
   transition: box-shadow 0.2s;
 }
@@ -4637,7 +4637,7 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
 /* ── Featured product card ── */
 .pcat-featured {
   position: relative;
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
   width: 100%;
   background: #ffffff;
   border: 2px solid transparent;
@@ -4839,7 +4839,7 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
   bottom: 0;
   left: 0;
   right: 0;
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
   background: #883fe2;
   color: #ffffff;
   padding: 12px;
@@ -4892,7 +4892,7 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
   justify-content: center;
 }
 .pcat-sheet {
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
   position: relative;
   width: 100%;
   max-width: 414px;
@@ -5726,7 +5726,7 @@ body[data-service-sheet-open] .mobile-bottom-tabs {
  * ============================================================ */
 .dpc {
   /* The parent flex slot has overflow-hidden; we own the scroll here. */
-  direction: rtl;
+  direction: inherit; /* follows the account: rtl for Hebrew, ltr for English */
   height: 100%;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;

@@ -3,12 +3,13 @@
  * markup is rendered in the admin tab, the brand dashboard and the printable
  * branded export, and the export must survive being sent to a PDF.
  *
- * RTL throughout — Hebrew is the primary language of both surfaces.
+ * Direction follows the account, not the stylesheet. These rules used to pin
+ * `direction: rtl`, and a CSS declaration beats the `dir` attribute — so the
+ * English report kept rendering right-to-left even after its markup said ltr.
  */
 
 .vp-root {
-  direction: rtl;
-  text-align: right;
+  text-align: start;
   font-feature-settings: 'tnum' 1; /* tabular figures so columns of numbers line up */
 }
 
@@ -101,7 +102,6 @@
 
 /* ---- branded printable report page ---- */
 .vp-page {
-  direction: rtl;
   max-width: 900px;
   margin: 0 auto;
   padding: 2.5rem 1.75rem 3rem;
@@ -216,7 +216,7 @@
   border: 1px solid var(--vp-border, rgba(0, 0, 0, 0.16));
   background: transparent;
   color: inherit;
-  text-align: right;
+  text-align: start;
 }
 
 .vp-cost-save {
