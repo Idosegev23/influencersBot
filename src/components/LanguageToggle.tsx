@@ -23,7 +23,11 @@ export function LanguageToggle({ lang, variant = 'nav' }: LanguageToggleProps) {
   const [busy, setBusy] = useState(false);
 
   const target: DashboardLang = lang === 'en' ? 'he' : 'en';
-  const targetLabel = target === 'en' ? 'English' : 'עברית'; // native names — not translated
+  // Named in the language currently on screen, not its own. Native names are the
+  // usual convention, but "עברית" was the single remaining piece of Hebrew script
+  // on an English customer's dashboard, and "Hebrew" is what an English reader
+  // can actually parse.
+  const targetLabel = target === 'en' ? 'English' : lang === 'en' ? 'Hebrew' : 'עברית';
   const t = getDashboardStrings(lang).nav;
 
   async function switchLanguage() {
