@@ -43,7 +43,14 @@ const securityHeaders = [
       // a codec problem and is not one. Scoped to our storage host rather than
       // `https:` so this stays narrower than img-src.
       "media-src 'self' blob: https://*.supabase.co",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://generativelanguage.googleapis.com https://vercel.live https://vitals.vercel-insights.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.facebook.com https://analytics.tiktok.com https://*.tiktok.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://generativelanguage.googleapis.com https://vercel.live https://vitals.vercel-insights.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.facebook.com https://graph.facebook.com https://connect.facebook.net https://analytics.tiktok.com https://*.tiktok.com",
+      // WhatsApp Embedded Signup. The Facebook JS SDK loads fine (script-src already
+      // allows connect.facebook.net) but then builds a hidden cross-domain iframe
+      // (xd_arbiter on staticxx.facebook.com) to talk to its login window. With no
+      // frame-src this fell back to default-src 'self' and the browser blocked it
+      // SILENTLY — the button appeared to do nothing at all. Exactly the media-src
+      // failure mode described above: the symptom points nowhere near the CSP.
+      "frame-src 'self' https://www.facebook.com https://staticxx.facebook.com https://web.facebook.com https://business.facebook.com",
       "frame-ancestors 'none'",
     ].join('; '),
   },

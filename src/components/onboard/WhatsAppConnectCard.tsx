@@ -81,10 +81,24 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
       js.id = SDK_ID;
       js.src = 'https://connect.facebook.net/en_US/sdk.js';
       js.async = true; js.defer = true; js.crossOrigin = 'anonymous';
+      js.onerror = () => {
+        console.error('[wa-connect] Facebook SDK failed to load (check CSP script-src)');
+        setStatus({ kind: 'error', message: 'לא הצלחנו לטעון את חלון החיבור של מטא. נסו לרענן, ואם זה חוזר — פנו אלינו.' });
+      };
       document.body.appendChild(js);
     } else if ((window as any).FB) {
       setStatus({ kind: 'idle' });
     }
+
+    // A silently-blocked SDK is the worst failure mode: the button renders and does
+    // nothing. If FB never initialises, say so instead of leaving a dead button.
+    const t = setTimeout(() => {
+      if (!(window as any).FB) {
+        console.error('[wa-connect] FB SDK never initialised — likely CSP frame-src/script-src');
+        setStatus({ kind: 'error', message: 'חלון החיבור של מטא לא נטען. נסו לרענן את הדף.' });
+      }
+    }, 8000);
+    return () => clearTimeout(t);
   }, []);
 
   const [billing, setBilling] = useState<Billing | null>(null);
@@ -118,13 +132,31 @@ export function WhatsAppConnectCard({ token }: { token: string }) {
   const launch = useCallback(() => {
     const configId = process.env.NEXT_PUBLIC_WA_ES_CONFIG_ID;
     const FB = (window as any).FB;
-    if (!FB || !configId) { setStatus({ kind: 'error', message: 'החיבור לוואטסאפ אינו מוגדר. פנו אלינו.' }); return; }
+    if (!configId) {
+      console.error('[wa-connect] NEXT_PUBLIC_WA_ES_CONFIG_ID is missing from the build');
+      setStatus({ kind: 'error', message: 'החיבור לוואטסאפ אינו מוגדר. פנו אלינו.' });
+      return;
+    }
+    if (!FB) {
+      console.error('[wa-connect] window.FB is undefined at launch — SDK blocked or not loaded');
+      setStatus({ kind: 'error', message: 'חלון החיבור של מטא לא זמין. נסו לרענן את הדף.' });
+      return;
+    }
 
     setStatus({ kind: 'connecting' });
     sessionRef.current = {};
 
+    // If the popup never opens (blocked iframe, blocked popup), FB.login's callback never
+    // fires and the card would sit on "waiting" forever. Time it out with a real message.
+    const stuck = setTimeout(() => {
+      setStatus((cur) => cur.kind === 'connecting'
+        ? { kind: 'error', message: 'החלון של מטא לא נפתח. ודאו שחוסם החלונות הקופצים כבוי ונסו שוב.' }
+        : cur);
+    }, 60_000);
+
     FB.login(
       async (response: any) => {
+        clearTimeout(stuck);
         const code = response?.authResponse?.code;
         if (!code) { setStatus({ kind: 'error', message: humanError() }); return; }
 
