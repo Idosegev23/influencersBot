@@ -48,10 +48,17 @@ describe('ES code exchange', () => {
     await expect(exchangeEsCode('CODE')).rejects.toThrow(/exchange failed/i);
   });
 
-  it('never puts the app secret in the URL query string', async () => {
-    mockJson({ access_token: 'T' });
-    await exchangeEsCode('CODE');
-    const url = String((fetch as any).mock.calls[0][0]);
-    expect(url).not.toContain('secret');
+  it('surfaces Meta\'s error detail without leaking the secret or the code', async () => {
+    // GET with query params is the form Meta documents for /oauth/access_token, so the secret
+    // does travel in the URL — inside TLS, on a server-to-server call. What must NEVER escape
+    // is the secret or the authorization code appearing in what we log or return.
+    mockJson({ error: { message: 'This authorization code has expired.', code: 100, error_subcode: 36009, type: 'OAuthException' } }, false);
+    await expect(exchangeEsCode('SECRET_CODE_VALUE')).rejects.toMatchObject({
+      metaDetail: { code: 100, subcode: 36009, type: 'OAuthException' },
+    });
+    const detail = await exchangeEsCode('SECRET_CODE_VALUE').catch((e) => JSON.stringify(e.metaDetail));
+    expect(detail).not.toContain('SECRET_CODE_VALUE');
+    expect(detail).not.toContain('secret');
+    expect(detail).toContain('expired');   // and it DOES carry the diagnosis
   });
 });

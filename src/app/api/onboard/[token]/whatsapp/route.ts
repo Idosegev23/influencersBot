@@ -33,9 +33,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   let accessToken: string;
   try {
     accessToken = await exchangeEsCode(String(code));
-  } catch (e) {
-    console.error('[wa-connect] code exchange failed', e);
-    return NextResponse.json({ error: 'exchange_failed' }, { status: 400 });
+  } catch (e: any) {
+    console.error('[wa-connect] code exchange failed', e?.metaDetail ?? e);
+    // Echo Meta's own error fields so a live failure is diagnosable from the browser instead
+    // of needing log access. Contains no credential and no authorization code.
+    return NextResponse.json({ error: 'exchange_failed', meta: e?.metaDetail ?? null }, { status: 400 });
   }
 
   // The browser claimed waba_id; Meta decides whether that claim is true. Nothing is written

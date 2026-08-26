@@ -13,8 +13,9 @@ const GRAPH = `https://graph.facebook.com/${process.env.WHATSAPP_GRAPH_VERSION |
 /**
  * Exchange the Embedded Signup code for a business-integration system-user token.
  *
- * Sent as a POST body rather than a query string: the app secret would otherwise land in
- * access logs, proxies and error traces along the way.
+ * GET with query params, which is the form Meta documents for /oauth/access_token — a POST
+ * body is not reliably accepted there. The secret travels inside the TLS tunnel of a
+ * server-to-server call and is never written to our own logs.
  */
 export async function exchangeEsCode(code: string): Promise<string> {
   const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
@@ -23,16 +24,25 @@ export async function exchangeEsCode(code: string): Promise<string> {
     throw new Error('NEXT_PUBLIC_FB_APP_ID and WHATSAPP_APP_SECRET are required to exchange an ES code');
   }
 
-  const res = await fetch(`${GRAPH}/oauth/access_token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: appId, client_secret: appSecret, code }).toString(),
-  });
+  const qs = new URLSearchParams({ client_id: appId, client_secret: appSecret, code });
+  const res = await fetch(`${GRAPH}/oauth/access_token?${qs.toString()}`, { method: 'GET' });
   const data = await res.json().catch(() => null);
+
   if (!res.ok || !data?.access_token) {
-    // Deliberately does not echo the body — it can contain the code and error detail we
-    // do not want in logs. The status is enough to triage.
-    throw new Error(`ES code exchange failed (status ${res.status})`);
+    // Meta's own diagnosis, minus anything that could carry the code itself. Without this the
+    // failure is untriageable — which is exactly where the first live attempt got stuck.
+    const e = data?.error ?? {};
+    const detail = {
+      status: res.status,
+      code: e.code ?? null,
+      subcode: e.error_subcode ?? null,
+      type: e.type ?? null,
+      message: typeof e.message === 'string' ? e.message.slice(0, 200) : null,
+    };
+    console.error('[wa-connect] ES code exchange failed', detail);
+    const err: any = new Error(`ES code exchange failed (status ${res.status})`);
+    err.metaDetail = detail;
+    throw err;
   }
   return data.access_token as string;
 }
