@@ -16,9 +16,9 @@ import type { ContentInsight, InsightCorpus, InsightEvidence } from './types';
  * WHAT THIS IS. A coverage audit. We ask the model for the questions a real
  * visitor to THIS account would arrive with — grounded in the account's own topic
  * map, so the questions are about what it actually does — then put every one of
- * them through the same retrieval the live assistant uses. A question whose best
- * match scores below the floor is a genuine hole: the assistant will be asked it
- * and will have to hedge.
+ * them through the same retrieval the live assistant uses, and report which its
+ * content answers most and least strongly. See the note on the score scale below
+ * for why almost everything here is stated relatively.
  *
  * Real audience questions are still used, and rank first when they exist, because
  * somebody actually typing a question outranks any simulation of one.
@@ -29,16 +29,28 @@ import type { ContentInsight, InsightCorpus, InsightEvidence } from './types';
 
 const PROBE_MODEL = 'gpt-5.6-luna';
 
-/** Retrieval confidence (0-1) below which the corpus does not really answer a question. */
-const COVERAGE_FLOOR = 0.45;
 /** Ask for this many probe questions; the model may return fewer. */
 const PROBE_COUNT = 14;
+
 /**
- * If more than this share of probes come back uncovered, the finding is not "you
- * have some gaps" — it is that retrieval or the scan is broken. Reporting a dozen
- * confident gaps in that state would be the worst kind of wrong.
+ * Retrieval scores are NOT on a calibrated 0-1 scale.
+ *
+ * `RetrievedSource.confidence` is a reranker score on one path and a raw cosine
+ * similarity on another; a live ABA run produced 0.942, 0.989 and 1.018 — above
+ * one. An absolute "below X means uncovered" threshold against that is
+ * meaningless: the first version of this used 0.45 and declared 100% coverage,
+ * which is not an insight, it is a broken measurement reported as good news.
+ *
+ * So there is exactly one ABSOLUTE claim we are entitled to make — retrieval
+ * returned nothing at all — and everything else is stated RELATIVELY, as which
+ * questions this account's own content answers most and least strongly. A
+ * relative ranking is true whatever the scale.
  */
-const BROKEN_THRESHOLD = 0.8;
+
+/** Questions whose weakest-scoring share gets reported as thin coverage. */
+const WEAK_SHARE = 0.3;
+/** Below this spread between best and worst, there is no meaningful ranking to report. */
+const MIN_SPREAD_RATIO = 1.05;
 
 function openai(): OpenAI {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -54,6 +66,11 @@ export function extractAudienceQuestions(comments: { text: string; postUrl: stri
     .filter((c) => {
       const t = c.text.trim();
       if (t.length < 8 || t.length > 300) return false;
+      // A comment carrying a link is the account promoting itself or somebody
+      // dropping a reference — not a member asking something. A live ABA run put
+      // "What's new in Virginia? https://virginia.org/..." and a Freedom Riders
+      // link-drop into the results as though a visitor had asked them.
+      if (/https?:\/\/|\bwww\./i.test(t)) return false;
       if (!t.includes('?') && !QUESTION_STARTERS.test(t)) return false;
       const key = t.toLowerCase().replace(/\W+/g, ' ').trim();
       if (seen.has(key)) return false;
@@ -166,73 +183,61 @@ export async function generateContentGaps(corpus: InsightCorpus): Promise<Conten
   }
   if (results.length === 0) return [];
 
-  const uncovered = results.filter((r) => r.topScore < COVERAGE_FLOOR);
-  const coveredShare = Math.round(((results.length - uncovered.length) / results.length) * 100);
-
-  // Everything scored low. That is a broken retrieval or a thin scan, not a
-  // content strategy finding, and it must not be dressed up as one.
-  if (uncovered.length / results.length > BROKEN_THRESHOLD) {
-    return [
-      {
-        type: 'content_gaps',
-        title: 'Your knowledge base is too thin to answer visitor questions',
-        summary:
-          `We put ${results.length} realistic visitor questions through your assistant's retrieval and ` +
-          `${uncovered.length} of them found nothing relevant. That is a coverage problem across the board, ` +
-          `not a gap in one topic — the scan needs more source material before these numbers mean anything.`,
-        rank: 0,
-        metrics: { probed: results.length, uncovered: uncovered.length, floor: COVERAGE_FLOOR },
-        evidence: uncovered.slice(0, 5).map(toEvidence),
-      },
-    ];
-  }
-
   const insights: ContentInsight[] = [];
+  const byScore = [...results].sort((a, b) => a.topScore - b.topScore);
 
-  if (uncovered.length > 0) {
-    // Audience-sourced gaps lead: a question somebody actually typed beats a
-    // simulated one every time.
-    const ordered = [...uncovered].sort((a, b) =>
-      a.source === b.source ? a.topScore - b.topScore : a.source === 'audience' ? -1 : 1,
-    );
-    const realCount = ordered.filter((r) => r.source === 'audience').length;
-
+  // ── The one absolute claim: retrieval returned nothing at all. ──
+  const unanswerable = byScore.filter((r) => r.topScore === 0);
+  if (unanswerable.length > 0) {
+    const realCount = unanswerable.filter((r) => r.source === 'audience').length;
     insights.push({
       type: 'content_gaps',
-      title: 'Questions your content cannot answer',
+      title: 'Questions your content cannot answer at all',
       summary:
         `We put ${results.length} realistic visitor questions through your assistant's retrieval. ` +
-        `${uncovered.length} found nothing solid to answer from` +
+        `${unanswerable.length} returned nothing at all` +
         (realCount > 0 ? `, including ${realCount} asked by real people in your comments` : '') +
-        `. Each one is a question your assistant will be asked and will have to hedge on.`,
+        `. Your assistant will be asked these and will have to say it doesn't know.`,
       rank: 0,
-      metrics: {
-        probed: results.length,
-        uncovered: uncovered.length,
-        coveredSharePct: coveredShare,
-        fromRealAudience: realCount,
-        floor: COVERAGE_FLOOR,
-      },
-      evidence: ordered.slice(0, 8).map(toEvidence),
+      metrics: { probed: results.length, unanswerable: unanswerable.length, fromRealAudience: realCount },
+      evidence: unanswerable.slice(0, 8).map(toEvidence),
     });
   }
 
-  // The other half of the audit, and the reassuring one: what it answers well.
-  const strongest = results
-    .filter((r) => r.topScore >= COVERAGE_FLOOR)
-    .sort((a, b) => b.topScore - a.topScore)
-    .slice(0, 5);
+  // ── Everything else is relative, because the score scale is not calibrated. ──
+  const answered = byScore.filter((r) => r.topScore > 0);
+  const spread = answered.length > 1 ? answered[answered.length - 1].topScore / (answered[0].topScore || 1) : 1;
 
-  if (strongest.length > 0) {
+  if (answered.length >= 4 && spread >= MIN_SPREAD_RATIO) {
+    const weakCount = Math.max(2, Math.round(answered.length * WEAK_SHARE));
+    const weakest = answered.slice(0, weakCount);
+
     insights.push({
       type: 'content_gaps',
-      title: 'What your assistant already answers well',
+      title: 'Where your content is thinnest',
       summary:
-        `${coveredShare}% of the questions we tested found solid grounding in your content. ` +
-        `These are the ones it will answer confidently and with a source.`,
-      rank: 1,
-      metrics: { probed: results.length, coveredSharePct: coveredShare },
-      evidence: strongest.map(toEvidence),
+        `Across ${results.length} questions we tested, these matched your content least strongly. ` +
+        `Your assistant can answer them, but from further away — they are the ones worth writing about next. ` +
+        `Scores are relative to this account's own content, not an absolute scale.`,
+      rank: unanswerable.length > 0 ? 1 : 0,
+      metrics: {
+        probed: results.length,
+        reportedAsThin: weakest.length,
+        weakestScore: weakest[0]?.topScore,
+        strongestScore: answered[answered.length - 1]?.topScore,
+      },
+      evidence: weakest.map(toEvidence),
+    });
+
+    insights.push({
+      type: 'content_gaps',
+      title: 'What your assistant answers best',
+      summary:
+        `These questions matched your content most strongly of the ${results.length} we tested — ` +
+        `the ones it will answer confidently and with a source to point at.`,
+      rank: unanswerable.length > 0 ? 2 : 1,
+      metrics: { probed: results.length, strongestScore: answered[answered.length - 1]?.topScore },
+      evidence: [...answered].reverse().slice(0, 5).map(toEvidence),
     });
   }
 
@@ -244,7 +249,7 @@ function toEvidence(r: ProbeResult): InsightEvidence {
     kind: 'probe',
     title: r.question,
     excerpt: r.bestMatch ? `Closest match: ${r.bestMatch}` : 'Nothing relevant retrieved',
-    metric: r.source === 'audience' ? 'asked by a real visitor · match score' : 'match score',
+    metric: r.source === 'audience' ? 'asked by a real visitor · match strength' : 'match strength',
     value: r.topScore,
   };
 }
