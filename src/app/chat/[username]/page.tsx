@@ -187,6 +187,9 @@ const CHAT_PAGE_STRINGS = {
     csStarter: 'יש לי בעיה עם הזמנה',
     csGreeting: 'היי! כאן שירות הלקוחות 🙂 איך אפשר לעזור?',
     csDetailsSent: 'שלחתי את הפרטים',
+    newConversation: 'שיחה חדשה',
+    newConversationTitle: 'שיחה חדשה?',
+    newConversationBody: 'השיחה הנוכחית תימחק ותתחיל שיחה חדשה',
   },
   en: {
     streamRetry: 'Something went wrong. Please try sending again.',
@@ -197,6 +200,9 @@ const CHAT_PAGE_STRINGS = {
     csStarter: 'I have an issue with my order',
     csGreeting: "Hi! You've reached customer service 🙂 How can I help?",
     csDetailsSent: 'Sent my details',
+    newConversation: 'New chat',
+    newConversationTitle: 'Start a new chat?',
+    newConversationBody: 'This conversation will be cleared and a new one will start.',
   },
 } as const;
 
@@ -2382,7 +2388,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           style={{ color: '#9ca3af', fontSize: '13px' }}
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
-                          <span>שיחה חדשה</span>
+                          <span>{chatStrings(influencer).newConversation}</span>
                         </button>
                       )}
                       <div ref={messagesEndRef} />
@@ -3303,6 +3309,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   (influencer.tabs || []).find((t: { id: string; topic?: string }) => t.id === activeTab)?.topic
                     || activeTab,
                 ]}
+                language={(influencer as any).language === 'en' ? 'en' : 'he'}
                 onAskAbout={(question: string) => {
                   setActiveTab('chat');
                   maybeShowLeadPopup();
@@ -3603,8 +3610,8 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                 onClick={(e) => e.stopPropagation()}
               >
                 <RotateCcw className="w-5 h-5 mx-auto mb-4" style={{ color: '#676767' }} />
-                <h3 className="font-semibold text-[19px] mb-1" style={{ color: '#0c1013' }}>שיחה חדשה?</h3>
-                <p className="text-[14px] mb-6" style={{ color: '#676767' }}>השיחה הנוכחית תימחק ותתחיל שיחה חדשה</p>
+                <h3 className="font-semibold text-[19px] mb-1" style={{ color: '#0c1013' }}>{chatStrings(influencer).newConversationTitle}</h3>
+                <p className="text-[14px] mb-6" style={{ color: '#676767' }}>{chatStrings(influencer).newConversationBody}</p>
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowNewChatConfirm(false)}

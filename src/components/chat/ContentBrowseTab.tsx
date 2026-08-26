@@ -6,6 +6,7 @@ import { Loader2, Search, ChevronLeft } from 'lucide-react';
 import { track } from '@/lib/analytics/track';
 import Image from 'next/image';
 import { getProxiedImageUrl } from '@/lib/image-utils';
+import { getChatUiStrings } from '@/lib/i18n/chat-ui';
 
 interface ContentItem {
   id: string;
@@ -22,6 +23,10 @@ interface ContentBrowseTabProps {
   tabLabel: string;
   topics?: string[];
   entityTypes?: string[];
+  /** Account language. Drives copy AND direction — this tab is the whole surface
+   *  for an association's Membership / Events / Advocacy tabs, so a Hebrew string
+   *  or an RTL input here is the first thing an overseas customer sees. */
+  language?: 'he' | 'en';
   onAskAbout: (question: string) => void;
 }
 
@@ -30,8 +35,11 @@ export default function ContentBrowseTab({
   tabLabel,
   topics,
   entityTypes,
+  language = 'he',
   onAskAbout,
 }: ContentBrowseTabProps) {
+  const isEn = language === 'en';
+  const ui = getChatUiStrings(language);
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -108,9 +116,9 @@ export default function ContentBrowseTab({
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={`חיפוש ב${tabLabel}...`}
-            className="w-full pr-10 pl-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
-            dir="rtl"
+            placeholder={ui.actions.searchInTab.replace('{tab}', tabLabel)}
+            className={`w-full py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 ${isEn ? 'pl-10 pr-4' : 'pr-10 pl-4'}`}
+            dir={isEn ? 'ltr' : 'rtl'}
           />
         </div>
       </div>
@@ -123,7 +131,7 @@ export default function ContentBrowseTab({
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
-            {searchQuery ? 'לא נמצאו תוצאות' : 'אין תוכן להצגה'}
+            {searchQuery ? ui.empty.noResults : ui.empty.generic}
           </div>
         ) : (
           <>
@@ -159,7 +167,7 @@ export default function ContentBrowseTab({
 
                     {/* Entity type badge */}
                     <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-medium bg-black/40 text-white backdrop-blur-sm">
-                      {getEntityLabel(item.entity_type)}
+                      {ui.entityLabels[item.entity_type as keyof typeof ui.entityLabels] || item.entity_type}
                     </div>
                   </div>
 
@@ -193,7 +201,7 @@ export default function ContentBrowseTab({
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    'טען עוד'
+                    ui.actions.loadMore
                   )}
                 </button>
               </div>
@@ -210,17 +218,11 @@ function getPlaceholderEmoji(topic: string): string {
     food: '\uD83C\uDF73', beauty: '\u2728', fashion: '\uD83D\uDC57',
     tech: '\uD83D\uDCF1', lifestyle: '\uD83C\uDF3F', health: '\u2764\uFE0F',
     home: '\uD83C\uDFE0', business: '\uD83D\uDCBC',
+    // association vocabulary (src/lib/rag/enrich.ts ASSOCIATION_TOPICS)
+    membership: '\uD83E\uDD1D', events: '\uD83D\uDCC5', advocacy: '\uD83C\uDFDB\uFE0F',
+    safety: '\uD83D\uDEE1\uFE0F', tourism: '\uD83D\uDE8C', industry: '\uD83D\uDCCA',
   };
   return map[topic] || '\uD83D\uDCCB';
 }
 
-function getEntityLabel(entityType: string): string {
-  const map: Record<string, string> = {
-    transcription: 'וידאו',
-    post: 'פוסט',
-    website: 'אתר',
-    coupon: 'קופון',
-    partnership: 'שיתוף פעולה',
-  };
-  return map[entityType] || entityType;
-}
+

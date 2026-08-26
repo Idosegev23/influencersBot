@@ -125,6 +125,25 @@ const STRINGS = {
       streamRetry: 'אופס, משהו השתבש. נסה לשלוח שוב',
       botFallback: 'מצטער, משהו השתבש. נסה שוב!',
     },
+
+    // --- Buttons and browse chrome ---
+    actions: {
+      loadMore: 'טען עוד',
+      newConversation: 'שיחה חדשה',
+      newConversationTitle: 'שיחה חדשה?',
+      newConversationBody: 'השיחה הנוכחית תימחק ותתחיל שיחה חדשה',
+      // {tab} is replaced with the tab's own label at the call site.
+      searchInTab: 'חיפוש ב{tab}...',
+    },
+
+    // What a content card is, shown as its badge.
+    entityLabels: {
+      transcription: 'וידאו',
+      post: 'פוסט',
+      website: 'אתר',
+      coupon: 'קופון',
+      partnership: 'שיתוף פעולה',
+    },
   },
 
   en: {
@@ -235,6 +254,24 @@ const STRINGS = {
       generic: 'Something went wrong on my side 😅 Please try sending again or rephrase your question.',
       streamRetry: 'Something went wrong. Please try sending again.',
       botFallback: 'Sorry, something went wrong. Try again!',
+    },
+
+    // --- Buttons and browse chrome ---
+    actions: {
+      loadMore: 'Load more',
+      newConversation: 'New chat',
+      newConversationTitle: 'Start a new chat?',
+      newConversationBody: 'This conversation will be cleared and a new one will start.',
+      searchInTab: 'Search {tab}...',
+    },
+
+    // What a content card is, shown as its badge.
+    entityLabels: {
+      transcription: 'Video',
+      post: 'Post',
+      website: 'Page',
+      coupon: 'Offer',
+      partnership: 'Partnership',
     },
   },
 } as const;

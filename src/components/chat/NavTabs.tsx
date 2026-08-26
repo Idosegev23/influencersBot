@@ -30,6 +30,10 @@ const LABEL_ICONS: Record<string, string> = {
   // English labels (IMAI and future int'l accounts)
   'Chat': 'nav/comment',
   'Discover': 'nav/screen-play',
+  // association archetype
+  'Membership': 'nav/bonus-alt',
+  'Events': 'nav/screen-play',
+  'Advocacy': 'nav/bonus-alt',
   'Platform': 'nav/bonus-alt',
   'Customers': 'mozarim',
   // "Play a demo" semantics — the screen-with-play-button icon. Only
