@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { BriefView } from '@/components/documents/BriefView';
 import { QuoteView } from '@/components/documents/QuoteView';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 interface Document {
   id: string;
@@ -17,6 +19,11 @@ interface Document {
 }
 
 export default function DocumentReviewPage() {
+  const routeParams = useParams();
+  const dashUsername = routeParams?.username as string | undefined;
+  const { lang } = useDashboardLang(dashUsername);
+  const t = getDashboardStrings(lang);
+  const isEn = lang === 'en';
   const params = useParams();
   const router = useRouter();
   const username = params.username as string;
@@ -52,7 +59,7 @@ export default function DocumentReviewPage() {
       setEditedData(result.document.parsed_data || {});
     } catch (err) {
       console.error('Error loading document:', err);
-      setError('שגיאה בטעינת המסמך');
+      setError(t.partnershipDetail.dr_docLoadError);
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +93,7 @@ export default function DocumentReviewPage() {
       );
     } catch (err) {
       console.error('Error creating partnership:', err);
-      setError('שגיאה ביצירת השת"פ');
+      setError(t.partnershipDetail.dr_createError);
     } finally {
       setIsSaving(false);
     }
@@ -101,7 +108,7 @@ export default function DocumentReviewPage() {
       const tasks = editedData.tasks || [];
 
       if (tasks.length === 0) {
-        setError('אין משימות בבריף');
+        setError(t.partnershipDetail.dr_noTasks);
         setIsCreatingTasks(false);
         return;
       }
@@ -132,7 +139,7 @@ export default function DocumentReviewPage() {
       router.push(`/influencer/${username}/tasks`);
     } catch (err) {
       console.error('Error creating tasks:', err);
-      setError('שגיאה ביצירת המשימות');
+      setError(t.partnershipDetail.dr_taskError);
     } finally {
       setIsCreatingTasks(false);
     }
@@ -168,7 +175,7 @@ export default function DocumentReviewPage() {
             className="mt-4 px-4 py-2 rounded-xl animate-slide-up"
             style={{ background: 'var(--dash-negative)', color: 'white' }}
           >
-            חזור
+            {t.partnershipDetail.dr_backWord}
           </button>
         </div>
       </div>
@@ -202,20 +209,20 @@ export default function DocumentReviewPage() {
           <svg className="w-5 h-5 animate-slide-up" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          <span>חזור</span>
+          <span>{t.partnershipDetail.dr_backWord}</span>
         </button>
       </div>
 
       {/* Header */}
       <div className="mb-8 animate-slide-up">
-        <h1 className="text-3xl font-bold animate-slide-up" style={{ color: 'var(--dash-text)' }}>סקירת מסמך מנותח</h1>
+        <h1 className="text-3xl font-bold animate-slide-up" style={{ color: 'var(--dash-text)' }}>{t.partnershipDetail.dr_reviewTitle}</h1>
         <p className="mt-2 animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>{document.filename}</p>
         <div className="flex items-center gap-4 mt-4 animate-slide-up">
           <span className="text-sm animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>
-            מודל AI: {document.ai_model_used || 'N/A'}
+            {t.partnershipDetail.dr_model} AI: {document.ai_model_used || 'N/A'}
           </span>
           <span className="text-sm font-medium animate-slide-up" style={{ color: confidenceColor }}>
-            דיוק: {(confidence * 100).toFixed(0)}%
+            {t.partnershipDetail.dr_accuracy} {(confidence * 100).toFixed(0)}%
           </span>
           {document.download_url && (
             <a
@@ -224,9 +231,7 @@ export default function DocumentReviewPage() {
               rel="noopener noreferrer"
               className="text-sm animate-slide-up"
               style={{ color: 'var(--color-info)' }}
-            >
-              הורד מסמך מקורי
-            </a>
+            >{t.partnershipDetail.dr_downloadOriginal}</a>
           )}
         </div>
       </div>
@@ -249,11 +254,11 @@ export default function DocumentReviewPage() {
         >
           <p>
             {document.parsing_status === 'pending' &&
-              'המסמך ממתין לניתוח...'}
+              t.partnershipDetail.dr_awaitingAnalysis}
             {document.parsing_status === 'processing' &&
-              'המסמך מנותח כעת...'}
+              t.partnershipDetail.dr_analysingNow}
             {document.parsing_status === 'failed' &&
-              'הניתוח נכשל. אנא מלא את הפרטים ידנית.'}
+              t.partnershipDetail.dr_analysisFailed}
           </p>
         </div>
       )}
@@ -268,9 +273,7 @@ export default function DocumentReviewPage() {
             {/* Brief View - Special Display */}
             {document.document_type === 'brief' ? (
               <>
-                <h2 className="text-xl font-semibold mb-6 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>
-                  סקירת בריף
-                </h2>
+                <h2 className="text-xl font-semibold mb-6 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>{t.partnershipDetail.dr_reviewBrief}</h2>
                 <BriefView data={editedData} />
               </>
             ) : document.document_type === 'contract' ? (
@@ -287,8 +290,8 @@ export default function DocumentReviewPage() {
                       </svg>
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold animate-slide-up" style={{ color: 'var(--dash-text)' }}>החוזה נותח בהצלחה!</h3>
-                      <p className="text-sm animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>המערכת זיהתה את הפרטים הבאים:</p>
+                      <h3 className="text-xl font-bold animate-slide-up" style={{ color: 'var(--dash-text)' }}>{t.partnershipDetail.dr_analysedOk}</h3>
+                      <p className="text-sm animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>{t.partnershipDetail.dr_identified}</p>
                     </div>
                   </div>
 
@@ -296,13 +299,13 @@ export default function DocumentReviewPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 animate-slide-up">
                     {/* Brand */}
                     <div className="rounded-xl p-4 animate-slide-up" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                      <p className="text-xs font-medium mb-1 animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>מותג</p>
+                      <p className="text-xs font-medium mb-1 animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.dr_brandWord}</p>
                       <p className="text-lg font-bold animate-slide-up" style={{ color: 'var(--color-info)' }}>{editedData.parties?.brand || editedData.brandName || '—'}</p>
                     </div>
 
                     {/* Amount */}
                     <div className="rounded-xl p-4 animate-slide-up" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                      <p className="text-xs font-medium mb-1 animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>סכום</p>
+                      <p className="text-xs font-medium mb-1 animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.dr_amountWord}</p>
                       <p className="text-lg font-bold animate-slide-up" style={{ color: 'var(--dash-positive)' }}>
                         {editedData.paymentTerms?.totalAmount || editedData.totalAmount
                           ? `₪${(editedData.paymentTerms?.totalAmount || editedData.totalAmount).toLocaleString()}`
@@ -312,7 +315,7 @@ export default function DocumentReviewPage() {
 
                     {/* Dates */}
                     <div className="rounded-xl p-4 animate-slide-up" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                      <p className="text-xs font-medium mb-1 animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>תאריכים</p>
+                      <p className="text-xs font-medium mb-1 animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.dr_datesWord}</p>
                       <p className="text-sm font-bold animate-slide-up" style={{ color: 'var(--color-primary)' }}>
                         {editedData.effectiveDate || editedData.timeline?.startDate || '—'} → {editedData.expiryDate || editedData.timeline?.endDate || '—'}
                       </p>
@@ -320,9 +323,9 @@ export default function DocumentReviewPage() {
 
                     {/* Deliverables */}
                     <div className="rounded-xl p-4 animate-slide-up" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                      <p className="text-xs font-medium mb-1 animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>דליברבלס</p>
+                      <p className="text-xs font-medium mb-1 animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.dr_deliverablesWord}</p>
                       <p className="text-lg font-bold animate-slide-up" style={{ color: 'var(--color-warning)' }}>
-                        {editedData.deliverables?.length || 0} פריטים
+                        {editedData.deliverables?.length || 0} {t.partnershipDetail.dr_itemsWord}
                       </p>
                     </div>
                   </div>
@@ -330,7 +333,7 @@ export default function DocumentReviewPage() {
                   {/* Payment Schedule */}
                   {editedData.paymentTerms?.schedule?.length > 0 && (
                     <div className="mb-6 animate-slide-up">
-                      <p className="text-sm font-medium mb-3 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>מועדי תשלום שזוהו:</p>
+                      <p className="text-sm font-medium mb-3 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>{t.partnershipDetail.dr_paymentsFound}</p>
                       <div className="space-y-2 animate-slide-up">
                         {editedData.paymentTerms.schedule.map((payment: any, i: number) => (
                           <div
@@ -358,7 +361,7 @@ export default function DocumentReviewPage() {
                   {/* Deliverables Details */}
                   {editedData.deliverables?.length > 0 && (
                     <div className="mb-6 animate-slide-up">
-                      <p className="text-sm font-medium mb-3 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>דליברבלס שזוהו:</p>
+                      <p className="text-sm font-medium mb-3 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>{t.partnershipDetail.dr_deliverablesFound}</p>
                       <ul className="space-y-2 animate-slide-up">
                         {editedData.deliverables.map((d: any, i: number) => (
                           <li
@@ -386,14 +389,14 @@ export default function DocumentReviewPage() {
 
                   {/* Important Terms Preview */}
                   <div className="mb-6 animate-slide-up">
-                    <p className="text-sm font-medium mb-3 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>תנאים חשובים:</p>
+                    <p className="text-sm font-medium mb-3 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>{t.partnershipDetail.dr_keyTermsFound}</p>
                     <div className="space-y-2 animate-slide-up">
                       {editedData.exclusivity?.isExclusive && (
                         <div
                           className="rounded-xl p-3 text-start animate-slide-up"
                           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)' }}
                         >
-                          <p className="text-sm font-bold animate-slide-up" style={{ color: 'var(--color-primary)' }}>חוזה אקסקלוסיבי</p>
+                          <p className="text-sm font-bold animate-slide-up" style={{ color: 'var(--color-primary)' }}>{t.partnershipDetail.dr_exclusiveContract}</p>
                           {editedData.exclusivity.categories?.length > 0 && (
                             <p className="text-xs mt-1 animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
                               {editedData.exclusivity.categories.join(', ')}
@@ -416,9 +419,7 @@ export default function DocumentReviewPage() {
               </>
             ) : document.document_type === 'quote' ? (
               <>
-                <h2 className="text-xl font-semibold mb-6 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>
-                  סקירת הצעת מחיר
-                </h2>
+                <h2 className="text-xl font-semibold mb-6 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>{t.partnershipDetail.dr_reviewQuote}</h2>
                 <QuoteView data={editedData} />
               </>
             ) : (
@@ -426,9 +427,7 @@ export default function DocumentReviewPage() {
             {/* Brand Name */}
             {editedData.brandName !== undefined && (
               <div>
-                <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
-                  שם המותג
-                </label>
+                <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>{t.partnershipDetail.dr_brandNameField}</label>
                 <input
                   type="text"
                   value={editedData.brandName || ''}
@@ -444,9 +443,7 @@ export default function DocumentReviewPage() {
             {/* Campaign Name */}
             {editedData.campaignName !== undefined && (
               <div>
-                <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
-                  שם הקמפיין
-                </label>
+                <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>{t.partnershipDetail.dr_campaignNameField}</label>
                 <input
                   type="text"
                   value={editedData.campaignName || ''}
@@ -463,7 +460,7 @@ export default function DocumentReviewPage() {
             {editedData.totalAmount !== undefined && (
               <div>
                 <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
-                  סכום כולל (₪)
+                  {t.partnershipDetail.dr_totalAmount} ({isEn ? "$" : "₪"})
                 </label>
                 <input
                   type="number"
@@ -485,7 +482,7 @@ export default function DocumentReviewPage() {
               <div className="grid grid-cols-2 gap-4 animate-slide-up">
                 <div>
                   <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
-                    תאריך התחלה
+                    {t.partnershipDetail.dr_startDate}
                   </label>
                   <input
                     type="date"
@@ -505,7 +502,7 @@ export default function DocumentReviewPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
-                    תאריך סיום
+                    {t.partnershipDetail.dr_endDate}
                   </label>
                   <input
                     type="date"
@@ -530,7 +527,7 @@ export default function DocumentReviewPage() {
             {editedData.deliverables && editedData.deliverables.length > 0 && (
               <div>
                 <label className="block text-sm font-medium mb-2 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
-                  דליברבלס
+                  {t.partnershipDetail.dr_deliverablesWord}
                 </label>
                 <div className="space-y-2 animate-slide-up">
                   {editedData.deliverables.map((item: any, index: number) => (
@@ -556,9 +553,7 @@ export default function DocumentReviewPage() {
 
             {/* Raw JSON (for debugging) */}
             <details className="mt-6 animate-slide-up">
-              <summary className="cursor-pointer text-sm animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>
-                הצג JSON מלא
-              </summary>
+              <summary className="cursor-pointer text-sm animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.dr_showJson}</summary>
               <pre
                 className="mt-2 p-4 rounded-xl text-xs overflow-auto max-h-64 text-left animate-slide-up"
                 style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-2)' }}
@@ -572,9 +567,7 @@ export default function DocumentReviewPage() {
             {/* Raw JSON always available */}
             {document.document_type === 'brief' && (
               <details className="mt-6 animate-slide-up">
-                <summary className="cursor-pointer text-sm animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>
-                  הצג JSON מלא
-                </summary>
+                <summary className="cursor-pointer text-sm animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.dr_showJson}</summary>
                 <pre
                   className="mt-2 p-4 rounded-xl text-xs overflow-auto max-h-64 text-left animate-slide-up"
                   style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--dash-text-2)' }}
@@ -585,9 +578,7 @@ export default function DocumentReviewPage() {
             )}
           </>
         ) : (
-          <p className="text-center py-8 animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>
-            אין נתונים לתצוגה. אנא מלא את הפרטים ידנית.
-          </p>
+          <p className="text-center py-8 animate-slide-up" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.dr_noData}</p>
         )}
       </div>
 
@@ -598,7 +589,7 @@ export default function DocumentReviewPage() {
           className="px-6 py-2 rounded-xl transition-colors animate-slide-up"
           style={{ border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-2)' }}
         >
-          חזור
+          {t.partnershipDetail.dr_backWord}
         </button>
 
         {/* Different actions based on document type */}
@@ -608,7 +599,7 @@ export default function DocumentReviewPage() {
             disabled={!editedData.tasks || editedData.tasks.length === 0}
             className="btn-teal px-6 py-2 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed animate-slide-up"
           >
-            צור {editedData.tasks?.length || 0} משימות מהבריף
+            {t.partnershipDetail.dr_tasksFromBrief.replace('{n}', String(editedData.tasks?.length || 0))}
           </button>
         ) : document.document_type === 'contract' ? (
           <div className="flex gap-3 animate-slide-up">
@@ -617,14 +608,14 @@ export default function DocumentReviewPage() {
               disabled={isSaving || !editedData.parties?.brand}
               className="btn-primary px-6 py-2 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed animate-slide-up"
             >
-              {isSaving ? 'יוצר שת"פ...' : 'צור שת"פ מההסכם'}
+              {isSaving ? t.partnershipDetail.dr_creating : t.partnershipDetail.dr_createFromAgreement}
             </button>
             {editedData.tasks && editedData.tasks.length > 0 && (
               <button
                 onClick={() => setShowTasksModal(true)}
                 className="btn-teal px-6 py-2 rounded-xl transition-colors animate-slide-up"
               >
-                צור {editedData.tasks?.length || 0} משימות מההסכם
+                {t.partnershipDetail.dr_tasksFromAgreement.replace('{n}', String(editedData.tasks?.length || 0))}
               </button>
             )}
           </div>
@@ -634,7 +625,7 @@ export default function DocumentReviewPage() {
             disabled={isSaving || !editedData.brandName}
             className="btn-primary px-6 py-2 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed animate-slide-up"
           >
-            {isSaving ? 'יוצר שת"פ...' : 'צור שת"פ מהמסמך'}
+            {isSaving ? t.partnershipDetail.dr_creating : t.partnershipDetail.dr_createFromDoc}
           </button>
         )}
       </div>
@@ -646,12 +637,12 @@ export default function DocumentReviewPage() {
             className="rounded-xl max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto animate-slide-up"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)' }}
           >
-            <h3 className="text-2xl font-bold mb-4 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>
-              אישור יצירת משימות
-            </h3>
+            <h3 className="text-2xl font-bold mb-4 text-start animate-slide-up" style={{ color: 'var(--dash-text)' }}>{t.partnershipDetail.dr_confirmTasks}</h3>
 
             <p className="mb-6 text-start animate-slide-up" style={{ color: 'var(--dash-text-2)' }}>
-              האם ליצור {editedData.tasks?.length || 0} משימות מה{document.document_type === 'brief' ? 'בריף' : 'הסכם'}?
+              {t.partnershipDetail.dr_confirmBody
+                .replace('{n}', String(editedData.tasks?.length || 0))
+                .replace('{kind}', document.document_type === 'brief' ? t.partnershipDetail.dr_briefWord : t.partnershipDetail.dr_agreement)}
             </p>
 
             {/* Tasks Preview */}
@@ -669,8 +660,8 @@ export default function DocumentReviewPage() {
                       task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
                       'bg-green-100 text-green-800'
                     }`}>
-                      {task.priority === 'high' ? 'גבוה' :
-                       task.priority === 'medium' ? 'בינוני' : 'נמוך'}
+                      {task.priority === 'high' ? t.partnershipDetail.dr_high :
+                       task.priority === 'medium' ? t.partnershipDetail.dr_medium : t.partnershipDetail.dr_low}
                     </span>
                   </div>
                   {task.description && (
@@ -693,14 +684,14 @@ export default function DocumentReviewPage() {
                 className="px-6 py-2 rounded-xl transition-colors disabled:opacity-50 animate-slide-up"
                 style={{ border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-2)' }}
               >
-                ביטול
+                {t.partnershipDetail.dr_cancelWord}
               </button>
               <button
                 onClick={handleCreateTasks}
                 disabled={isCreatingTasks}
                 className="btn-teal px-6 py-2 rounded-xl transition-colors disabled:opacity-50 animate-slide-up"
               >
-                {isCreatingTasks ? 'יוצר משימות...' : `אשר ויצור ${editedData.tasks?.length || 0} משימות`}
+                {isCreatingTasks ? t.partnershipDetail.dr_creatingTasks : t.partnershipDetail.dr_confirmCreate.replace('{n}', String(editedData.tasks?.length || 0))}
               </button>
             </div>
           </div>

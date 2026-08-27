@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabaseClient } from '@/lib/supabase-client';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 interface Partnership {
   id: string;
@@ -49,18 +51,24 @@ interface Document {
   parsing_status?: string;
 }
 
-const STATUS_MAP: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-  lead: { label: 'ליד', bg: 'rgba(156,163,175,0.15)', text: 'var(--dash-text-2)', dot: '#9ca3af' },
-  proposal: { label: 'הצעה', bg: 'rgba(168,85,247,0.15)', text: '#a855f7', dot: '#a855f7' },
-  negotiation: { label: 'משא ומתן', bg: 'rgba(249,115,22,0.15)', text: '#f97316', dot: '#f97316' },
-  contract: { label: 'חוזה', bg: 'rgba(59,130,246,0.15)', text: '#3b82f6', dot: '#3b82f6' },
-  active: { label: 'פעיל', bg: 'rgba(34,197,94,0.15)', text: '#22c55e', dot: '#22c55e' },
-  in_progress: { label: 'בעבודה', bg: 'rgba(34,197,94,0.15)', text: '#22c55e', dot: '#22c55e' },
-  completed: { label: 'הושלם', bg: 'rgba(16,185,129,0.15)', text: '#10b981', dot: '#10b981' },
-  cancelled: { label: 'בוטל', bg: 'rgba(239,68,68,0.15)', text: '#ef4444', dot: '#ef4444' },
-};
+// Takes the bundle: module-level, but every label is translatable.
+const statusMap = (t: any): Record<string, { label: string; bg: string; text: string; dot: string }> => ({
+  lead: { label: t.partnershipDetail.pd_lead, bg: 'rgba(156,163,175,0.15)', text: 'var(--dash-text-2)', dot: '#9ca3af' },
+  proposal: { label: t.partnershipDetail.pd_proposalStatus, bg: 'rgba(168,85,247,0.15)', text: '#a855f7', dot: '#a855f7' },
+  negotiation: { label: t.partnershipDetail.pd_negotiating, bg: 'rgba(249,115,22,0.15)', text: '#f97316', dot: '#f97316' },
+  contract: { label: t.partnershipDetail.pd_contract, bg: 'rgba(59,130,246,0.15)', text: '#3b82f6', dot: '#3b82f6' },
+  active: { label: t.partnershipDetail.pd_active, bg: 'rgba(34,197,94,0.15)', text: '#22c55e', dot: '#22c55e' },
+  in_progress: { label: t.partnershipDetail.pd_inProgress, bg: 'rgba(34,197,94,0.15)', text: '#22c55e', dot: '#22c55e' },
+  completed: { label: t.partnershipDetail.pd_completed, bg: 'rgba(16,185,129,0.15)', text: '#10b981', dot: '#10b981' },
+  cancelled: { label: t.partnershipDetail.pd_cancelled, bg: 'rgba(239,68,68,0.15)', text: '#ef4444', dot: '#ef4444' },
+});
 
 export default function PartnershipDetailPage() {
+  const routeParams = useParams();
+  const dashUsername = routeParams?.username as string | undefined;
+  const { lang } = useDashboardLang(dashUsername);
+  const t = getDashboardStrings(lang);
+  const isEn = lang === 'en';
   const params = useParams();
   const router = useRouter();
   const username = params.username as string;
@@ -100,7 +108,7 @@ export default function PartnershipDetailPage() {
       setEditData(p);
       if (p.account_id) setAccountId(p.account_id);
     } catch {
-      setError('שגיאה בטעינת השת"פ');
+      setError(t.partnershipDetail.pd_loadError);
     } finally {
       setIsLoading(false);
     }
@@ -146,19 +154,19 @@ export default function PartnershipDetailPage() {
       setPartnership(p);
       setIsEditing(false);
     } catch {
-      setError('שגיאה בשמירה');
+      setError(t.partnershipDetail.pd_saveError);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('למחוק את השת"פ?')) return;
+    if (!confirm(t.partnershipDetail.pd_confirmDelete)) return;
     try {
       await fetch(`/api/influencer/partnerships/${partnershipId}?username=${username}`, { method: 'DELETE' });
       router.push(`/influencer/${username}/partnerships`);
     } catch {
-      setError('שגיאה במחיקה');
+      setError(t.partnershipDetail.pd_deleteError);
     }
   };
 
@@ -171,7 +179,7 @@ export default function PartnershipDetailPage() {
 
     try {
       for (const file of Array.from(files)) {
-        if (file.size > 10 * 1024 * 1024) { setError(`${file.name} גדול מדי (מקס 10MB)`); continue; }
+        if (file.size > 10 * 1024 * 1024) { setError(t.partnershipDetail.pd_fileTooBig.replace('{name}', file.name)); continue; }
 
         const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const path = `${accountId}/partnerships/${partnershipId}/${Date.now()}_${cleanName}`;
@@ -179,7 +187,7 @@ export default function PartnershipDetailPage() {
         const { error: upErr } = await supabaseClient.storage
           .from('partnership-documents')
           .upload(path, file, { contentType: file.type, upsert: false });
-        if (upErr) { setError(`העלאת ${file.name} נכשלה`); continue; }
+        if (upErr) { setError(t.partnershipDetail.pd_uploadFailed.replace('{name}', file.name)); continue; }
 
         const metaRes = await fetch('/api/influencer/documents/metadata', {
           method: 'POST',
@@ -202,7 +210,7 @@ export default function PartnershipDetailPage() {
       await loadDocuments();
       setError(null);
     } catch {
-      setError('שגיאה בהעלאה');
+      setError(t.partnershipDetail.pd_uploadError);
     } finally {
       setIsUploading(false);
     }
@@ -226,10 +234,10 @@ export default function PartnershipDetailPage() {
       if (data.success) {
         setPartnership(prev => prev ? { ...prev, brand_logo_url: data.logo_url } : prev);
       } else {
-        setError(data.error || 'שגיאה בהעלאת לוגו');
+        setError(data.error || t.partnershipDetail.pd_logoError);
       }
     } catch {
-      setError('שגיאה בהעלאת לוגו');
+      setError(t.partnershipDetail.pd_logoError);
     } finally {
       setIsUploadingLogo(false);
       e.target.value = '';
@@ -265,13 +273,13 @@ export default function PartnershipDetailPage() {
   if (!partnership) {
     return (
       <div className="max-w-3xl mx-auto py-8 px-4 text-center">
-        <p style={{ color: 'var(--dash-negative)' }}>{error || 'לא נמצא'}</p>
-        <button onClick={() => router.back()} className="mt-4 px-4 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--dash-text-2)' }}>חזור</button>
+        <p style={{ color: 'var(--dash-negative)' }}>{error || t.partnershipDetail.pd_notFound}</p>
+        <button onClick={() => router.back()} className="mt-4 px-4 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--dash-text-2)' }}>{t.partnershipDetail.pd_back}</button>
       </div>
     );
   }
 
-  const st = STATUS_MAP[partnership.status] || STATUS_MAP.lead;
+  const st = statusMap(t)[partnership.status] || statusMap(t).lead;
   const amount = partnership.contract_amount || partnership.proposal_amount || 0;
 
   // ─── Main Render ───
@@ -287,9 +295,7 @@ export default function PartnershipDetailPage() {
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        חזור לשת"פים
-      </button>
+        </svg>{t.partnershipDetail.pd_backToList}</button>
 
       {/* Error */}
       {error && (
@@ -329,25 +335,25 @@ export default function PartnershipDetailPage() {
         <div className="flex flex-wrap gap-4 text-sm">
           {amount > 0 && (
             <div>
-              <span style={{ color: 'var(--dash-text-3)' }}>סכום: </span>
+              <span style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_amountLabel}</span>
               <span className="font-semibold" style={{ color: 'var(--color-primary)' }}>₪{amount.toLocaleString('he-IL')}</span>
             </div>
           )}
           {partnership.start_date && (
             <div>
-              <span style={{ color: 'var(--dash-text-3)' }}>התחלה: </span>
+              <span style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_startLabel}</span>
               <span>{new Date(partnership.start_date).toLocaleDateString('he-IL')}</span>
             </div>
           )}
           {partnership.end_date && (
             <div>
-              <span style={{ color: 'var(--dash-text-3)' }}>סיום: </span>
+              <span style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_endLabel}</span>
               <span>{new Date(partnership.end_date).toLocaleDateString('he-IL')}</span>
             </div>
           )}
           {partnership.category && (
             <div>
-              <span style={{ color: 'var(--dash-text-3)' }}>קטגוריה: </span>
+              <span style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_categoryLabel}</span>
               <span>{partnership.category}</span>
             </div>
           )}
@@ -381,27 +387,19 @@ export default function PartnershipDetailPage() {
         <div className="flex gap-2 mt-4 pt-4" style={{ borderTop: '1px solid var(--dash-glass-border)' }}>
           {!isEditing ? (
             <>
-              <button onClick={() => setIsEditing(true)} className="px-4 py-2 rounded-xl text-sm font-medium transition-colors btn-primary">
-                ערוך
-              </button>
-              <button onClick={handleDelete} className="px-4 py-2 rounded-xl text-sm transition-colors" style={{ color: 'var(--dash-text-3)' }}>
-                מחק
-              </button>
+              <button onClick={() => setIsEditing(true)} className="px-4 py-2 rounded-xl text-sm font-medium transition-colors btn-primary">{t.partnershipDetail.pd_edit}</button>
+              <button onClick={handleDelete} className="px-4 py-2 rounded-xl text-sm transition-colors" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_delete}</button>
               <button
                 onClick={() => router.push(`/influencer/${username}/partnerships/${partnershipId}/summary`)}
                 className="px-4 py-2 rounded-xl text-sm transition-colors mr-auto btn-secondary"
-              >
-                סיכום AI
-              </button>
+              >{t.partnershipDetail.pd_aiSummary}</button>
             </>
           ) : (
             <>
               <button onClick={handleSave} disabled={isSaving} className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 btn-solid">
-                {isSaving ? 'שומר...' : 'שמור'}
+                {isSaving ? t.partnershipDetail.pd_saving : t.partnershipDetail.pd_save}
               </button>
-              <button onClick={() => { setIsEditing(false); setEditData(partnership); }} className="px-4 py-2 rounded-xl text-sm" style={{ color: 'var(--dash-text-3)' }}>
-                ביטול
-              </button>
+              <button onClick={() => { setIsEditing(false); setEditData(partnership); }} className="px-4 py-2 rounded-xl text-sm" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_cancel}</button>
             </>
           )}
         </div>
@@ -410,29 +408,29 @@ export default function PartnershipDetailPage() {
       {/* ═══ Edit Form (shown only when editing) ═══ */}
       {isEditing && (
         <div className="glass-card rounded-2xl p-5 space-y-5"  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)' }}>
-          <h3 className="font-semibold text-sm" style={{ color: 'var(--dash-text-2)' }}>עריכת פרטים</h3>
+          <h3 className="font-semibold text-sm" style={{ color: 'var(--dash-text-2)' }}>{t.partnershipDetail.pd_editDetails}</h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>סטטוס</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_status}</label>
               <select value={editData.status || ''} onChange={e => setEditData({ ...editData, status: e.target.value })} className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }}>
-                {Object.entries(STATUS_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                {Object.entries(statusMap(t)).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>סכום (₪)</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_amount} ({isEn ? "$" : "₪"})</label>
               <input type="number" value={editData.contract_amount ?? ''} onChange={e => setEditData({ ...editData, contract_amount: parseFloat(e.target.value) || null })} className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>תאריך התחלה</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_startDate}</label>
               <input type="date" value={editData.start_date ?? ''} onChange={e => setEditData({ ...editData, start_date: e.target.value })} className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>תאריך סיום</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_endDate}</label>
               <input type="date" value={editData.end_date ?? ''} onChange={e => setEditData({ ...editData, end_date: e.target.value })} className="w-full px-3 py-2 rounded-xl text-sm" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>שם קמפיין</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_campaignName}</label>
               <input type="text" value={editData.campaign_name ?? ''} onChange={e => setEditData({ ...editData, campaign_name: e.target.value })} className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
             </div>
           </div>
@@ -440,24 +438,22 @@ export default function PartnershipDetailPage() {
           {/* Brand Contact Info */}
           <div>
             <h4 className="text-xs font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--dash-text-3)' }}>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-              פרטי קשר מותג (פר שת"פ)
-            </h4>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>{t.partnershipDetail.pd_brandContact}</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>שם איש קשר</label>
-                <input type="text" value={editData.brand_contact_name ?? ''} onChange={e => setEditData({ ...editData, brand_contact_name: e.target.value })} placeholder="למשל: יוסי כהן" className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
+                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_contactName}</label>
+                <input type="text" value={editData.brand_contact_name ?? ''} onChange={e => setEditData({ ...editData, brand_contact_name: e.target.value })} placeholder={t.partnershipDetail.pd_egContact} className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
               </div>
               <div>
-                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>וואטסאפ מותג</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_brandWhatsapp}</label>
                 <input type="tel" dir="ltr" value={editData.whatsapp_phone ?? ''} onChange={e => setEditData({ ...editData, whatsapp_phone: e.target.value })} placeholder="972501234567" className="w-full px-3 py-2 rounded-xl text-sm text-left" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
               </div>
               <div>
-                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>מייל מותג</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_brandEmail}</label>
                 <input type="email" dir="ltr" value={editData.brand_contact_email ?? ''} onChange={e => setEditData({ ...editData, brand_contact_email: e.target.value })} placeholder="contact@brand.com" className="w-full px-3 py-2 rounded-xl text-sm text-left" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
               </div>
               <div>
-                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>טלפון מותג</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_brandPhone}</label>
                 <input type="tel" dir="ltr" value={editData.brand_contact_phone ?? ''} onChange={e => setEditData({ ...editData, brand_contact_phone: e.target.value })} placeholder="03-1234567" className="w-full px-3 py-2 rounded-xl text-sm text-left" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
               </div>
             </div>
@@ -466,9 +462,7 @@ export default function PartnershipDetailPage() {
           {/* Brand Logo Upload (global) */}
           <div>
             <h4 className="text-xs font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--dash-text-3)' }}>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              לוגו מותג (משותף לכל המשפיענים)
-            </h4>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>{t.partnershipDetail.pd_brandLogo}</h4>
             <div className="flex items-center gap-4">
               {partnership.brand_logo_url ? (
                 <img src={partnership.brand_logo_url} alt={partnership.brand_name} className="w-16 h-16 rounded-xl object-contain" style={{ background: 'rgba(255,255,255,0.05)', padding: '4px' }} />
@@ -483,14 +477,14 @@ export default function PartnershipDetailPage() {
                 ) : (
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                 )}
-                {isUploadingLogo ? 'מעלה...' : partnership.brand_logo_url ? 'החלף לוגו' : 'העלה לוגו'}
+                {isUploadingLogo ? t.partnershipDetail.pd_uploadingShort : partnership.brand_logo_url ? t.partnershipDetail.pd_replaceLogo : t.partnershipDetail.pd_uploadLogo}
                 <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={isUploadingLogo} className="hidden" />
               </label>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>הערות</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_notes}</label>
             <textarea value={editData.notes ?? ''} onChange={e => setEditData({ ...editData, notes: e.target.value })} rows={3} className="w-full px-3 py-2 rounded-xl text-sm text-start" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text)' }} />
           </div>
         </div>
@@ -501,13 +495,13 @@ export default function PartnershipDetailPage() {
         <div className="glass-card rounded-2xl p-5"  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)' }}>
           {partnership.brief && (
             <div className="mb-3">
-              <h3 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>בריף</h3>
+              <h3 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_brief}</h3>
               <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--dash-text)' }}>{partnership.brief}</p>
             </div>
           )}
           {partnership.notes && (
             <div>
-              <h3 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>הערות</h3>
+              <h3 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_notes}</h3>
               <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--dash-text-2)' }}>{partnership.notes}</p>
             </div>
           )}
@@ -517,14 +511,14 @@ export default function PartnershipDetailPage() {
       {/* ═══ Coupons (inline, compact) ═══ */}
       {coupons.length > 0 && (
         <div className="glass-card rounded-2xl p-5"  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)' }}>
-          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text-2)' }}>קופונים</h3>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text-2)' }}>{t.partnershipDetail.pd_coupons}</h3>
           <div className="space-y-2">
             {coupons.map(c => (
               <div key={c.id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'transparent', border: '1px solid var(--dash-glass-border)' }}>
                 <div className="flex items-center gap-3">
                   <span className="font-mono font-bold text-sm" style={{ color: 'var(--color-primary)' }}>{c.code}</span>
                   <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>
-                    {c.discount_type === 'percentage' ? `${c.discount_value}%` : c.discount_type === 'fixed' ? `₪${c.discount_value}` : 'משלוח חינם'}
+                    {c.discount_type === 'percentage' ? `${c.discount_value}%` : c.discount_type === 'fixed' ? `₪${c.discount_value}` : t.partnershipDetail.pd_freeShipping}
                   </span>
                   {c.is_active ? (
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
@@ -533,10 +527,8 @@ export default function PartnershipDetailPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{c.usage_count || 0} שימושים</span>
-                  <button onClick={() => copyToClipboard(c.code)} className="px-2.5 py-1 rounded-xl text-xs transition-colors btn-primary">
-                    העתק
-                  </button>
+                  <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{c.usage_count || 0} {t.partnershipDetail.pd_uses}</span>
+                  <button onClick={() => copyToClipboard(c.code)} className="px-2.5 py-1 rounded-xl text-xs transition-colors btn-primary">{t.partnershipDetail.pd_copy}</button>
                 </div>
               </div>
             ))}
@@ -549,7 +541,7 @@ export default function PartnershipDetailPage() {
         Array.isArray(partnership.deliverables) ? partnership.deliverables.length > 0 : typeof partnership.deliverables === 'string' && partnership.deliverables.trim()
       ) && (
         <div className="glass-card rounded-2xl p-5"  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)' }}>
-          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text-2)' }}>דליברבלס</h3>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--dash-text-2)' }}>{t.partnershipDetail.pd_deliverables}</h3>
           {typeof partnership.deliverables === 'string' ? (
             <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--dash-text)' }}>{partnership.deliverables}</p>
           ) : (
@@ -571,14 +563,14 @@ export default function PartnershipDetailPage() {
       {/* ═══ Documents (compact) ═══ */}
       <div className="glass-card rounded-2xl p-5"  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dash-glass-border)' }}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>מסמכים ({documents.length})</h3>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--dash-text-2)' }}>{t.partnershipDetail.pd_documents} ({documents.length})</h3>
           <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium cursor-pointer transition-colors btn-primary">
             {isUploading ? (
               <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
             )}
-            {isUploading ? 'מעלה...' : 'העלה'}
+            {isUploading ? t.partnershipDetail.pd_uploadingShort : t.partnershipDetail.pd_upload}
             <input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={handleFileUpload} disabled={isUploading} className="hidden" />
           </label>
         </div>
@@ -586,10 +578,10 @@ export default function PartnershipDetailPage() {
         {/* Doc type selector */}
         <div className="flex gap-1.5 mb-3 flex-wrap">
           {[
-            { v: 'contract', l: 'חוזה' },
-            { v: 'brief', l: 'בריף' },
-            { v: 'invoice', l: 'חשבונית' },
-            { v: 'other', l: 'אחר' },
+            { v: 'contract', l: t.partnershipDetail.pd_contract },
+            { v: 'brief', l: t.partnershipDetail.pd_brief },
+            { v: 'invoice', l: t.partnershipDetail.pd_invoice },
+            { v: 'other', l: t.partnershipDetail.pd_other },
           ].map(t => (
             <button key={t.v} onClick={() => setSelectedDocType(t.v)} className={`px-2.5 py-1 rounded-xl text-[11px] transition-colors ${selectedDocType === t.v ? 'pill pill-purple' : 'pill pill-neutral'}`}>
               {t.l}
@@ -598,7 +590,7 @@ export default function PartnershipDetailPage() {
         </div>
 
         {documents.length === 0 ? (
-          <p className="text-xs text-center py-6" style={{ color: 'var(--dash-text-3)' }}>אין מסמכים. העלה חוזה, בריף או חשבונית.</p>
+          <p className="text-xs text-center py-6" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_noDocs}</p>
         ) : (
           <div className="space-y-2">
             {documents.map(doc => (
@@ -615,13 +607,13 @@ export default function PartnershipDetailPage() {
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
                   {doc.parsing_status === 'completed' && (
-                    <button onClick={() => router.push(`/influencer/${username}/documents/${doc.id}/review`)} className="text-xs" style={{ color: 'var(--color-primary)' }}>סקור</button>
+                    <button onClick={() => router.push(`/influencer/${username}/documents/${doc.id}/review`)} className="text-xs" style={{ color: 'var(--color-primary)' }}>{t.partnershipDetail.pd_review}</button>
                   )}
                   <button onClick={async () => {
                     const r = await fetch(`/api/influencer/documents/${doc.id}?username=${username}`);
                     const { document: d } = await r.json();
                     if (d?.download_url) window.open(d.download_url, '_blank');
-                  }} className="text-xs" style={{ color: 'var(--dash-text-3)' }}>הורד</button>
+                  }} className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_download}</button>
                 </div>
               </div>
             ))}
@@ -637,7 +629,7 @@ export default function PartnershipDetailPage() {
             className="w-full flex items-center justify-between p-5 text-sm font-semibold"
             style={{ color: 'var(--dash-text-2)' }}
           >
-            <span>פרטי חוזה</span>
+            <span>{t.partnershipDetail.pd_contractDetails}</span>
             <svg className={`w-4 h-4 transition-transform ${showContractDetails ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
@@ -648,7 +640,7 @@ export default function PartnershipDetailPage() {
               {/* Payment Schedule */}
               {partnership.payment_schedule && partnership.payment_schedule.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-medium mb-2" style={{ color: 'var(--dash-text-3)' }}>מועדי תשלום</h4>
+                  <h4 className="text-xs font-medium mb-2" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_paymentDates}</h4>
                   <div className="space-y-2">
                     {partnership.payment_schedule.map((m, i) => (
                       <div key={i} className="flex items-center justify-between p-2.5 rounded-xl text-sm" style={{ background: 'transparent' }}>
@@ -669,7 +661,7 @@ export default function PartnershipDetailPage() {
               {/* Contract Scope */}
               {partnership.contract_scope && (
                 <div>
-                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>תחום החוזה</h4>
+                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_contractScope}</h4>
                   <p className="text-sm" style={{ color: 'var(--dash-text)' }}>{partnership.contract_scope}</p>
                 </div>
               )}
@@ -677,7 +669,7 @@ export default function PartnershipDetailPage() {
               {/* Exclusivity */}
               {partnership.exclusivity?.isExclusive && (
                 <div className="flex items-center gap-2">
-                  <span className="pill pill-amber">אקסקלוסיבי</span>
+                  <span className="pill pill-amber">{t.partnershipDetail.pd_exclusive}</span>
                   {partnership.exclusivity.categories?.length > 0 && (
                     <span className="text-xs" style={{ color: 'var(--dash-text-3)' }}>{partnership.exclusivity.categories.join(', ')}</span>
                   )}
@@ -687,7 +679,7 @@ export default function PartnershipDetailPage() {
               {/* Termination */}
               {partnership.termination_clauses && partnership.termination_clauses.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>תנאי ביטול</h4>
+                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_cancellationTerms}</h4>
                   <ul className="text-sm space-y-1" style={{ color: 'var(--dash-text-2)' }}>
                     {partnership.termination_clauses.map((c, i) => <li key={i}>• {c}</li>)}
                   </ul>
@@ -697,7 +689,7 @@ export default function PartnershipDetailPage() {
               {/* Key Dates */}
               {partnership.key_dates && partnership.key_dates.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>תאריכים חשובים</h4>
+                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_keyDates}</h4>
                   <div className="space-y-1">
                     {partnership.key_dates.map((kd, i) => (
                       <div key={i} className="flex justify-between text-sm">
@@ -712,16 +704,14 @@ export default function PartnershipDetailPage() {
               {/* Confidentiality */}
               {partnership.confidentiality && (
                 <div>
-                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>סודיות</h4>
+                  <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.partnershipDetail.pd_confidentiality}</h4>
                   <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{partnership.confidentiality}</p>
                 </div>
               )}
 
               {/* Auto Renewal */}
               {partnership.auto_renewal && (
-                <span className="pill pill-green">
-                  חידוש אוטומטי
-                </span>
+                <span className="pill pill-green">{t.partnershipDetail.pd_autoRenew}</span>
               )}
             </div>
           )}
@@ -730,7 +720,7 @@ export default function PartnershipDetailPage() {
 
       {/* ═══ Meta ═══ */}
       <div className="text-[11px] text-center" style={{ color: 'var(--dash-text-3)' }}>
-        נוצר {new Date(partnership.created_at).toLocaleDateString('he-IL')} · עודכן {new Date(partnership.updated_at).toLocaleDateString('he-IL')}
+        {t.partnershipDetail.pd_created} {new Date(partnership.created_at).toLocaleDateString('he-IL')} · {t.partnershipDetail.pd_updated} {new Date(partnership.updated_at).toLocaleDateString('he-IL')}
       </div>
     </div>
   );
