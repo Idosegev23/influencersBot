@@ -24,7 +24,20 @@ const PLATFORM_LABEL: Record<string, string> = {
   facebook: 'Facebook',
   tiktok: 'TikTok',
   youtube: 'YouTube',
+  linkedin: 'LinkedIn',
 };
+
+/**
+ * Platforms whose posts carry no engagement data at all.
+ *
+ * The LinkedIn company endpoint returns text and a date and nothing else — no
+ * reactions, no comments. Ranking those posts, or averaging them into a
+ * per-platform comparison, would report "LinkedIn: 0 interactions" when the
+ * truth is that we cannot see them. Silence is not zero, so they are excluded
+ * from anything measuring response. Their TEXT still counts everywhere else:
+ * topic map, RAG, persona.
+ */
+const NO_ENGAGEMENT_DATA = new Set(['linkedin']);
 
 /** Human label for a topic slug, e.g. 'membership' → 'Membership'. */
 export function topicLabel(topic: string): string {
@@ -158,7 +171,9 @@ export function generateTopicMap(corpus: InsightCorpus): ContentInsight[] {
  * describe posts this function already selected.
  */
 export function generateTopPerformers(corpus: InsightCorpus): ContentInsight[] {
-  const posts = corpus.posts.filter((p) => p.caption.trim().length > 0);
+  const posts = corpus.posts.filter(
+    (p) => p.caption.trim().length > 0 && !NO_ENGAGEMENT_DATA.has(p.platform),
+  );
   if (posts.length === 0) return [];
 
   const ranked = [...posts].sort((a, b) => b.relativeEngagement - a.relativeEngagement);

@@ -23,7 +23,7 @@ interface ScanRow {
 // Hebrew labels for the pipeline steps (mirrors StepBoard's STEP_LABELS).
 const STEP_LABELS: Record<string, string> = {
   'create-account': 'יצירת חשבון', 'ig-scan': 'סריקת אינסטגרם', 'transcribe': 'תמלול וידאו',
-  'fb-scan': 'סריקת פייסבוק', 'youtube-scan': 'סריקת יוטיוב', 'tiktok-scan': 'סריקת טיקטוק',
+  'fb-scan': 'סריקת פייסבוק', 'linkedin-scan': 'סריקת לינקדאין', 'youtube-scan': 'סריקת יוטיוב', 'tiktok-scan': 'סריקת טיקטוק',
   'site-discover': 'איתור עמודי אתר', 'site-crawl': 'סריקת אתר', 'rag-ingest': 'אינדוקס RAG',
   'product-extract': 'חילוץ מוצרים', 'persona-build': 'בניית פרסונה',
   'insights-build': 'תובנות תוכן', 'finalize': 'סיום והגדרות',

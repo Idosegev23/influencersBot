@@ -1,5 +1,5 @@
 export const SCAN_STEPS = [
-  'create-account', 'ig-scan', 'transcribe', 'fb-scan', 'youtube-scan', 'tiktok-scan', 'site-discover', 'site-crawl',
+  'create-account', 'ig-scan', 'transcribe', 'fb-scan', 'linkedin-scan', 'youtube-scan', 'tiktok-scan', 'site-discover', 'site-crawl',
   'rag-ingest', 'product-extract', 'persona-build', 'insights-build', 'finalize',
 ];
 

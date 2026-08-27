@@ -47,6 +47,7 @@ export default function AddAccountPage() {
   const [youtube, setYoutube] = useState('');
   const [tiktok, setTiktok] = useState('');
   const [facebook, setFacebook] = useState('');
+  const [linkedin, setLinkedin] = useState('');
   const [archetype, setArchetype] = useState('brand');
   // Catalog market — drives the product taxonomy AND the extraction prompt.
   // Follows the archetype until the admin overrides it, then stays put.
@@ -237,6 +238,7 @@ export default function AddAccountPage() {
           youtube: youtube.trim() || undefined,
           tiktok: tiktok.trim() || undefined,
           facebook: facebook.trim() || undefined,
+          linkedin: linkedin.trim() || undefined,
         }),
       });
 
@@ -526,6 +528,19 @@ export default function AddAccountPage() {
                 value={facebook}
                 onChange={(e) => setFacebook(e.target.value)}
                 placeholder="שם העמוד או כתובת מלאה"
+                className="neon-input w-full"
+                style={{ direction: 'ltr' }}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+                LinkedIn <span className="font-normal" style={{ color: '#817a6c' }}>(עמוד חברה, אופציונלי)</span>
+              </label>
+              <input
+                type="text"
+                value={linkedin}
+                onChange={(e) => setLinkedin(e.target.value)}
+                placeholder="linkedin.com/company/..."
                 className="neon-input w-full"
                 style={{ direction: 'ltr' }}
               />
