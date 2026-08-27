@@ -386,6 +386,17 @@
         detailsSubmit: 'שליחה',
         detailsSent: 'שלחתי את הפרטים',
         orderTitle: 'סטטוס הזמנה',
+        // Store statuses arrive as English machine codes and used to be printed
+        // verbatim inside this Hebrew card. Mirror of
+        // src/lib/cs/order-status-label.ts — change one, change the other.
+        orderStatus: {
+          fulfilled: 'נשלחה', shipped: 'נשלחה', partially_fulfilled: 'נשלחה חלקית',
+          unfulfilled: 'בהכנה', pending: 'ממתינה', in_transit: 'בדרך אלייך',
+          out_for_delivery: 'יצאה למסירה', delivered: 'נמסרה', open: 'פתוחה',
+          closed: 'הושלמה', paid: 'שולמה', on_hold: 'מוקפאת', cancelled: 'בוטלה',
+          canceled: 'בוטלה', voided: 'בוטלה', refunded: 'זוכתה',
+          partially_refunded: 'זוכתה חלקית', returned: 'הוחזרה',
+        },
         trackBtn: 'למעקב משלוח',
         ticketTitle: 'נפתחה פנייה ✓',
         ticketBody: 'מספר פנייה לשמירה:',
@@ -524,6 +535,14 @@
         detailsSubmit: 'Send',
         detailsSent: 'Sent my details',
         orderTitle: 'Order status',
+        orderStatus: {
+          fulfilled: 'Fulfilled', shipped: 'Shipped', partially_fulfilled: 'Partially fulfilled',
+          unfulfilled: 'Being prepared', pending: 'Pending', in_transit: 'In transit',
+          out_for_delivery: 'Out for delivery', delivered: 'Delivered', open: 'Open',
+          closed: 'Completed', paid: 'Paid', on_hold: 'On hold', cancelled: 'Cancelled',
+          canceled: 'Cancelled', voided: 'Cancelled', refunded: 'Refunded',
+          partially_refunded: 'Partially refunded', returned: 'Returned',
+        },
         trackBtn: 'Track shipment',
         ticketTitle: 'Ticket opened ✓',
         ticketBody: 'Your reference:',
@@ -4384,7 +4403,12 @@
     if (p.kind === 'order_status_card' && p.order) {
       var o = p.order;
       var rows = '';
-      if (o.status) rows += '<div style="display:inline-block;background:' + pc + '1a;color:' + pc + ';border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;margin-bottom:6px;">' + escapeHtml(o.status) + '</div>';
+      // An unmapped code still renders raw — a shopper can quote it to a human,
+      // and an empty chip would be a worse answer than an ugly one.
+      var statusMap = (locale.cs && locale.cs.orderStatus) || {};
+      var statusText = String(o.status == null ? '' : o.status).trim();
+      if (statusText) statusText = statusMap[statusText.toLowerCase()] || statusText;
+      if (statusText) rows += '<div style="display:inline-block;background:' + pc + '1a;color:' + pc + ';border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;margin-bottom:6px;">' + escapeHtml(statusText) + '</div>';
       if (o.itemSummary) rows += '<div style="font-size:12.5px;color:var(--ibot-text-primary);margin-bottom:4px;">' + escapeHtml(o.itemSummary) + '</div>';
       if (o.total) rows += '<div style="font-size:12px;color:var(--ibot-text-muted);margin-bottom:4px;">' + escapeHtml(String(o.total)) + '</div>';
       if (o.shipmentText) rows += '<div style="font-size:12.5px;color:var(--ibot-text-primary);margin-bottom:4px;">🚚 ' + escapeHtml(o.shipmentText) + '</div>';

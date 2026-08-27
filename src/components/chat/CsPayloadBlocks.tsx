@@ -4,6 +4,7 @@
 // DirectiveRenderer so the blocks persist in scrollback after the user replies.
 import { useState } from 'react';
 import type { CsUiPayload } from '@/lib/cs/payloads';
+import { orderStatusLabel } from '@/lib/cs/order-status-label';
 
 const STRINGS = {
   he: {
@@ -97,14 +98,16 @@ export default function CsPayloadBlocks({ payloads, language, brandColor, onDeta
       {payloads.map((p, i) => {
         if (p.kind === 'order_status_card') {
           const o = p.order;
+          // The payload carries the platform's raw code; the shopper must not see it.
+          const statusText = orderStatusLabel(o.status, language === 'en' ? 'en' : 'he');
           return (
             <div key={i} dir={dir} className="rounded-xl border border-gray-200 bg-white/80 p-4 max-w-md">
               <div className="text-sm font-bold mb-2">
                 {t.orderTitle}{o.orderNumber ? ` #${o.orderNumber}` : ''}
               </div>
-              {o.status && (
+              {statusText && (
                 <span className="inline-block rounded-full px-3 py-0.5 text-xs font-semibold mb-2" style={{ background: `${accent}1a`, color: accent }}>
-                  {o.status}
+                  {statusText}
                 </span>
               )}
               {o.itemSummary && <div className="text-sm mb-1">{o.itemSummary}</div>}
