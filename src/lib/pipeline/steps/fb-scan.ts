@@ -1,8 +1,14 @@
 import { createClient } from '@/lib/supabase/server';
 import { setCount } from '@/lib/pipeline/state';
-import { getFacebookProfile, getFacebookPosts } from '@/lib/scraping/facebookScraper';
+import { getFacebookProfile, getFacebookPosts, getFacebookPostImage } from '@/lib/scraping/facebookScraper';
+import { persistPostMedia } from '@/lib/scraping/media-storage';
 import type { StepContext } from '../types';
 import { enrichSkips, type StepResult } from './index';
+
+/** Posts whose media is enriched + persisted per invocation. */
+const MEDIA_BATCH = 25;
+/** Ceiling on the media pass; the run route has no re-enqueue limit of its own. */
+const MAX_MEDIA_BATCHES = 60;
 
 const QUOTE_POST_CAP = 15;
 const FULL_POST_CAP = 300;
@@ -40,6 +46,11 @@ export async function fbScanStep(ctx: StepContext): Promise<StepResult> {
   if (!page) return { status: 'advance' };
 
   const supabase = await createClient();
+
+  // Batch 0 walks the page and stores the posts. Every batch after it works on
+  // their media, a slice at a time — see mediaBatch below for why that cannot
+  // live in the same invocation.
+  if (ctx.batch > 0) return mediaBatch(ctx, supabase);
 
   const profile = await getFacebookProfile(page);
   if (profile) {
@@ -124,5 +135,93 @@ export async function fbScanStep(ctx: StepContext): Promise<StepResult> {
   }
 
   await setCount(ctx.jobId, 'fb-scan', { done: posts.length, total: posts.length });
-  return { status: 'advance' };
+  // Hand off to the media pass rather than advancing — see mediaBatch.
+  return { status: 're-enqueue' };
+}
+
+/**
+ * Fill in and preserve post images, a slice per invocation.
+ *
+ * TWO problems, both found on the live ABA scan:
+ *
+ * 1. The list endpoint returns `image: null` for a large share of posts — 137 of
+ *    300 here — because a link share carries its picture on the attachment. The
+ *    single-post endpoint has it, at one credit each, so it is only called for
+ *    posts that came back with nothing.
+ *
+ * 2. Facebook CDN urls EXPIRE. Nothing in the pipeline persisted post media, and
+ *    the refresh cron only covers Instagram, so a Facebook image would simply
+ *    stop loading partway through a demo. Persisting to our own storage is what
+ *    makes the images outlive the scan.
+ *
+ * Both are per-post network work on top of a 300-post walk, which is why this is
+ * a separate batched pass rather than more work inside the first invocation.
+ */
+async function mediaBatch(ctx: StepContext, supabase: any): Promise<StepResult> {
+  // No cursor, deliberately. Every row processed here gets `media_stored_at` set —
+  // including a text-only post that will never have an image — so the unprocessed
+  // set strictly shrinks and "take the next N" always terminates. An offset would
+  // have raced the shrinking set and skipped rows.
+  if (ctx.batch > MAX_MEDIA_BATCHES) {
+    console.warn(`[fb-scan/media] ceiling reached after ${ctx.batch} batches`);
+    return { status: 'advance' };
+  }
+
+  const { data: posts } = await supabase
+    .from('instagram_posts')
+    .select('id, shortcode, post_url, media_urls, thumbnail_url')
+    .eq('account_id', ctx.accountId)
+    .eq('platform', 'facebook')
+    .is('media_stored_at', null)
+    .order('posted_at', { ascending: false })
+    .limit(MEDIA_BATCH);
+
+  if (!posts || posts.length === 0) return { status: 'advance' };
+
+  let recovered = 0;
+  let persisted = 0;
+
+  for (const row of posts) {
+    try {
+      let mediaUrls: string[] = Array.isArray(row.media_urls) ? row.media_urls : [];
+      let thumb: string | null = row.thumbnail_url || null;
+
+      if (mediaUrls.length === 0 && row.post_url) {
+        const found = await getFacebookPostImage(row.post_url);
+        if (found) {
+          mediaUrls = [found];
+          thumb = found;
+          recovered++;
+        }
+      }
+
+      if (mediaUrls.length === 0) {
+        // Genuinely a text-only post. Stamp it anyway so it leaves the queue —
+        // otherwise it would be re-examined on every batch, forever.
+        await supabase
+          .from('instagram_posts')
+          .update({ media_stored_at: new Date().toISOString() })
+          .eq('id', row.id);
+        continue;
+      }
+
+      const stored = await persistPostMedia(supabase, ctx.accountId, row.shortcode, mediaUrls, thumb);
+      await supabase
+        .from('instagram_posts')
+        .update({
+          media_urls: mediaUrls,
+          thumbnail_url: thumb,
+          stored_media_urls: stored.stored_media_urls,
+          stored_thumbnail_url: stored.stored_thumbnail_url,
+          media_stored_at: new Date().toISOString(),
+        })
+        .eq('id', row.id);
+      if (stored.stored_media_urls?.length) persisted++;
+    } catch (e: any) {
+      console.error(`[fb-scan/media] post ${row.shortcode} failed:`, e?.message || e);
+    }
+  }
+
+  console.log(`[fb-scan/media] batch ${ctx.batch}: recovered ${recovered} images, persisted ${persisted}`);
+  return { status: 're-enqueue' };
 }

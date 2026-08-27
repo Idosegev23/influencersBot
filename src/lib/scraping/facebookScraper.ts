@@ -5,6 +5,7 @@
  *   GET /v1/facebook/profile        ?url=<page url>  -> page metadata
  *   GET /v1/facebook/profile/posts  ?url=<page url>[&cursor=x]
  *                                   -> { posts: [...], cursor }
+ *   GET /v1/facebook/post           ?url=<post url>  -> full post, incl. media
  *
  * Both cost one credit per call. The posts endpoint returns THREE posts per call,
  * so a 300-post scan is ~100 calls — bounded, but worth knowing before raising a
@@ -211,4 +212,38 @@ export async function getFacebookPosts(input: string, limit = 60): Promise<Faceb
   }
 
   return out;
+}
+
+/**
+ * The image for ONE post, from the single-post endpoint.
+ *
+ * The list endpoint returns `image: null` for a large share of posts — 137 of
+ * ABA's 300 — because a link share carries its picture on the ATTACHMENT, not on
+ * the post. The detail endpoint exposes `images`, `image_url`, `thumbnail`, the
+ * video thumbnail and `link_attachment.image_url`; this picks the first that
+ * exists, in the order a reader would consider them.
+ *
+ * One credit per call, so callers should only reach for it when the list gave
+ * them nothing.
+ */
+export async function getFacebookPostImage(postUrl: string): Promise<string | null> {
+  if (!postUrl) return null;
+  try {
+    const { data } = await client().get('/v1/facebook/post', { params: { url: postUrl } });
+    const candidates = [
+      Array.isArray(data?.images) ? data.images[0]?.url ?? data.images[0] : null,
+      data?.image_url,
+      data?.thumbnail,
+      data?.video?.thumbnail,
+      Array.isArray(data?.videos) ? data.videos[0]?.thumbnail : null,
+      data?.link_attachment?.image_url,
+    ];
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.startsWith('http')) return c;
+    }
+    return null;
+  } catch (e: any) {
+    console.error('[facebookScraper] post detail failed:', e?.message || e);
+    return null;
+  }
 }
