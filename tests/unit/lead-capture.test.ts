@@ -711,3 +711,37 @@ describe('contact details survive a classifier that misses them', () => {
     expect(supabase.updates).toHaveLength(0);
   });
 });
+
+/**
+ * On 2026-04-21 the bot took נעה שילה through a full qualification, collected her
+ * name, phone and email, and then said: "מעולה, קבענו כיוון למחר ב-09:00 בזום 🤍
+ * אנחנו ניישר את זה מול הצוות ונחזור אלייך עם אישור מסודר ולינק לזום."
+ *
+ * There is no calendar integration anywhere in this product. Nothing was booked,
+ * no link was ever sent, and five days later she wrote "אז אני מבינה שזה לא רציני
+ * / אמיתי". It offered "30 דקות עם הצוות" in four other threads too.
+ *
+ * The bot may still move a lead toward a meeting — it must not assert that one
+ * exists.
+ */
+describe('leadDiggingInstruction — meetings it cannot book', () => {
+  const instruction = leadDiggingInstruction('LDRS GROUP');
+
+  it('forbids confirming a slot, a link or an invite', () => {
+    expect(instruction).toContain('אל תאשר');
+    expect(instruction).toMatch(/זום|לינק/);
+    expect(instruction).toContain('יומן');
+  });
+
+  it('still lets it collect availability and hand over', () => {
+    expect(instruction).toMatch(/זמינות|מתי נוח/);
+    expect(instruction).toContain('נציג');
+  });
+
+  it('names the brand and stays a single bracketed internal note', () => {
+    expect(instruction.startsWith('[')).toBe(true);
+    expect(instruction.endsWith(']')).toBe(true);
+    expect(instruction).toContain('LDRS GROUP');
+    expect(instruction.split('[').length - 1).toBe(1);
+  });
+});

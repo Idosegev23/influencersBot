@@ -32,7 +32,14 @@ const HUMAN_STRONG = [
 // the verb "manages" ("מי מנהלת הלקוח של סודה" is a normal question, not an
 // escalation — it was 12 of 17 false positives). Only count these as a
 // human-demand when the message also carries a request cue.
-const HUMAN_MANAGER = ['מנהל', 'מנהלת', 'אחראי', 'אחראית', 'manager'];
+// The prefixed forms are listed explicitly rather than by relaxing the boundary
+// for single-word keywords: "תעבירו אותי למנהל" is the natural way to ask, and it
+// silently failed to escalate. Widening the matcher instead would put 'משפט'
+// (also "sentence") and 'נורא' (also "very") back in play.
+const HUMAN_MANAGER = [
+  'מנהל', 'מנהלת', 'אחראי', 'אחראית', 'manager',
+  'למנהל', 'למנהלת', 'לאחראי', 'לאחראית', 'המנהל', 'האחראי',
+];
 const REQUEST_CUE = [
   'רוצה', 'תעביר', 'תעבירו', 'העבירו', 'לדבר', 'תנו לי', 'אפשר', 'צריך',
   'צריכה', 'דרוש', 'חבר אותי', 'want', 'talk', 'speak', 'get me', 'connect me',
@@ -43,6 +50,18 @@ const NEGATIVE = [
   'נורא', 'בושה', 'מזעזע', 'חוצפה', 'עד מתי', 'כמה זמן עוד', 'אף אחד לא עונה',
   'מתעלמים', 'לא מקצועי', 'לא ייאמן', 'disappointed', 'angry', 'furious',
   'unacceptable', 'ridiculous', 'worst', 'terrible',
+  // The "you keep stringing me along / nobody answers" family — the single most
+  // common shape of a real complaint in this product's traffic, and it was
+  // missing. A former LDRS influencer opened with "וכל הזמן מורחים אותי במיילים
+  // ... זה לא הגיוני בשום צורה" (2026-04-15) and nothing fired for five turns.
+  //
+  // 'מורחים' is NOT here on its own on purpose: bare "מורחים" is how every
+  // skincare account's customers ask how to apply a cream ("כמה פעמים ביום
+  // מורחים?"). Only the object-pronoun forms are a complaint.
+  'מורחים אותי', 'מורחים אותנו', 'מרחו אותי', 'דוחים אותי',
+  'אין מענה', 'לא מקבל מענה', 'לא מקבלת מענה',
+  'לא חוזרים אליי', 'לא חוזרים אלי', 'לא חזרו אליי', 'לא חזרו אלי',
+  'לא חוזר אליי', 'לא חוזר אלי', 'לא הגיוני',
 ];
 
 function escapeRegex(s: string): string {
@@ -54,13 +73,23 @@ function escapeRegex(s: string): string {
 // 'issue' and 'court' inside 'courtesy' all false-fired with includes().
 // Unicode lookarounds (\p{L} = any letter incl. Hebrew, \p{N} = digit) give a
 // real word boundary: the keyword must not be flanked by another letter/digit.
+// Hebrew glues its one-letter prefixes straight onto the next word, so
+// "ואין מענה" / "שלא חזרו אליי" never matched the phrase they obviously contain
+// — "אני כל יום מתקשרת ואין מענה" read as clean. A single leading ו/ב/ל/כ/ש/מ/ה
+// is therefore allowed, but ONLY in front of a multi-word phrase: single-word
+// keywords keep the strict boundary, which is what stops 'עוד' matching inside
+// 'בעוד' (see the LEGAL note above) and 'מנהל' inside 'מנהלת'.
+const HEB_PREFIX = '[\u05d5\u05d1\u05dc\u05db\u05e9\u05de\u05d4]';
+
 function hasAny(text: string, words: string[]): boolean {
   const t = (text || '').toLowerCase();
   if (!t) return false;
   return words.some((w) => {
     const kw = w.toLowerCase().trim();
     if (!kw) return false;
-    const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegex(kw)}(?![\\p{L}\\p{N}])`, 'u');
+    const allowPrefix = /\s/.test(kw) && /^[\u0590-\u05ff]/.test(kw);
+    const lead = allowPrefix ? `(?<![\\p{L}\\p{N}])(?:${HEB_PREFIX})?` : '(?<![\\p{L}\\p{N}])';
+    const re = new RegExp(`${lead}${escapeRegex(kw)}(?![\\p{L}\\p{N}])`, 'u');
     return re.test(t);
   });
 }

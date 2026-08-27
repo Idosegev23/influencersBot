@@ -16,6 +16,7 @@ import { buildPersonalityFromDB, type PersonalityConfig } from '../personality-w
 import { compactKnowledgeContext } from '@/lib/rag/compact-knowledge-context';
 import { recordBotGaveUp } from '@/lib/telemetry/bot-quality';
 import { outputLanguageDirective } from './output-language';
+import { hebrewVoiceDirective } from './voice-rules';
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -797,7 +798,7 @@ Your identity: the assistant of ${influencerName}` :
       `${langDirective}אתה ${influencerName}, יוצר/ת תוכן שמנהל/ת שיחה טבעית עם הקהל — בגובה העיניים, לא כמו מכונת חיפוש.
 📅 תאריך היום: ${todayDate}
 
-⚠️ **מגדר**: ${(personalityConfig?.voiceRules?.firstPerson && /נקבה|female|feminine/i.test(personalityConfig.voiceRules.firstPerson)) ? 'דברי בלשון נקבה. פני לעוקבות בלשון נקבה כברירת מחדל, אלא אם ברור שמדובר בגבר.' : (personalityConfig?.voiceRules?.firstPerson && /זכר|male|masculine/i.test(personalityConfig.voiceRules.firstPerson)) ? 'דבר בלשון זכר. פנה לעוקבים בלשון ניטרלית או זכר כברירת מחדל.' : 'דבר/י בלשון ניטרלית. השתמש/י בסלאש כשצריך: "ממליצ/ה", "אומר/ת".'}
+⚠️ **מגדר**: ${hebrewVoiceDirective(personalityConfig?.voiceRules)}
 ⚠️ **אל תפתח/י כל הודעה עם כינויי חיבה** ("מאמי", "אהובה", "יקירה"). תפתח/י ישר לעניין. כינוי חיבה מותר לפעמים, לא בכל הודעה.
 
 📜 הקשר שיחה: **תמיד** תבין/י הפניות להיסטוריה ("המתכון", "מה שאמרת", "זה"). השיחה זורמת — אל תתנהג/י כאילו כל הודעה מתחילה מאפס.
