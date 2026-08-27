@@ -259,6 +259,12 @@ export function generateCadence(corpus: InsightCorpus): ContentInsight[] {
   const posts = corpus.posts.filter((p) => Number.isFinite(Date.parse(p.postedAt)));
   if (posts.length < MIN_POSTS_FOR_PATTERN) return [];
 
+  // Publishing FREQUENCY legitimately counts every platform — a LinkedIn post is
+  // a post. Media share and engagement do not: LinkedIn reports neither, and
+  // counting its silence would understate the media share and drag the
+  // day-of-week averages toward zero. Same rule as top_performers.
+  const measurable = posts.filter((p) => !NO_ENGAGEMENT_DATA.has(p.platform));
+
   const times = posts.map((p) => Date.parse(p.postedAt)).sort((a, b) => a - b);
   const spanDays = (times[times.length - 1] - times[0]) / 86_400_000;
   if (spanDays < 7) return [];
@@ -266,7 +272,8 @@ export function generateCadence(corpus: InsightCorpus): ContentInsight[] {
   const perWeek = round((posts.length / spanDays) * 7);
   const insights: ContentInsight[] = [];
 
-  const withMedia = posts.filter((p) => p.hasMedia).length;
+  const mediaSample = measurable.length > 0 ? measurable : posts;
+  const withMedia = mediaSample.filter((p) => p.hasMedia).length;
   const avgLength = Math.round(posts.reduce((s, p) => s + p.caption.length, 0) / posts.length);
 
   insights.push({
@@ -274,14 +281,14 @@ export function generateCadence(corpus: InsightCorpus): ContentInsight[] {
     title: 'Your publishing rhythm',
     summary:
       `You publish about ${perWeek} times a week across ${Math.round(spanDays)} days of history. ` +
-      `${Math.round((withMedia / posts.length) * 100)}% of posts carry an image or video, and captions ` +
+      `${Math.round((withMedia / mediaSample.length) * 100)}% of posts carry an image or video, and captions ` +
       `average ${avgLength} characters.`,
     rank: 0,
     metrics: {
       postsPerWeek: perWeek,
       spanDays: Math.round(spanDays),
       sampleSize: posts.length,
-      mediaShare: round((withMedia / posts.length) * 100),
+      mediaShare: round((withMedia / mediaSample.length) * 100),
       avgCaptionLength: avgLength,
     },
     evidence: [
@@ -292,7 +299,7 @@ export function generateCadence(corpus: InsightCorpus): ContentInsight[] {
 
   // Day-of-week performance, only where a day has enough posts to compare.
   const byDay = new Map<number, InsightPost[]>();
-  for (const p of posts) {
+  for (const p of measurable) {
     const parts = localParts(p.postedAt, corpus.timezone);
     if (!parts) continue;
     byDay.set(parts.day, [...(byDay.get(parts.day) || []), p]);
