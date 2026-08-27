@@ -35,6 +35,26 @@ export default function InfluencerLoginPage({
       const data = await res.json();
 
       if (res.ok) {
+        // Seed the language cache before navigating.
+        //
+        // The dashboard resolves its language from /api/influencer/nav-features,
+        // which 401s for the first moment after login while the session cookie
+        // propagates. Until the fallback answers, the shared chrome — cookie
+        // banner, Bestie launcher, the nav's own aria-labels — renders in Hebrew,
+        // so an English customer's first sight of their dashboard is a flash of a
+        // script they cannot read. Writing the cache here means the very first
+        // render after login already has the right answer.
+        try {
+          const langRes = await fetch(`/api/account/language?username=${encodeURIComponent(username)}`);
+          if (langRes.ok) {
+            const { language } = await langRes.json();
+            if (language === 'en' || language === 'he') {
+              window.localStorage.setItem(`dash_lang:${username}`, language);
+            }
+          }
+        } catch {
+          /* the dashboard's own fetch still resolves it; this only removes the flash */
+        }
         router.push(`/influencer/${username}/dashboard`);
       } else {
         setError(data.error || t.login.defaultError);
