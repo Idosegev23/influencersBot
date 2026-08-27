@@ -8,7 +8,7 @@ import { enrichSkips, type StepResult } from './index';
 /** Posts whose media is enriched + persisted per invocation. */
 const MEDIA_BATCH = 25;
 /** Ceiling on the media pass; the run route has no re-enqueue limit of its own. */
-const MAX_MEDIA_BATCHES = 60;
+const MAX_MEDIA_BATCHES = 120;
 
 const QUOTE_POST_CAP = 15;
 const FULL_POST_CAP = 300;
@@ -167,11 +167,15 @@ async function mediaBatch(ctx: StepContext, supabase: any): Promise<StepResult> 
     return { status: 'advance' };
   }
 
+  // Every platform, not just Facebook. Instagram's CDN urls expire the same way,
+  // and nothing in the pipeline was persisting those either — the refresh cron
+  // only runs on Sundays and re-fetches rather than preserving what a scan
+  // already had. Image RECOVERY below stays Facebook-only, since that is where
+  // the list endpoint omits the picture.
   const { data: posts } = await supabase
     .from('instagram_posts')
-    .select('id, shortcode, post_url, media_urls, thumbnail_url')
+    .select('id, shortcode, platform, post_url, media_urls, thumbnail_url')
     .eq('account_id', ctx.accountId)
-    .eq('platform', 'facebook')
     .is('media_stored_at', null)
     .order('posted_at', { ascending: false })
     .limit(MEDIA_BATCH);
@@ -186,7 +190,7 @@ async function mediaBatch(ctx: StepContext, supabase: any): Promise<StepResult> 
       let mediaUrls: string[] = Array.isArray(row.media_urls) ? row.media_urls : [];
       let thumb: string | null = row.thumbnail_url || null;
 
-      if (mediaUrls.length === 0 && row.post_url) {
+      if (mediaUrls.length === 0 && row.platform === 'facebook' && row.post_url) {
         const found = await getFacebookPostImage(row.post_url);
         if (found) {
           mediaUrls = [found];
