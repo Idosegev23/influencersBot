@@ -3,6 +3,8 @@
 import { useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
+import { getDashboardStrings } from '@/lib/i18n/dashboard';
 
 /**
  * Influencer Landing Page
@@ -17,6 +19,8 @@ export default function InfluencerLandingPage({
 }) {
   const resolvedParams = use(params);
   const username = resolvedParams.username;
+  const { lang: dashLang } = useDashboardLang(username);
+  const t = getDashboardStrings(dashLang);
   const router = useRouter();
 
   useEffect(() => {
@@ -54,7 +58,7 @@ export default function InfluencerLandingPage({
           className="w-8 h-8 animate-spin mx-auto mb-4"
           style={{ color: 'var(--color-primary)' }}
         />
-        <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>מפנה...</p>
+        <p className="text-sm" style={{ color: 'var(--dash-text-2)' }}>{t.common?.redirecting ?? 'Redirecting…'}</p>
       </div>
     </div>
   );

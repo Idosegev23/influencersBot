@@ -1,6 +1,7 @@
 // Generic shared strings.
 export const common = {
   he: {
+    redirecting: 'מפנה...',
     loading: 'טוען…',
     retry: 'נסה שוב',
     cancel: 'ביטול',
@@ -14,6 +15,7 @@ export const common = {
     genericError: 'אירעה שגיאה',
   },
   en: {
+    redirecting: 'Redirecting…',
     loading: 'Loading…',
     retry: 'Try again',
     cancel: 'Cancel',

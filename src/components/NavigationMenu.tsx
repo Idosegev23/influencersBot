@@ -21,6 +21,7 @@ import { MessageSquare,
 import { useEffect, useState } from 'react';
 import { getDashboardStrings, dashboardDir, type DashboardLang } from '@/lib/i18n/dashboard';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { useDashboardLang } from '@/hooks/useDashboardLang';
 
 // b2b_saas also gets the "brand-like" tabs (support, attribution) — IMAI needs
 // the support inbox in particular.
@@ -89,7 +90,18 @@ export function NavigationMenu() {
   const isBrandLike = features ? BRAND_LIKE_ARCHETYPES.has(features.archetype || '') : true;
   const hasProducts = features ? features.hasProducts : false;
   const instagramConnected = features ? features.instagramConnected : false;
-  const lang: DashboardLang = features?.language || 'he';
+  // Language comes from the cached hook, NOT from `features` above.
+  //
+  // That fetch 401s for a moment after login while the session cookie propagates,
+  // and it is slower on the heavier pages — so the nav rendered its whole label
+  // set in Hebrew until it landed. On an English account that is the most visible
+  // element on the screen. useDashboardLang answers from cache on the first
+  // render and has a public fallback when the authenticated call fails.
+  //
+  // `features` still owns archetype / hasProducts / instagramConnected, which
+  // only affect WHICH tabs show, not what language they are in.
+  const { lang: cachedLang } = useDashboardLang(username);
+  const lang: DashboardLang = features?.language || cachedLang || 'he';
   const t = getDashboardStrings(lang).nav;
   const dir = dashboardDir(lang);
 

@@ -67,6 +67,11 @@ const ASSIST = {
   he: {
     starters: STARTERS_HE,
     open: 'פתח את בסטי', alt: 'בסטי', newChat: 'שיחה חדשה', close: 'סגור',
+    name: 'בסטי',
+    tagline: 'שואלים אותי כל דבר על המערכת',
+    intro: 'אני רואה את החשבון שלך ואת המסך שאתה נמצא בו. אפשר להתחיל מכאן:',
+    send: 'שלח',
+    typing: 'בסטי כותבת',
     ask: 'שאלו משהו…',
     errGeneric: 'משהו השתבש. נסו שוב בעוד רגע.',
     errConnect: 'לא הצלחתי להתחבר. נסו שוב.',
@@ -74,6 +79,11 @@ const ASSIST = {
   en: {
     starters: STARTERS_EN,
     open: 'Open Bestie', alt: 'Bestie', newChat: 'New chat', close: 'Close',
+    name: 'Bestie',
+    tagline: 'Ask me anything about the system',
+    intro: "I can see your account and the screen you're on. Start here:",
+    send: 'Send',
+    typing: 'Bestie is typing',
     ask: 'Ask me anything…',
     errGeneric: 'Something went wrong. Please try again in a moment.',
     errConnect: "I couldn't connect. Please try again.",
@@ -239,9 +249,9 @@ export default function DashboardAssistant({ username }: { username: string }) {
             <img src={BRAND.icon} alt="" style={{ width: '100%', height: '100%' }} />
           </span>
           <span>
-            <span style={{ display: 'block', fontWeight: 700, lineHeight: 1.2 }}>בסטי</span>
+            <span style={{ display: 'block', fontWeight: 700, lineHeight: 1.2 }}>{A.name}</span>
             <span style={{ display: 'block', fontSize: 12, opacity: 0.85 }}>
-              שואלים אותי כל דבר על המערכת
+              {A.tagline}
             </span>
           </span>
         </div>
@@ -278,7 +288,7 @@ export default function DashboardAssistant({ username }: { username: string }) {
               style={{ height: 26, width: 'auto', alignSelf: 'center', margin: '4px 0 10px', opacity: 0.9 }}
             />
             <p style={{ fontSize: 14, opacity: 0.7, margin: '0 0 4px' }}>
-              אני רואה את החשבון שלך ואת המסך שאתה נמצא בו. אפשר להתחיל מכאן:
+              {A.intro}
             </p>
             {A.starters.map(s => (
               <button
@@ -383,7 +393,7 @@ export default function DashboardAssistant({ username }: { username: string }) {
           </div>
         ))}
 
-        {busy && <div style={{ fontSize: 13, opacity: 0.6, padding: '8px 4px' }}>בסטי כותבת…</div>}
+        {busy && <div style={{ fontSize: 13, opacity: 0.6, padding: '8px 4px' }}>{A.typing}…</div>}
       </div>
 
       <form
@@ -409,9 +419,7 @@ export default function DashboardAssistant({ username }: { username: string }) {
             background: BRAND.gradient, color: '#fff',
             opacity: busy || !input.trim() ? 0.5 : 1, fontWeight: 600,
           }}
-        >
-          שלח
-        </button>
+        >{A.send}</button>
       </form>
     </div>
   );
