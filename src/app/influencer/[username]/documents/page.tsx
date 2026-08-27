@@ -41,7 +41,11 @@ export default function DocumentsPage() {
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // A FLAG, not a translated string. Storing the translated text froze whichever
+  // language was resolved at the moment of the error — and since the failure
+  // happens on first load, before the language settles, an English customer was
+  // left looking at a permanently Hebrew error.
+  const [hasLoadError, setHasLoadError] = useState(false);
 
   // Upload state
   const [accountId, setAccountId] = useState<string | null>(null);
@@ -53,9 +57,9 @@ export default function DocumentsPage() {
     loadData();
   }, [username]);
 
-  const loadData = async () => {
+  const loadData = async (isRetry = false): Promise<void> => {
     setIsLoading(true);
-    setError(null);
+    setHasLoadError(false);
 
     try {
       const response = await fetch(
@@ -63,6 +67,13 @@ export default function DocumentsPage() {
       );
 
       if (!response.ok) {
+        // The session cookie is not always available on the very first request
+        // after login, so this 401s and the page used to settle on a permanent
+        // error. One retry covers the window.
+        if (response.status === 401 && !isRetry) {
+          await new Promise((r) => setTimeout(r, 1200));
+          return loadData(true);
+        }
         throw new Error('Failed to load documents');
       }
 
@@ -76,7 +87,7 @@ export default function DocumentsPage() {
       }
     } catch (err) {
       console.error('Error loading documents:', err);
-      setError(t.documents.loadError);
+      setHasLoadError(true);
     } finally {
       setIsLoading(false);
     }
@@ -247,9 +258,9 @@ export default function DocumentsPage() {
         )}
 
         {/* Error */}
-        {error && (
+        {hasLoadError && (
           <div className="p-4 rounded-2xl animate-fade-in" style={{ background: 'color-mix(in srgb, var(--dash-negative, red) 10%, transparent)', color: 'var(--dash-negative, red)', border: '1px solid var(--dash-glass-border)' }}>
-            {error}
+            {t.documents.loadError}
           </div>
         )}
 
