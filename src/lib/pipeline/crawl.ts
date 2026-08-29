@@ -190,17 +190,32 @@ export async function persistPageHtml(
       '.post-content',
       '.page-body',
     ];
+    // Take the RICHEST candidate, not the first one over a threshold.
+    //
+    // This loop used to stop at the first selector yielding more than 200
+    // characters. On buses.org/membership/join/ that is `article` — four small
+    // blocks, 1,930 characters, no prices — so it broke before ever reaching
+    // `main`, which holds 9,570 characters INCLUDING the twelve dues figures
+    // ($1,060 … $21,050). ABA asked the assistant what membership costs and were
+    // told the information was not available, from a page we had crawled and then
+    // discarded four fifths of.
+    //
+    // Every candidate is measured and the longest wins, with the stripped body as
+    // the final candidate rather than a sub-100-character rescue.
+    let best = '';
     for (const selector of contentSelectors) {
       const els = $(selector);
-      if (els.length > 0) {
-        els.each((_, el) => {
-          const text = $(el).text().trim();
-          if (text.length > 30) content += text + '\n\n';
-        });
-        if (content.length > 200) break;
-      }
+      if (els.length === 0) continue;
+      let candidate = '';
+      els.each((_, el) => {
+        const text = $(el).text().trim();
+        if (text.length > 30) candidate += text + '\n\n';
+      });
+      if (candidate.length > best.length) best = candidate;
     }
-    if (content.length < 100) content = $('body').text().trim();
+    const bodyText = $('body').text().trim();
+    if (bodyText.length > best.length) best = bodyText;
+    content += best;
     content = content
       .replace(/[\t ]+/g, ' ')
       .replace(/\n{3,}/g, '\n\n')

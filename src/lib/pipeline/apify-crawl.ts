@@ -29,6 +29,35 @@ const CHALLENGE_MARKERS = [
   '_incapsula_resource',
 ];
 
+/**
+ * Public suffixes that take TWO labels, so the registrable domain needs three.
+ *
+ * This list is the whole safety story for the subdomain glob below. Taking the
+ * last two labels of `www.argania.co.il` yields `co.il`, and a
+ * `https://*.co.il/**` glob would send the crawler across the Israeli internet
+ * on a customer's budget. Anything not listed here falls back to two labels,
+ * which is correct for .com/.org/.net and every customer we have.
+ */
+const TWO_LABEL_SUFFIXES = new Set([
+  'co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'co.il', 'org.il', 'ac.il', 'gov.il', 'net.il',
+  'com.au', 'net.au', 'org.au', 'co.nz', 'co.za', 'com.br', 'com.mx', 'co.jp', 'com.tr',
+]);
+
+/**
+ * The registrable domain of a host — `www.buses.org` → `buses.org`.
+ * Returns null when the host is an IP or too short to generalise safely.
+ */
+export function registrableDomain(host: string): string | null {
+  const labels = host.toLowerCase().replace(/\.$/, '').split('.');
+  if (labels.length < 2) return null;
+  if (/^\d+$/.test(labels[labels.length - 1])) return null; // an IP address
+  const lastTwo = labels.slice(-2).join('.');
+  if (TWO_LABEL_SUFFIXES.has(lastTwo)) {
+    return labels.length >= 3 ? labels.slice(-3).join('.') : null;
+  }
+  return lastTwo;
+}
+
 export interface ApifyRunHandle {
   runId: string;
   datasetId: string;
@@ -88,6 +117,19 @@ export async function isSiteChallenged(url: string): Promise<boolean> {
  */
 export async function startApifyCrawl(startUrl: string, maxPages: number): Promise<ApifyRunHandle> {
   const token = requireToken();
+
+  // Follow SIBLING SUBDOMAINS, not just the starting hostname.
+  //
+  // ABA's biggest event lives on marketplace.buses.org, and the crawl —
+  // hostname-scoped by default — never saw it, so the assistant told them it had
+  // no event calendar. A customer's site is their domain, not one host of it.
+  // maxCrawlPages still bounds the whole thing.
+  let includeUrlGlobs: { glob: string }[] | undefined;
+  try {
+    const domain = registrableDomain(new URL(startUrl).hostname);
+    if (domain) includeUrlGlobs = [{ glob: `https://*.${domain}/**` }, { glob: `https://${domain}/**` }];
+  } catch { /* malformed url — stay hostname-scoped */ }
+
   const res = await fetch(`${API}/acts/${ACTOR_ID}/runs?token=${token}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -103,6 +145,7 @@ export async function startApifyCrawl(startUrl: string, maxPages: number): Promi
       saveHtml: true,
       saveMarkdown: false,
       proxyConfiguration: { useApifyProxy: true },
+      ...(includeUrlGlobs ? { includeUrlGlobs } : {}),
     }),
     signal: AbortSignal.timeout(30000),
   });

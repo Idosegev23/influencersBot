@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { toApifyPage } from '@/lib/pipeline/apify-crawl';
+import { toApifyPage, registrableDomain } from '@/lib/pipeline/apify-crawl';
 import { persistPageHtml } from '@/lib/pipeline/crawl';
 
 describe('toApifyPage', () => {
@@ -129,5 +129,69 @@ describe('persistPageHtml is one extraction path for both transports', () => {
     } as any;
     const res = await persistPageHtml(URL_, FETCH_HTML, 'acct-1', failing);
     expect(res.saved).toBe(false);
+  });
+});
+
+describe('content extraction takes the richest region, not the first', () => {
+  function fakeSupabase() {
+    const rows: any[] = [];
+    return {
+      rows,
+      from: () => ({ upsert: (row: any) => { rows.push(row); return Promise.resolve({ error: null }); } }),
+    } as any;
+  }
+
+  // The shape of buses.org/membership/join/: an <article> teaser that clears any
+  // reasonable length threshold, and a <main> further down holding what the
+  // customer actually asked for. The old loop stopped at <article> and ABA were
+  // told their own dues were "not available".
+  const PAGE = `<html><head><title>Join</title></head><body>
+    <article>${'Membership is open to private companies that own motorcoaches. '.repeat(6)}</article>
+    <main>${'Full membership detail. '.repeat(20)} Annual dues range from $1,060 to $21,050 depending on fleet size.</main>
+  </body></html>`;
+
+  it('keeps the dues that live outside the first matching selector', async () => {
+    const db = fakeSupabase();
+    const res = await persistPageHtml('https://www.buses.org/membership/join/', PAGE, 'acct-1', db);
+
+    expect(res.saved).toBe(true);
+    const content = db.rows[0].page_content as string;
+
+    // Presence first: the teaser is still captured...
+    expect(content).toContain('open to private companies');
+    // ...and so is the part that was being thrown away.
+    expect(content).toContain('$1,060');
+    expect(content).toContain('$21,050');
+  });
+
+  it('prefers the body when no content selector covers the page', async () => {
+    const db = fakeSupabase();
+    const bare = '<html><body><div class="wrapper">Dues start at $500 per year for allied members.</div></body></html>';
+    await persistPageHtml('https://www.buses.org/x/', bare, 'acct-1', db);
+    expect(db.rows[0].page_content).toContain('$500');
+  });
+});
+
+describe('registrableDomain — what the subdomain glob is allowed to cover', () => {
+  it('generalises a hostname to its domain, so sibling subdomains are in scope', () => {
+    // The whole point: ABA's Marketplace lives on a different host of the same site.
+    expect(registrableDomain('www.buses.org')).toBe('buses.org');
+    expect(registrableDomain('marketplace.buses.org')).toBe('buses.org');
+    expect(registrableDomain('buses.org')).toBe('buses.org');
+  });
+
+  it('does NOT collapse an Israeli customer to co.il', () => {
+    // A `https://*.co.il/**` glob would send the crawler across the Israeli
+    // internet on one customer's budget. Every account we have is .co.il or .com,
+    // so this is the case that must not regress.
+    expect(registrableDomain('www.argania.co.il')).toBe('argania.co.il');
+    expect(registrableDomain('shop.studiopasha.co.il')).toBe('studiopasha.co.il');
+    expect(registrableDomain('www.gov.uk')).toBe('www.gov.uk');
+  });
+
+  it('refuses to generalise when there is nothing safe to generalise to', () => {
+    expect(registrableDomain('co.il')).toBeNull();   // the suffix itself
+    expect(registrableDomain('localhost')).toBeNull();
+    expect(registrableDomain('93.184.216.34')).toBeNull();
   });
 });
