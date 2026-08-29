@@ -51,6 +51,25 @@ async function isCouponsDisabled(
 // ============================================
 
 /**
+ * Is this document byte-identical to what we already stored for it?
+ *
+ * Compares as SETS, not lengths. A document may legitimately repeat a chunk's
+ * text — a page with the same boilerplate paragraph twice — and the store holds
+ * one row for it, so comparing an incoming array length against a deduplicated
+ * store reports a change on every run and re-embeds forever.
+ *
+ * An empty store is never "unchanged": that is a document whose chunks are
+ * missing, which must be re-ingested rather than skipped.
+ */
+export function isUnchangedChunkSet(storedHashes: string[], incomingHashes: string[]): boolean {
+  const stored = new Set(storedHashes);
+  const incoming = new Set(incomingHashes);
+  if (stored.size === 0 || stored.size !== incoming.size) return false;
+  for (const h of incoming) if (!stored.has(h)) return false;
+  return true;
+}
+
+/**
  * Ingest a single document: normalize → chunk → embed → store.
  * If the same source_id + entity_type already exists for this account,
  * the old document and its chunks are replaced.
@@ -100,6 +119,51 @@ export async function ingestDocument(input: IngestInput): Promise<IngestResult> 
     totalTokens,
     avgTokensPerChunk: Math.round(totalTokens / Math.max(chunks.length, 1)),
   }, accountId);
+
+  // 2.5 Unchanged-source fast path.
+  //
+  // Embeddings were generated for every chunk BEFORE the duplicate check in
+  // step 6, so re-ingesting a source whose text had not changed embedded the
+  // whole document and then threw all of it away. On ABA's website-only
+  // re-scan that made the `post` batch — 364 unchanged chunks, none of which
+  // had been re-scraped — outlive the step's time budget, so QStash retried
+  // the identical work every ten minutes and the `website` batch behind it
+  // (the entire point of the run) never started.
+  //
+  // Hashing is local and the lookup is one indexed query, so this costs
+  // almost nothing on the path where content DID change.
+  const chunkHashes = chunks.map(c =>
+    crypto.createHash('md5').update(c.text).digest('hex')
+  );
+
+  if (sourceId) {
+    const { data: priorDoc } = await supabase
+      .from('documents')
+      .select('id')
+      .eq('account_id', accountId)
+      .eq('entity_type', entityType)
+      .eq('source_id', sourceId)
+      .maybeSingle();
+
+    if (priorDoc) {
+      const { data: priorChunks } = await supabase
+        .from('document_chunks')
+        .select('chunk_hash')
+        .eq('document_id', priorDoc.id);
+
+      if (isUnchangedChunkSet((priorChunks || []).map(r => r.chunk_hash), chunkHashes)) {
+        log.info('Source unchanged since last ingest, skipping re-embed', {
+          documentId: priorDoc.id, chunkCount: chunks.length,
+        }, accountId);
+        return {
+          documentId: priorDoc.id,
+          chunksCreated: 0,
+          totalTokens,
+          durationMs: Date.now() - startMs,
+        };
+      }
+    }
+  }
 
   // 3. Generate embeddings for all chunks
   const chunkTexts = chunks.map(c => c.text);
@@ -156,11 +220,7 @@ export async function ingestDocument(input: IngestInput): Promise<IngestResult> 
     throw new Error(`Failed to insert document: ${docError?.message}`);
   }
 
-  // 6. Compute hashes and deduplicate against existing chunks
-  const chunkHashes = chunks.map(c =>
-    crypto.createHash('md5').update(c.text).digest('hex')
-  );
-
+  // 6. Deduplicate against existing chunks (hashes computed in 2.5)
   // Query existing hashes for this account (batch check)
   const { data: existingHashRows } = await supabase
     .from('document_chunks')
