@@ -59,7 +59,7 @@ export async function siteDiscoverStep(ctx: StepContext): Promise<StepResult> {
  */
 async function startChallengedCrawl(ctx: StepContext): Promise<StepResult> {
   const maxPages = ctx.state.options?.maxPages ?? APIFY_DEFAULT_MAX_PAGES;
-  const handle = await startApifyCrawl(ctx.state.websiteUrl!, maxPages);
+  const handle = await startApifyCrawl(ctx.state.websiteUrl!, maxPages, ctx.state.options?.seedUrls ?? []);
 
   // Re-read before writing: other steps mutate state, and this runs late enough
   // that a blind overwrite could drop their counts.

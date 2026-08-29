@@ -115,8 +115,19 @@ export async function isSiteChallenged(url: string): Promise<boolean> {
  * Start an asynchronous crawl. Returns immediately with the run handle; nothing
  * is waited on here.
  */
-export async function startApifyCrawl(startUrl: string, maxPages: number): Promise<ApifyRunHandle> {
+export async function startApifyCrawl(
+  startUrl: string,
+  maxPages: number,
+  seedUrls: string[] = [],
+): Promise<ApifyRunHandle> {
   const token = requireToken();
+
+  // Seeds are entry points, not hints. On the plain-fetch path they are merged
+  // into the frontier; here they were being dropped, so a page a human explicitly
+  // named could only be found if the BFS happened to reach it. ABA named
+  // /membership/join/ and /events/ — exactly the two pages that must not be left
+  // to luck.
+  const starts = [...new Set([startUrl, ...seedUrls])].filter(Boolean);
 
   // Follow SIBLING SUBDOMAINS, not just the starting hostname.
   //
@@ -134,7 +145,7 @@ export async function startApifyCrawl(startUrl: string, maxPages: number): Promi
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      startUrls: [{ url: startUrl }],
+      startUrls: starts.map((url) => ({ url })),
       maxCrawlPages: maxPages,
       // Firefox passes challenges that the Chromium build does not.
       crawlerType: 'playwright:firefox',
