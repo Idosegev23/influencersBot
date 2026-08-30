@@ -374,27 +374,41 @@ async function promiseAllSettledObj<T extends Record<string, Promise<any>>>(
  * Merge websites from direct DB + RAG, deduplicate by URL.
  * Direct DB data is preferred (full page_content vs RAG excerpts).
  */
-function mergeWebsites(
+export function mergeWebsites(
   directWebsites: WebsiteContent[],
   ragWebsites: WebsiteContent[]
 ): WebsiteContent[] {
-  const seen = new Set<string>();
   const merged: WebsiteContent[] = [];
+  const seenPassages = new Set<string>();
+  const urlsFromRag = new Set<string>();
 
-  for (const w of directWebsites) {
-    const key = w.url || w.title;
-    if (!seen.has(key)) {
-      seen.add(key);
-      merged.push(w);
-    }
+  // Semantic passages FIRST, and several passages from one page are not
+  // duplicates of each other.
+  //
+  // Keying by URL alone did both of the wrong things at once. ABA's Join page
+  // chunks into an intro, a payment address, and the dues table; retrieval
+  // ranked the dues table in, and the URL key then dropped it in favour of
+  // whichever chunk arrived first — the payment address, which contains no
+  // figure at all. Meanwhile whole pages from the direct DB search went ahead
+  // of it, so long news articles filled every one of the ten website slots and
+  // the membership pages fell off the end. The assistant was left saying it had
+  // no dues information while holding the page that lists it.
+  for (const w of ragWebsites) {
+    const key = `${w.url || w.title}::${(w.content || '').slice(0, 200)}`;
+    if (seenPassages.has(key)) continue;
+    seenPassages.add(key);
+    if (w.url) urlsFromRag.add(w.url);
+    merged.push(w);
   }
 
-  for (const w of ragWebsites) {
+  // Then whole pages, only for URLs retrieval did not already speak to. A page
+  // that retrieval selected passages from is better represented by those
+  // passages than by its first two thousand characters.
+  for (const w of directWebsites) {
     const key = w.url || w.title;
-    if (!seen.has(key)) {
-      seen.add(key);
-      merged.push(w);
-    }
+    if (!key || urlsFromRag.has(w.url) || seenPassages.has(key)) continue;
+    seenPassages.add(key);
+    merged.push(w);
   }
 
   return merged;
