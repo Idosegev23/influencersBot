@@ -172,6 +172,49 @@ describe('content extraction takes the richest region, not the first', () => {
   });
 });
 
+describe('adjacent elements do not fuse into one word', () => {
+  function fakeSupabase() {
+    const rows: any[] = [];
+    return {
+      rows,
+      from: () => ({ upsert: (row: any) => { rows.push(row); return Promise.resolve({ error: null }); } }),
+    } as any;
+  }
+
+  // The shape of an events card on buses.org: the date and the title are
+  // siblings with no text between them. Cheerio's .text() joins them with
+  // nothing, producing "Aug 26BISC-South in New Orleans" — which the assistant
+  // then read as one string and reported the wrong day for.
+  const CARDS = `<html><body><main>
+    <div class="card"><span class="date">Aug 26</span><h3>BISC-South in New Orleans</h3>
+      <p>Co-located with the Alabama Motorcoach Association.</p></div>
+    <div class="card"><span class="date">Aug 31</span><h3>WIB Webinar Wednesday</h3>
+      <p>Why should I care about political advocacy?</p></div>
+  </main></body></html>`;
+
+  it('separates a date from the heading that follows it', async () => {
+    const db = fakeSupabase();
+    await persistPageHtml('https://www.buses.org/events', CARDS, 'acct-1', db);
+    const content = db.rows[0].page_content as string;
+
+    // Presence first — the content must still all be there...
+    expect(content).toContain('BISC-South in New Orleans');
+    expect(content).toContain('Aug 26');
+    // ...and the date must not have been glued onto the title.
+    expect(content).not.toMatch(/Aug 26BISC/);
+    expect(content).toMatch(/Aug 26\s+BISC-South/);
+  });
+
+  it('keeps each card date with its own title', async () => {
+    const db = fakeSupabase();
+    await persistPageHtml('https://www.buses.org/events', CARDS, 'acct-1', db);
+    const flat = (db.rows[0].page_content as string).replace(/\s+/g, ' ');
+
+    expect(flat).toMatch(/Aug 26 BISC-South in New Orleans/);
+    expect(flat).toMatch(/Aug 31 WIB Webinar Wednesday/);
+  });
+});
+
 describe('registrableDomain — what the subdomain glob is allowed to cover', () => {
   it('generalises a hostname to its domain, so sibling subdomains are in scope', () => {
     // The whole point: ABA's Marketplace lives on a different host of the same site.

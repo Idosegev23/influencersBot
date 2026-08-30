@@ -149,6 +149,20 @@ export async function persistPageHtml(
     $('.cookie-banner, .popup, #cookie-consent, .cookie-notice').remove();
     $('nav, footer, header').remove();
 
+    // Give element boundaries real whitespace before anything calls .text().
+    //
+    // Cheerio concatenates adjacent elements with NOTHING between them, so a
+    // card layout — <span>Aug 26</span><h3>BISC-South in New Orleans</h3> —
+    // flattens to "Aug 26BISC-South in New Orleans". ABA's events page produced
+    // seven of those, and the assistant read one as a single string and told a
+    // member the event was on a different day than it is. A wrong event date
+    // from an association is worse than no date at all.
+    //
+    // Whitespace here can only separate, never join, so this cannot corrupt
+    // text that was already correct; the normaliser below collapses any runs.
+    $('br').replaceWith(' ');
+    $('p,div,li,tr,td,th,h1,h2,h3,h4,h5,h6,section,article,aside,header,footer,span,time,a,label,figcaption,dt,dd').after(' ');
+
     // Metadata
     const title =
     $('title').text().trim() || $('h1').first().text().trim() || fallbacks?.title?.trim() || '';
