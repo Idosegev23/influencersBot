@@ -535,10 +535,28 @@ async function ingestEntityType(
         .eq('processing_status', 'completed')
         .not('page_content', 'is', null);
 
+      // Order before spending the budget. crawl_depth is 0 on every row from the
+      // browser-crawl transport, so the only ordering was whatever Postgres
+      // returned — meaning a budget that stops early stops on arbitrary pages.
+      // The site's own URL hierarchy is the signal that is always present:
+      // /membership/join/ outranks /news/2019/some-post/, and within one depth
+      // the page with more on it wins.
+      const pathDepth = (u: string): number => {
+        try {
+          return new URL(u).pathname.replace(/\/+$/, '').split('/').filter(Boolean).length;
+        } catch {
+          return 99; // unparseable url sinks to the bottom rather than the top
+        }
+      };
+      const ordered = (websites ?? []).slice().sort((a, b) => {
+        const d = pathDepth(a.url) - pathDepth(b.url);
+        return d !== 0 ? d : (b.page_content?.length ?? 0) - (a.page_content?.length ?? 0);
+      });
+
       if (websites) {
-        for (const w of websites) {
+        for (const w of ordered) {
           if (maxChunks && totalChunks >= maxChunks) {
-            log.info(`Content budget reached for website: ${totalChunks}/${maxChunks} chunks, skipping remaining ${websites.length - count} pages`, { accountId }, accountId);
+            log.info(`Content budget reached for website: ${totalChunks}/${maxChunks} chunks, skipping remaining ${ordered.length - count} pages`, { accountId }, accountId);
             break;
           }
           if (!w.page_content?.trim()) continue;

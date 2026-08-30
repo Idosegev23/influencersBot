@@ -14,15 +14,27 @@ import type { StepResult } from './index';
  * `processAccountContent` in one shot, which exceeded 300s on large sites and
  * got killed mid-run (see the Carolina Lemke acceptance run: 1,516 pages).
  *
- * `website` is capped at 200 chunks: a brand widget answers product questions
- * from the product catalog (`widget_products`), not from thousands of RAG pages,
- * so ingesting the full crawl is both slow and low-value.
+ * `website` is capped for brands: their widget answers product questions from
+ * the product catalog (`widget_products`), not from thousands of RAG pages, so
+ * ingesting the full crawl is both slow and low-value.
+ *
+ * That reasoning does not survive contact with an archetype that HAS no
+ * catalog. For an association or a ministry the site IS the knowledge base, and
+ * the pages people actually ask about — dues, events, regulations — are exactly
+ * the ones a 200-chunk cap drops. ABA's /membership/join/ page, the single page
+ * their own feedback asked about, lost that lottery: 97 of 385 pages were
+ * ingested and it was not among them.
  */
 const RAG_TYPES: EntityType[] = [
   'post', 'transcription', 'partnership', 'coupon', 'knowledge_base', 'website', 'document',
 ];
 
-const CONTENT_BUDGETS: Partial<Record<EntityType, number>> = { website: 200 };
+/** Archetypes with no product catalog behind them — the crawl is all they have. */
+const SITE_IS_THE_KNOWLEDGE_BASE = new Set(['association', 'government_ministry']);
+
+function contentBudgetsFor(archetype?: string): Partial<Record<EntityType, number>> {
+  return { website: SITE_IS_THE_KNOWLEDGE_BASE.has(archetype ?? '') ? 2000 : 200 };
+}
 
 export async function ragIngestStep(ctx: StepContext): Promise<StepResult> {
   const idx = ctx.batch;
@@ -37,7 +49,7 @@ export async function ragIngestStep(ctx: StepContext): Promise<StepResult> {
   await ingestAllForAccount(ctx.accountId, {
     entityTypes: [entityType],
     archetype,
-    contentBudgets: CONTENT_BUDGETS,
+    contentBudgets: contentBudgetsFor(archetype),
   });
 
   await setCount(ctx.jobId, 'rag-ingest', { done: idx + 1, total: RAG_TYPES.length });
