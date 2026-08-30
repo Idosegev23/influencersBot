@@ -215,6 +215,50 @@ describe('adjacent elements do not fuse into one word', () => {
   });
 });
 
+describe('a content header is not site chrome', () => {
+  function fakeSupabase() {
+    const rows: any[] = [];
+    return {
+      rows,
+      from: () => ({ upsert: (row: any) => { rows.push(row); return Promise.resolve({ error: null }); } }),
+    } as any;
+  }
+
+  // The shape of every event page on buses.org: the site banner is a <header>
+  // outside the content root, and the event's own facts are a <header> inside
+  // <main><article>. Removing both left six of fifteen stored event pages with
+  // no date on them.
+  const EVENT = `<html><body>
+    <header class="site-banner"><nav><a href="/">Home</a><a href="/events">Events</a></nav></header>
+    <main><article><div><div><header class="article__header">
+      <span>In-Person</span><h1>BISC-South in New Orleans</h1>
+      <ul><li>Varies</li><li>Aug 31, 2026</li><li>8:00 am EDT</li><li>New Orleans, LA</li></ul>
+    </header>
+    <p>${'Co-located with the Alabama Motorcoach Association. '.repeat(4)}</p></div></div></article></main>
+  </body></html>`;
+
+  it('keeps the date, time and place the event page exists to state', async () => {
+    const db = fakeSupabase();
+    await persistPageHtml('https://www.buses.org/events/bisc-south/', EVENT, 'acct-1', db);
+    const content = String(db.rows[0].page_content).replace(/\s+/g, ' ');
+
+    expect(content).toContain('BISC-South in New Orleans');
+    expect(content).toContain('Aug 31, 2026');
+    expect(content).toContain('8:00 am EDT');
+    expect(content).toContain('New Orleans, LA');
+  });
+
+  it('still drops the site banner and its navigation', async () => {
+    const db = fakeSupabase();
+    await persistPageHtml('https://www.buses.org/events/bisc-south/', EVENT, 'acct-1', db);
+    const content = String(db.rows[0].page_content);
+
+    // Without a presence assertion this passes on an empty page, so the test
+    // above is its pair: chrome gone, content kept.
+    expect(content).not.toContain('Home');
+  });
+});
+
 describe('registrableDomain — what the subdomain glob is allowed to cover', () => {
   it('generalises a hostname to its domain, so sibling subdomains are in scope', () => {
     // The whole point: ABA's Marketplace lives on a different host of the same site.

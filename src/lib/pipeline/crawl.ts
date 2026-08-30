@@ -147,7 +147,24 @@ export async function persistPageHtml(
     // Remove noise before extraction.
     $('script, style, noscript, iframe, svg').remove();
     $('.cookie-banner, .popup, #cookie-consent, .cookie-notice').remove();
-    $('nav, footer, header').remove();
+    $('nav, footer').remove();
+
+    // A <header> is NOT automatically site chrome, and removing every one of
+    // them threw away the facts we were crawling for. Every event page on
+    // buses.org puts its date, time and location in
+    // <header class="article__header"> inside <main><article> — so
+    // "BISC-South in New Orleans, Aug 31 2026, 8:00 am EDT, New Orleans, LA"
+    // was deleted before extraction, and six of fifteen stored event pages had
+    // no date on them at all. ABA asked what events are upcoming and we had
+    // thrown away every answer.
+    //
+    // Page banners live outside the content root or wrap the navigation;
+    // a header inside main/article is the content's own heading block.
+    $('header').each((_, el) => {
+      const $el = $(el);
+      const insideContent = $el.closest('main, article, [role="main"]').length > 0;
+      if (!insideContent || $el.find('nav').length > 0) $el.remove();
+    });
 
     // Give element boundaries real whitespace before anything calls .text().
     //
