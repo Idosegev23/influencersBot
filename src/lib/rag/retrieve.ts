@@ -687,12 +687,37 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       });
 
     if (bm25Results?.length) {
+      // Spread keyword matches across a band by how well they actually matched.
+      //
+      // Every BM25 result used to be assigned a flat 0.55 and the rank the RPC
+      // returns was thrown away. The uniform heuristic bonuses that follow then
+      // landed them all on the same total — 0.55 + 0.05 recency + 0.15 keyword
+      // + 0.03 first-chunk = 0.78 — so a page that barely matched scored
+      // identically to one that matched perfectly, and the whole block outranked
+      // genuine vector hits. On "How do I become a member?" that put three
+      // Marketplace pages and an unrelated disaster-recovery article at 0.7800
+      // above the membership page's real 0.7768, with the order among the tied
+      // four decided by nothing at all.
+      //
+      // The band keeps the old midpoint, so keyword matches remain a strong
+      // signal; they are simply no longer indistinguishable from each other.
+      const rankOf = (r: any) => Number(r?.rank ?? r?.bm25_score ?? 0) || 0;
+      const maxRank = Math.max(...bm25Results.map(rankOf), Number.EPSILON);
+
+      // Place keyword hits ON the same scale as the vector hits, rather than on
+      // a constant above them. A fixed 0.55 sat above the top vector similarity
+      // on this account (0.546), so keyword matches always won regardless of
+      // quality. Anchoring to the distribution this query actually produced
+      // keeps the two signals comparable whatever the embedding model returns.
+      const vecSims = candidates.map((c: any) => Number(c.similarity)).filter(Number.isFinite);
+      const kwFloor = vecSims.length ? Math.min(...vecSims) : 0.35;
+      const kwSpan = vecSims.length ? Math.max(...vecSims) - kwFloor : 0.2;
+
       for (const kr of bm25Results) {
         if (!existingIds.has(kr.id)) {
           existingIds.add(kr.id);
-          // BM25 matches get 0.55 base similarity — exact keyword matches
-          // are strong signals, especially for brand names
-          candidates.push({ ...kr, similarity: 0.55 });
+          const relative = Math.min(1, Math.max(0, rankOf(kr) / maxRank));
+          candidates.push({ ...kr, similarity: kwFloor + kwSpan * relative });
           added++;
         } else {
           // Boost existing candidates also found by BM25 — dual match is strong
@@ -765,10 +790,30 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
       log.warn('LDRS conference confidence calc failed', { error: (err as Error).message }, accountId);
     }
   }
-  // Split query into content words (3+ chars) for partial matching
-  // Hebrew stop words (יש, לך, את, מה, על, גם, עם, כל, אם, לא) are 2 chars — filter them out
-  const STOP_WORDS = new Set(['יש', 'לך', 'את', 'מה', 'על', 'גם', 'עם', 'כל', 'אם', 'לא', 'של', 'הם', 'זה', 'כי', 'או', 'אל']);
-  const queryWords = queryLower.replace(/[?!.,؟]/g, '').split(/\s+/).filter(w => w.length >= 3 || (w.length === 2 && !STOP_WORDS.has(w)));
+  // Split query into content words for partial matching.
+  //
+  // The list below was Hebrew-only, which quietly broke every English account:
+  // "how", "what", "does", "the", "are" are all 3+ characters, so they counted
+  // as content words. Nearly every chunk contains some of them, so nearly every
+  // chunk cleared the 0.8 match ratio and took the same +0.15 bonus — while the
+  // entire spread of real vector similarity on such a query was 0.371 to 0.546.
+  // A function word outweighed the whole ranking, and candidates came back tied
+  // to three decimal places, ordered arbitrarily. On "How do I become a member?"
+  // that put marketplace/exhibitor, marketplace/register and an unrelated news
+  // article above the membership page.
+  //
+  // Hebrew entries are 2-3 chars; English function words are listed explicitly.
+  const STOP_WORDS = new Set([
+    'יש', 'לך', 'את', 'מה', 'על', 'גם', 'עם', 'כל', 'אם', 'לא', 'של', 'הם', 'זה', 'כי', 'או', 'אל',
+    'the', 'and', 'for', 'are', 'you', 'your', 'our', 'with', 'that', 'this', 'from', 'have', 'has',
+    'how', 'what', 'when', 'where', 'which', 'who', 'why', 'can', 'does', 'did', 'was', 'were',
+    'will', 'would', 'should', 'could', 'about', 'into', 'any', 'all', 'get', 'got', 'there', 'here',
+    'they', 'them', 'their', 'its', 'not', 'but', 'his', 'her', 'she', 'him', 'been', 'more', 'some',
+  ]);
+  const queryWords = queryLower
+    .replace(/[?!.,؟]/g, '')
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !STOP_WORDS.has(w));
   for (const c of filtered) {
     // Recency bonus: content from last 30 days gets +0.05
     const ageMs = now - new Date(c.updated_at).getTime();
