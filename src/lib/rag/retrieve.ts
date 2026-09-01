@@ -229,15 +229,30 @@ const STRUCTURED_INDICATORS = [
  * This helps bridge vocabulary gaps, e.g. "פסטה" → includes "רביולי, לזניה, ספגטי".
  * Gemini 2.5 Flash Lite: ~600ms, 100% consistent, supports temperature=0.
  */
-async function expandQuery(query: string): Promise<string> {
+/**
+ * Expand a query with related terms.
+ *
+ * `domainHint` is what this account actually writes about, taken from the
+ * candidates the first search already returned — free, and the difference
+ * between a useful expansion and a harmful one. Without it the expander is a
+ * generic word associator: asked to expand "How do i become a memener?" for a
+ * motorcoach trade association, it read the typo as "meme" and returned
+ * "meme creator, meme lord, meme culture, funny memes, internet humor", which
+ * buried a member's question about joining.
+ */
+async function expandQuery(query: string, domainHint?: string): Promise<string> {
   try {
     const gemini = getGemini();
     const response = await gemini.models.generateContent({
       model: 'gemini-2.5-flash-lite',
-      contents: query,
+      contents: domainHint ? `${query}\n\n[This search is inside: ${domainHint}]` : query,
       config: {
         systemInstruction: `Expand search queries with 8-12 related specific terms for better retrieval.
 Return the ORIGINAL query + related terms, comma-separated. ONLY the expanded text — no explanations.
+
+If the query contains an obvious typo, expand the word the user MEANT.
+Stay inside the subject area given in brackets — never expand into an unrelated
+domain, even when a misspelling happens to resemble a word from one.
 
 Examples:
 "פסטה טובה" → "פסטה טובה, רביולי, לזניה, ספגטי, פנה, ניוקי, פטוצ'יני, טורטליני, קנלוני, מתכון פסטה"
@@ -541,7 +556,25 @@ export async function retrieveContext(input: RetrieveInput): Promise<RetrievalRe
   if (initialTopSimilarity < 0.6 && candidates.length > 0 && query.length <= 100) {
     pm?.inc('expandQueryCalled');
     pm?.mark('expand_start');
-    expandedQuery = await expandQuery(query);
+    // What this account is about, taken from the URLs the first search already
+    // matched. Chunk text is a poor hint — chunking cuts mid-sentence, and the
+    // fragment that came back for this account ("ocations at Marketplace.
+    // However, to make all locations searchable...") named no subject at all.
+    // A url carries the domain and the section in a few clean words.
+    const hintWords = new Set<string>();
+    for (const c of candidates.slice(0, 6)) {
+      const url = String((c as any)?.metadata?.url || '');
+      if (!url) continue;
+      for (const w of url.replace(/^https?:\/\//, '').split(/[/.\-_?#]+/)) {
+        const t = w.toLowerCase();
+        if (t.length >= 3 && !['www', 'com', 'org', 'net', 'html', 'php', 'page'].includes(t)) {
+          hintWords.add(t);
+        }
+      }
+      if (hintWords.size >= 14) break;
+    }
+    const domainHint = [...hintWords].slice(0, 14).join(', ');
+    expandedQuery = await expandQuery(query, domainHint || undefined);
     pm?.measure('expandQueryMs', 'expand_start');
     if (expandedQuery !== query) {
       const expandedEnriched = conversationSummary
