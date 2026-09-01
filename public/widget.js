@@ -290,6 +290,7 @@
         submitting: 'שולח...',
         required: 'שדה חובה',
         invalidEmail: 'אימייל לא תקין',
+        emailMaybe: 'התכוונת ל-',
         successTitle: 'הפנייה נשלחה ✓',
         successBody: 'קיבלנו את הפנייה שלך. נחזור אליך בהקדם.',
         successRef: 'מספר פנייה: ',
@@ -439,6 +440,7 @@
         submitting: 'Sending...',
         required: 'Required',
         invalidEmail: 'Invalid email',
+        emailMaybe: 'Did you mean ',
         successTitle: 'Request received ✓',
         successBody: "We've got your request. We'll be in touch shortly.",
         successRef: 'Reference: ',
@@ -4776,6 +4778,99 @@
   }
 
   // ============================================
+  // Email deliverability
+  //
+  // Five copies of /^[^\s@]+@[^\s@]+\.[^\s@]+$/ used to live in this file, and every one
+  // of them accepted lililevy42@gmail.com.il — which is shape-perfect and does not exist.
+  // Shape is still checked (cheaply, below), but "can we deliver to it" is a question only
+  // the server can answer, so it is asked there.
+  // ============================================
+  var emailCheckCache = {};
+  var emailCheckTimer = null;
+
+  function isEmailShape(v) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim());
+  }
+
+  // Strips the invisible bidi/zero-width marks a Hebrew keyboard leaves around a Latin
+  // address. Three real addresses reached us carrying U+202C: they look correct in every
+  // field, pass every regex, and fail at DNS.
+  function stripInvisible(v) {
+    return String(v || '').replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '').trim();
+  }
+
+  // Asks the server whether the address is deliverable, then calls cb(verdict).
+  // Never blocks the form: any failure answers 'unknown', which every caller treats as fine.
+  function checkEmailRemote(email, cb) {
+    var addr = stripInvisible(email).toLowerCase();
+    if (!isEmailShape(addr)) { cb({ status: 'unknown', email: addr }); return; }
+    if (emailCheckCache[addr]) { cb(emailCheckCache[addr]); return; }
+    fetch(BASE_URL + '/api/widget/validate-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: addr })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (v) {
+        var verdict = (v && v.status) ? v : { status: 'unknown', email: addr };
+        if (verdict.status !== 'unknown') emailCheckCache[addr] = verdict;
+        cb(verdict);
+      })
+      .catch(function () { cb({ status: 'unknown', email: addr }); });
+  }
+
+  // Renders the inline hint under an email input. `suggestion` null clears it.
+  function renderEmailHint(inputId, suggestion) {
+    var input = document.getElementById(inputId);
+    if (!input) return;
+    var hintId = inputId + '-hint';
+    var existing = document.getElementById(hintId);
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    if (!suggestion) return;
+    var local = stripInvisible(input.value).split('@')[0];
+    var fixed = local + '@' + suggestion;
+    var hint = document.createElement('div');
+    hint.id = hintId;
+    hint.style.cssText = 'margin-top:6px;font-size:12px;color:#b45309;display:flex;gap:6px;align-items:center;flex-wrap:wrap;';
+    hint.innerHTML = escapeHtml((locale.support && locale.support.emailMaybe) || 'Did you mean ') +
+      '<button type="button" id="' + hintId + '-fix" style="background:none;border:none;padding:0;' +
+      'font:inherit;color:#2563eb;text-decoration:underline;cursor:pointer;" dir="ltr">' +
+      escapeHtml(fixed) + '</button>';
+    if (input.parentNode) input.parentNode.appendChild(hint);
+    var btn = document.getElementById(hintId + '-fix');
+    if (btn) btn.onclick = function () {
+      input.value = fixed;
+      renderEmailHint(inputId, null);
+    };
+  }
+
+  // Exposed under the file's existing __ibot* convention so an end-to-end test can drive the
+  // real helper against the real endpoint. Everything it touches is already visible to the
+  // page — it renders into the page's own DOM — so this exposes no state a visitor lacks.
+  window.__ibotAttachEmailCheck = function (inputId) { attachEmailCheck(inputId); };
+
+  // Wires blur + debounced input on an email field to the remote check.
+  function attachEmailCheck(inputId) {
+    var input = document.getElementById(inputId);
+    if (!input || input.getAttribute('data-ibot-checked') === '1') return;
+    input.setAttribute('data-ibot-checked', '1');
+    var run = function () {
+      var value = input.value;
+      checkEmailRemote(value, function (verdict) {
+        // Re-read: the visitor may have typed on while the request was in flight.
+        if (stripInvisible(input.value).toLowerCase() !== stripInvisible(value).toLowerCase()) return;
+        renderEmailHint(inputId, verdict.suggestion || null);
+      });
+    };
+    input.addEventListener('blur', run);
+    input.addEventListener('input', function () {
+      renderEmailHint(inputId, null);
+      if (emailCheckTimer) clearTimeout(emailCheckTimer);
+      emailCheckTimer = setTimeout(run, 400);
+    });
+  }
+
+  // ============================================
   // Support form — view + submit + success states.
   // ============================================
   function openSupportForm(prefill) {
@@ -4813,7 +4908,7 @@
     var s = locale.support;
     if (!supportForm.name.trim()) return s.nameLabel + ': ' + s.required;
     if (!supportForm.email.trim()) return s.emailLabel + ': ' + s.required;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportForm.email.trim())) return s.invalidEmail;
+    if (!isEmailShape(supportForm.email)) return s.invalidEmail;
     if (!supportForm.message.trim()) return s.messageLabel + ': ' + s.required;
     return null;
   }
@@ -4869,7 +4964,15 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-      .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || 'submit failed'); }); })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        return r.json().then(function (j) {
+          var err = new Error(j.error || 'submit failed');
+          err.code = j.code;
+          err.suggestion = j.suggestion;
+          throw err;
+        });
+      })
       .then(function (data) {
         supportForm.submitting = false;
         lastTicketRef = (data && data.requestId) ? String(data.requestId).split('-')[0].toUpperCase() : null;
@@ -4879,9 +4982,18 @@
       })
       .catch(function (e) {
         supportForm.submitting = false;
-        supportForm.error = locale.support.submitError;
+        // A rejected email must NOT empty the form. The shopper has typed a name, a message
+        // and possibly an order number; making her retype all of it to fix one character
+        // loses the ticket, which is the exact outcome the gate exists to prevent.
+        // supportForm still holds every field, and render() repaints them.
+        supportForm.error = (e && e.code === 'undeliverable_email')
+          ? e.message
+          : locale.support.submitError;
         widgetTrack('widget_support_failed', { error: String(e && e.message || e).slice(0, 200) });
         render();
+        if (e && e.code === 'undeliverable_email' && e.suggestion) {
+          setTimeout(function () { renderEmailHint('ibot-sf-email', e.suggestion); }, 0);
+        }
       });
   }
 
@@ -4982,6 +5094,7 @@
     if (back) back.onclick = closeSupportForm;
     var sub = document.getElementById('ibot-sf-submit');
     if (sub) sub.onclick = submitSupportTicket;
+    attachEmailCheck('ibot-sf-email');
     var closeBtn = document.getElementById('ibot-close');
     // closeWidget() (not a duplicated isOpen/view/render sequence): whatever
     // opened this session — including the inline surface — needs its
@@ -5266,7 +5379,8 @@
   // ============================================
   function requestEmailTranscript() {
     var email = window.prompt(locale.dir === 'rtl' ? 'מייל לשליחת התמלול:' : 'Email to send transcript to:', supportForm.email || leadForm.email || '');
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return;
+    if (!email || !isEmailShape(email)) return;
+    email = stripInvisible(email);
     widgetTrack('widget_transcript_requested', {});
     fetch(BASE_URL + '/api/widget/transcript', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -5496,7 +5610,7 @@
 
     var s = locale.support; // shared validation strings
     if (!leadForm.name.trim()) { leadForm.error = locale.lead.nameLabel + ': ' + s.required; render(); return; }
-    if (!leadForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadForm.email.trim())) { leadForm.error = s.invalidEmail; render(); return; }
+    if (!isEmailShape(leadForm.email)) { leadForm.error = s.invalidEmail; render(); return; }
     leadForm.submitting = true; leadForm.error = null; render();
 
     // Leads ride the same support_requests table as tickets — one inbox, one
@@ -5550,6 +5664,7 @@
     bindFormShell();
     var sub = document.getElementById('ibot-form-submit');
     if (sub) sub.onclick = submitLeadTicket;
+    attachEmailCheck('ibot-lf-email');
   }
 
   // ============================================
@@ -5581,7 +5696,7 @@
 
     var s = locale.support;
     if (!bookDemoForm.name.trim()) { bookDemoForm.error = locale.bookDemo.nameLabel + ': ' + s.required; render(); return; }
-    if (!bookDemoForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookDemoForm.email.trim())) { bookDemoForm.error = s.invalidEmail; render(); return; }
+    if (!isEmailShape(bookDemoForm.email)) { bookDemoForm.error = s.invalidEmail; render(); return; }
     if (!bookDemoForm.company.trim()) { bookDemoForm.error = locale.bookDemo.companyLabel + ': ' + s.required; render(); return; }
     bookDemoForm.submitting = true; bookDemoForm.error = null; render();
 
@@ -5638,6 +5753,7 @@
     bindFormShell();
     var sub = document.getElementById('ibot-form-submit');
     if (sub) sub.onclick = submitBookDemo;
+    attachEmailCheck('ibot-bd-email');
   }
 
   // ============================================
@@ -5663,7 +5779,8 @@
     orderForm.email = (document.getElementById('ibot-of-email') || {}).value || '';
     var s = locale.support, O = locale.order;
     if (!orderForm.orderNumber.trim()) { orderForm.error = O.orderNumberLabel + ': ' + s.required; render(); return; }
-    if (!orderForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderForm.email.trim())) { orderForm.error = s.invalidEmail; render(); return; }
+    if (!isEmailShape(orderForm.email)) { orderForm.error = s.invalidEmail; render(); return; }
+    orderForm.email = stripInvisible(orderForm.email);
     orderForm.submitting = true; orderForm.error = null; render();
 
     fetch(BASE_URL + '/api/widget/order-lookup', {
