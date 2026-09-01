@@ -209,10 +209,18 @@ export async function PATCH(req: NextRequest) {
       updates.voice_rules = { ...((existingPersona?.voice_rules as object) || {}), ...voiceRulesPatch };
     }
 
-    // Remember which fields a human set, so a later persona rebuild does not
+    // Remember which fields a human CHANGED, so a later persona rebuild does not
     // silently overwrite them — see background-scraper.
+    //
+    // Only fields whose value actually differs are locked. The editor submits
+    // every field on every save, so locking all of them would freeze the whole
+    // persona the first time someone edits one line — and an account whose
+    // greeting is still empty would have that emptiness locked in forever,
+    // because no rebuild would ever be allowed to fill it.
+    const SKIP = new Set(['updated_at', 'ai_snapshot', 'user_edited_fields']);
+    const sameValue = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
     const editedNow = Object.keys(updates).filter(
-      (k) => k !== 'updated_at' && k !== 'ai_snapshot' && k !== 'user_edited_fields',
+      (k) => !SKIP.has(k) && !sameValue(updates[k], (existingPersona as any)?.[k]),
     );
     if (editedNow.length > 0) {
       const prior: string[] = Array.isArray(existingPersona?.user_edited_fields)
