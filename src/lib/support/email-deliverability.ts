@@ -26,7 +26,11 @@ import { redisGet, redisSet } from '@/lib/redis';
 export type EmailVerdict =
   | { status: 'ok'; email: string }
   | { status: 'typo'; email: string; suggestion: string }
-  | { status: 'undeliverable'; email: string; reason: 'no_mx' | 'nxdomain' | 'bounced'; suggestion?: string }
+  | { status: 'undeliverable'; email: string;
+      // `invalid_shape` is not a DNS answer — it means the value was never an address.
+      // Callers that phrase a message to the shopper need the distinction: "the domain
+      // does not exist" is actionable, and wrong for לא רוצה.
+      reason: 'no_mx' | 'nxdomain' | 'bounced' | 'invalid_shape'; suggestion?: string }
   | { status: 'unknown'; email: string };
 
 // ── L0: normalization ──────────────────────────────────────────────────────
@@ -194,7 +198,7 @@ export async function probeMx(domain: string): Promise<'has_mx' | 'no_mx' | 'unk
 /** L0 + L1 only. For callers with no network budget; never claims 'ok'. */
 export function verifyEmailSync(raw: unknown): EmailVerdict {
   const email = normalizeEmail(raw);
-  if (!email) return { status: 'undeliverable', email: String(raw ?? ''), reason: 'nxdomain' };
+  if (!email) return { status: 'undeliverable', email: String(raw ?? ''), reason: 'invalid_shape' };
   const suggestion = suggestDomain(domainOf(email));
   if (suggestion) return { status: 'typo', email, suggestion };
   // Not 'ok': MX has not been checked, so we do not know that it is.
@@ -204,7 +208,7 @@ export function verifyEmailSync(raw: unknown): EmailVerdict {
 /** The full verdict. Never throws. */
 export async function verifyEmail(raw: unknown): Promise<EmailVerdict> {
   const email = normalizeEmail(raw);
-  if (!email) return { status: 'undeliverable', email: String(raw ?? ''), reason: 'nxdomain' };
+  if (!email) return { status: 'undeliverable', email: String(raw ?? ''), reason: 'invalid_shape' };
 
   const domain = domainOf(email);
   const mapped = suggestDomain(domain);

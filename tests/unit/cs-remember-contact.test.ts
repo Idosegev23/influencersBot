@@ -15,7 +15,25 @@ function makeCtx(over: any = {}) {
 describe('remember_contact', () => {
   beforeEach(() => vi.resetModules());
 
+  // Domains this test treats as having no mail server. Deliverability is mocked rather than
+  // probed so these stay offline and deterministic — a suite that resolves gmail.com for real
+  // is one that fails on a train.
+  const DEAD = new Set(['gmail.com.il', 'dead.example']);
+
   async function loadTool(updates: any[]) {
+    vi.doMock('@/lib/support/email-deliverability', async (orig) => {
+      const actual = await (orig() as Promise<any>);
+      return {
+        ...actual,
+        verifyEmail: async (raw: unknown) => {
+          const email = actual.normalizeEmail(raw);
+          if (!email) return { status: 'undeliverable', email: String(raw ?? ''), reason: 'nxdomain' };
+          return DEAD.has(actual.domainOf(email))
+            ? { status: 'undeliverable', email, reason: 'no_mx', suggestion: 'gmail.com' }
+            : { status: 'ok', email };
+        },
+      };
+    });
     vi.doMock('@/lib/supabase', () => ({
       supabase: {
         from: () => {
@@ -90,6 +108,36 @@ describe('remember_contact', () => {
       expect((r.data as any).reason).toBe('invalid_contact');
     }
     expect(updates.length).toBe(0);
+  });
+
+  it('refuses to store an address whose domain does not exist, and names the fix', async () => {
+    // The bug in one line: this passes realEmailOrNull, and bounces.
+    const updates: any[] = [];
+    const tool = await loadTool(updates);
+    const r = await tool.handler({ email: 'lililevy42@gmail.com.il' }, makeCtx());
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(r.data)).toContain('gmail.com');
+    expect(updates.length).toBe(0);
+  });
+
+  it('still stores a perfectly good address', async () => {
+    // Companion: without this, a tool that rejected every address would pass the test above.
+    const updates: any[] = [];
+    const tool = await loadTool(updates);
+    const r = await tool.handler({ email: 'shopper@gmail.com' }, makeCtx());
+    expect(r.ok).toBe(true);
+    expect(updates[0].customer_email).toBe('shopper@gmail.com');
+  });
+
+  it('keeps a dialable phone even when the address alongside it is dead', async () => {
+    // Same rule as the intake gate: a dead email must not cost us a working phone.
+    const updates: any[] = [];
+    const tool = await loadTool(updates);
+    const r = await tool.handler({ phone: '0526936571', email: 'x@dead.example' }, makeCtx());
+    expect(r.ok).toBe(true);
+    expect(r.learnedPhone).toBe('0526936571');
+    expect(updates[0].customer_phone).toBe('0526936571');
+    expect(updates[0].customer_email).toBeUndefined();
   });
 
   it('still reports the phone when there is no ticket to write to yet', async () => {

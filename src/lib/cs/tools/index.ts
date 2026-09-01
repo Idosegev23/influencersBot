@@ -2,6 +2,7 @@ import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
 import { identityPhone, ticketSourceFor, CS_TICKET_SOURCES } from '@/lib/cs/identity';
 import { realPhoneOrNull, realEmailOrNull, hasContactRoute } from '@/lib/support/contact';
+import { verifyEmail } from '@/lib/support/email-deliverability';
 import type { CsProductCard, CsTool, CsToolCtx, CsToolResult, OpenAIFunctionDef } from './types';
 
 const TERMINAL_TICKET = new Set(['resolved', 'closed', 'cancelled']);
@@ -161,10 +162,30 @@ const rememberContactTool: CsTool = {
   } },
   async handler(args, ctx): Promise<CsToolResult> {
     const phone = realPhoneOrNull(args?.phone);
-    const email = realEmailOrNull(args?.email);
+    // Shape is not enough: gmail.com.il satisfies realEmailOrNull and has no mail server.
+    // Verified here rather than at reply time, because by reply time the conversation is
+    // over and the bounce lands in a mailbox nobody reads.
+    const emailVerdict = await verifyEmail(args?.email);
+    const email = emailVerdict.status === 'undeliverable'
+      ? null
+      : realEmailOrNull(emailVerdict.email);
     // Reject rather than store something undialable/unmailable — the agent would see contact
     // details that don't work and only find out when the reply bounces.
     if (!phone && !email) {
+      // A dead domain gets its own answer: the shopper can fix a typo she can see, but
+      // "invalid_contact" gives her nothing to act on.
+      if (args?.email && emailVerdict.status === 'undeliverable' && emailVerdict.reason === 'no_mx') {
+        return {
+          ok: false,
+          data: {
+            reason: 'undeliverable_email',
+            hint: emailVerdict.suggestion
+              ? `the domain does not exist — ask whether she meant ${emailVerdict.suggestion}`
+              : 'the domain does not exist — ask her to read the address again',
+            suggestion: emailVerdict.suggestion ?? null,
+          },
+        };
+      }
       return { ok: false, data: { reason: 'invalid_contact', hint: 'ask for a full phone number or a valid email address' } };
     }
     // Write straight through to the open ticket so the support inbox becomes actionable NOW,
