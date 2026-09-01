@@ -12,6 +12,8 @@ import { autoAssignNewTicket } from '@/lib/support/auto-assign';
 import { sendEmail, sendEmailWithAttachments } from '@/lib/email';
 import { resolveBrandReplyTo } from '@/lib/support/reply-address';
 import { realPhoneOrNull } from '@/lib/support/contact';
+import { verifyEmail, emailGate } from '@/lib/support/email-deliverability';
+import { recordDeliverability } from '@/lib/support/email-deliverability-store';
 
 // ============================================
 // CORS — opens this route for cross-origin POSTs from embedded widgets.
@@ -76,8 +78,13 @@ export async function POST(req: NextRequest) {
     // must not look the same. But a truncated number ("05456906" — three of these on real tickets)
     // is a guaranteed Meta failure, so nothing is ever SENT to one.
     const dialablePhone = realPhoneOrNull(sanitizedPhone);
-    const sanitizedEmail = (typeof customerEmail === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim()))
-      ? customerEmail.trim().toLowerCase()
+    // Deliverability, not shape. `lililevy42@gmail.com.il` satisfies that regex — .il is a
+    // real TLD — and the reply to it bounced. See lib/support/email-deliverability.ts.
+    const emailVerdict = await verifyEmail(customerEmail);
+    // Stored VERBATIM, for the same reason the phone above is: a corrected or blanked value
+    // hides from the agent what the customer actually typed.
+    const sanitizedEmail = typeof customerEmail === 'string' && customerEmail.trim()
+      ? customerEmail.trim()
       : null;
     const sanitizedBrand = brand ? sanitizeHtml(brand) : null;
     const sanitizedOrderNumber = orderNumber ? sanitizeHtml(orderNumber) : null;
@@ -109,6 +116,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Account not found' },
         { status: 404, headers: cors }
+      );
+    }
+
+    // Would we be able to answer this ticket at all? Only asked once the account is known,
+    // because the rule is opt-in per account and absence means permissive — so no account
+    // that exists today changes behaviour until someone turns this on for them.
+    const enforceEmail = ((influencer as any)?._rawConfig?.email_validation?.enforce) === true;
+    const gate = emailGate(emailVerdict, sanitizedPhone, enforceEmail);
+    if (gate.blocked) {
+      return NextResponse.json(
+        {
+          error: gate.suggestion
+            ? `כתובת המייל לא קיימת. התכוונת ל-${gate.suggestion}?`
+            : 'כתובת המייל לא קיימת. אפשר לתקן אותה, או להשאיר מספר טלפון.',
+          code: 'undeliverable_email',
+          suggestion: gate.suggestion || null,
+        },
+        { status: 400, headers: cors }
       );
     }
 
@@ -232,6 +257,17 @@ export async function POST(req: NextRequest) {
     // configured. Best-effort: if there are no agents (legacy influencers),
     // the ticket stays unassigned. The act is recorded with actor='system'.
     void autoAssignNewTicket(supportRequest.id, influencer.id);
+
+    // Best-effort, fire-and-forget: the support inbox reads this to show the agent that a
+    // reply by email will not arrive, and to point them at the phone instead. 'unknown' is
+    // not recorded — it says something about the resolver, not about the address.
+    if (sanitizedEmail && emailVerdict.status !== 'unknown') {
+      void recordDeliverability(
+        sanitizedEmail,
+        emailVerdict.status === 'undeliverable' ? 'no_mx' : 'ok',
+        emailVerdict.status === 'undeliverable' ? emailVerdict.reason : undefined,
+      );
+    }
 
     // Email notification — fire-and-forget. Sends via the existing Bestie
     // Gmail service (lib/email.ts) when:

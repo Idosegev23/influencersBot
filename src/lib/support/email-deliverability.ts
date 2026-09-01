@@ -20,7 +20,7 @@
  */
 
 import dns from 'node:dns/promises';
-import { realEmailOrNull } from '@/lib/support/contact';
+import { realEmailOrNull, realPhoneOrNull } from '@/lib/support/contact';
 import { redisGet, redisSet } from '@/lib/redis';
 
 export type EmailVerdict =
@@ -218,4 +218,33 @@ export async function verifyEmail(raw: unknown): Promise<EmailVerdict> {
   // Has MX (or we could not tell) but the domain is a known lookalike: suggest, never block.
   if (mapped) return { status: 'typo', email, suggestion: mapped };
   return mx === 'has_mx' ? { status: 'ok', email } : { status: 'unknown', email };
+}
+
+// ── The intake gate ────────────────────────────────────────────────────────
+
+/**
+ * Should a submission be refused because we would have no way to answer it?
+ *
+ * Three conditions, and each one exists to stop a different way of getting this wrong.
+ *
+ * First, the account has to have opted in. Absence means permissive, so shipping this
+ * changes nothing for anyone until someone turns it on.
+ *
+ * Second, only `undeliverable` counts. A `typo` verdict is a GUESS — the address may well
+ * be fine — and blocking on a guess is how a mail.com customer gets told she mistyped her
+ * own address. Only MX actually reporting that no mail server exists is fact enough.
+ *
+ * Third, even then, only when there is no phone. A ticket with a dead email and a real
+ * number is answerable; refusing it loses the customer entirely, which is the very failure
+ * this feature exists to prevent. לילי left 0526936571 on the ticket that started all this.
+ */
+export function emailGate(
+  verdict: EmailVerdict,
+  phone: string | null | undefined,
+  enforce: boolean,
+): { blocked: boolean; suggestion?: string } {
+  if (!enforce) return { blocked: false };
+  if (verdict.status !== 'undeliverable') return { blocked: false };
+  if (realPhoneOrNull(phone)) return { blocked: false };
+  return { blocked: true, suggestion: verdict.suggestion };
 }
