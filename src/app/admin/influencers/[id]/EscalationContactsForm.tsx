@@ -53,7 +53,41 @@ export default function EscalationContactsForm({ accountId }: { accountId: strin
 
   const hasEmptyRow = recipients.some((r) => !r.email.trim() && !r.whatsapp.trim());
 
+  const [badEmails, setBadEmails] = useState<Record<number, string>>({});
+  const hasBadEmail = Object.keys(badEmails).length > 0;
+
+  /**
+   * Unlike a shopper's address, a recipient here has no phone fallback and no bounce anyone
+   * reads: if this domain does not exist, every escalation for this brand is delivered to
+   * nobody and nothing says so. Blocking the save is the only signal available.
+   */
+  async function checkRow(i: number, email: string) {
+    const clear = () => setBadEmails((b) => { const n = { ...b }; delete n[i]; return n; });
+    if (!email.trim()) { clear(); return; }
+    try {
+      const res = await fetch('/api/widget/validate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const v = await res.json();
+      if (v?.status === 'undeliverable') {
+        setBadEmails((b) => ({
+          ...b,
+          [i]: v.suggestion ? `הדומיין לא קיים — התכוונת ל-${v.suggestion}?` : 'הדומיין לא קיים',
+        }));
+      } else {
+        clear();
+      }
+    } catch {
+      // A validator outage must not stop an admin from saving a recipient.
+      clear();
+    }
+  }
+
   async function save() {
+    // Belt and braces: the button is disabled, but a stale render must not slip past it.
+    if (hasBadEmail) return;
     setStatus('saving');
     try {
       const res = await fetch(`/api/admin/accounts/${accountId}/escalation`, {
@@ -102,7 +136,18 @@ export default function EscalationContactsForm({ accountId }: { accountId: strin
           </div>
           <div>
             {i === 0 && <label style={labelStyle}>אימייל</label>}
-            <input type="email" placeholder="name@example.com" value={r.email} onChange={(e) => update(i, 'email', e.target.value)} style={inputStyle} dir="ltr" />
+            <input
+              type="email"
+              placeholder="name@example.com"
+              value={r.email}
+              onChange={(e) => update(i, 'email', e.target.value)}
+              onBlur={(e) => checkRow(i, e.target.value)}
+              style={inputStyle}
+              dir="ltr"
+            />
+            {badEmails[i] && (
+              <div style={{ color: '#dc2626', fontSize: 11, marginTop: 4 }}>{badEmails[i]}</div>
+            )}
           </div>
           <div>
             {i === 0 && <label style={labelStyle}>וואטסאפ (E.164)</label>}
@@ -123,9 +168,10 @@ export default function EscalationContactsForm({ accountId }: { accountId: strin
         <button
           type="button"
           onClick={save}
-          disabled={status === 'saving' || hasEmptyRow}
-          title={hasEmptyRow ? 'יש שורה בלי מייל ובלי וואטסאפ — מלאו או הסירו אותה' : undefined}
-          style={{ padding: '8px 16px', borderRadius: 8, background: '#111', color: '#fff', fontSize: 13, border: 'none', opacity: status === 'saving' || hasEmptyRow ? 0.5 : 1, cursor: 'pointer' }}
+          disabled={status === 'saving' || hasEmptyRow || hasBadEmail}
+          title={hasBadEmail ? 'יש נמען עם דומיין שלא קיים — התראות אליו לא יגיעו לאף אחד'
+            : hasEmptyRow ? 'יש שורה בלי מייל ובלי וואטסאפ — מלאו או הסירו אותה' : undefined}
+          style={{ padding: '8px 16px', borderRadius: 8, background: '#111', color: '#fff', fontSize: 13, border: 'none', opacity: status === 'saving' || hasEmptyRow || hasBadEmail ? 0.5 : 1, cursor: 'pointer' }}
         >
           {status === 'saving' ? 'שומר…' : 'שמור נמענים'}
         </button>
