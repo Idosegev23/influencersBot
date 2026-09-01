@@ -30,11 +30,12 @@ export async function GET(request: Request) {
     const supabase = await createClient();
 
     // Get account ID
+    // `accounts` has no `username` column — the handle lives in config.
     const { data: account } = await supabase
       .from('accounts')
       .select('id')
-      .eq('username', username)
-      .single();
+      .eq('config->>username', username)
+      .maybeSingle();
 
     if (!account) {
       return NextResponse.json(

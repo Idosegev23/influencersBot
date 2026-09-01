@@ -30,11 +30,15 @@ export async function GET(request: Request) {
     const supabase = await createClient();
 
     // Get account ID
+    // `accounts` has no `username` column — the handle lives in config.
+    // Querying a missing column returned no row, so this route answered
+    // "Account not found" for every account and the bot page showed 0 posts,
+    // 0 topics and "never scanned" on an account with hundreds of each.
     const { data: account } = await supabase
       .from('accounts')
       .select('id')
-      .eq('username', username)
-      .single();
+      .eq('config->>username', username)
+      .maybeSingle();
 
     if (!account) {
       return NextResponse.json(
