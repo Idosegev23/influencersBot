@@ -123,6 +123,27 @@ export function compactKnowledgeContext(
   // --- Build sections (order matters: coupons first — they're critical) ---
   let context = '';
 
+  // 0. Manual knowledge — what the ACCOUNT OWNER wrote, so it outranks everything
+  //    the crawler found on its own.
+  //
+  // This section did not exist. `manualKnowledge` was fetched, merged with the
+  // RAG knowledge_base chunks, logged, and returned on the knowledge base — and
+  // then no renderer ever put it in the prompt. Every entry any customer had
+  // ever added through "Bot content" reached the assistant through nothing at
+  // all, while the dashboard implied it would be used.
+  //
+  // It goes first and is never truncated away: an owner-authored correction is
+  // the most authoritative thing we hold, and it is small.
+  if (kb.manualKnowledge?.length > 0) {
+    const items = kb.manualKnowledge.slice(0, 12);
+    let section = `\n📌 **מידע שהעסק הזין ידנית (${kb.manualKnowledge.length}) — מקור סמכותי, גובר על מידע שנאסף מהאתר:**\n`;
+    items.forEach((m: any, i: number) => {
+      section += `${i + 1}. ${m.title}\n   ${truncate(m.content || '', 1200)}\n`;
+    });
+    context += section;
+    sectionCounts.manualKnowledge = items.length;
+  }
+
   // 1. Coupons (never truncated, never deduped — they're small and critical)
   const now = new Date();
   const activeCoupons = (kb.coupons || []).filter(c => isCouponValid(c as any, now));
