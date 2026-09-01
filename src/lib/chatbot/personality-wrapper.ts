@@ -56,6 +56,8 @@ export interface PersonalityConfig {
     responseStructure?: string;
     answerExamples?: string[];
     recurringPhrases?: string[];
+    /** Words and phrases the account does not want said. Enforced in the prompt. */
+    avoidedWords?: string[];
   };
   knowledgeMap?: {
     coreTopics?: Array<{

@@ -336,16 +336,29 @@ Example response:
       );
 
       if (persona) {
-        await supabase.from('chatbot_persona').upsert(
-          {
-            influencer_id: influencer.id,
-            tone: persona.tone,
-            emoji_style: persona.emoji_style,
-            response_length: persona.response_length,
-            topics: persona.topics,
-          },
-          { onConflict: 'influencer_id' }
+        // Never overwrite what the customer set by hand.
+        //
+        // This upsert used to write `tone` on every rebuild. Now that the
+        // dashboard can edit the persona, that would make an edit appear to save
+        // and then quietly revert on the next scan — which is worse than not
+        // offering the edit at all. user_edited_fields is empty for every
+        // account that has never been hand-edited, so nothing changes for them.
+        const { data: current } = await supabase
+          .from('chatbot_persona')
+          .select('user_edited_fields')
+          .eq('influencer_id', influencer.id)
+          .maybeSingle();
+        const locked = new Set<string>(
+          Array.isArray(current?.user_edited_fields) ? current!.user_edited_fields : [],
         );
+
+        const personaRow: Record<string, unknown> = { influencer_id: influencer.id };
+        if (!locked.has('tone')) personaRow.tone = persona.tone;
+        if (!locked.has('emoji_usage')) personaRow.emoji_style = persona.emoji_style;
+        personaRow.response_length = persona.response_length;
+        personaRow.topics = persona.topics;
+
+        await supabase.from('chatbot_persona').upsert(personaRow, { onConflict: 'influencer_id' });
       }
 
       console.log(`⏱️ [${username}] Generating greeting...`);
@@ -357,10 +370,21 @@ Example response:
       );
 
       if (greeting) {
-        await supabase.from('chatbot_persona').update({
-          greeting_message: greeting.greeting,
-          initial_questions: greeting.questions,
-        }).eq('influencer_id', influencer.id);
+        const { data: cur } = await supabase
+          .from('chatbot_persona')
+          .select('user_edited_fields')
+          .eq('influencer_id', influencer.id)
+          .maybeSingle();
+        const lockedG = new Set<string>(
+          Array.isArray(cur?.user_edited_fields) ? cur!.user_edited_fields : [],
+        );
+
+        const greetingRow: Record<string, unknown> = { initial_questions: greeting.questions };
+        // A hand-written welcome message is the first thing every visitor reads;
+        // regenerating over it is the most visible way to lose a customer's work.
+        if (!lockedG.has('greeting_message')) greetingRow.greeting_message = greeting.greeting;
+
+        await supabase.from('chatbot_persona').update(greetingRow).eq('influencer_id', influencer.id);
       }
       
       const personaElapsed = ((Date.now() - personaStartTime) / 1000).toFixed(2);

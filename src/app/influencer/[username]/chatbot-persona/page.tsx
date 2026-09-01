@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use, useCallback } from 'react';
+import { useState, useEffect, use, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { getDashboardStrings } from '@/lib/i18n/dashboard';
@@ -141,6 +141,67 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
   });
   const [syncing, setSyncing] = useState(false);
 
+  // Persona editor. Seeded from the loaded persona; `dirty` keeps the form from
+  // being clobbered by a background reload while the customer is typing.
+  const [form, setForm] = useState({
+    tone: '', directives: '', avoidedWords: '', greeting: '', emoji: 'moderate',
+  });
+  const [dirty, setDirty] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  // loadData is a useCallback that must not re-run on every keystroke, so the
+  // dirty flag is read through a ref rather than closed over.
+  const dirtyRef = useRef(false);
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+
+  const setField = (k: keyof typeof form, v: string) => {
+    setDirty(true);
+    setSaveState('idle');
+    setForm((f) => ({ ...f, [k]: v }));
+  };
+
+  const savePersona = async () => {
+    setSaveState('saving');
+    try {
+      const res = await fetch(`/api/influencer/chatbot/persona?username=${username}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tone: form.tone.trim(),
+          // Directives are one rule per line in the box, and an array in the DB.
+          directives: form.directives.split('\n').map((d) => d.trim()).filter(Boolean),
+          avoided_words: form.avoidedWords.split(',').map((w) => w.trim()).filter(Boolean),
+          greeting_message: form.greeting.trim(),
+          emoji_usage: form.emoji,
+        }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      setSaveState('saved');
+      setDirty(false);
+      await loadData();
+    } catch {
+      setSaveState('error');
+    }
+  };
+
+  const restoreAiPersona = async () => {
+    if (!confirm(t.chatbotPersona.restoreConfirm)) return;
+    setSaveState('saving');
+    try {
+      const res = await fetch(`/api/influencer/chatbot/persona?username=${username}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restore: true }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      setDirty(false);
+      dirtyRef.current = false;
+      setSaveState('idle');
+      await loadData();
+    } catch {
+      setSaveState('error');
+    }
+  };
+
   const loadData = useCallback(async () => {
     try {
       const authRes = await fetch(`/api/influencer/auth?username=${username}`);
@@ -154,8 +215,23 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
       const personaRes = await fetch(`/api/influencer/chatbot/persona?username=${username}`);
       if (personaRes.ok) {
         const personaData = await personaRes.json();
-        setPersona(personaData.persona || null);
+        const p = personaData.persona || null;
+        setPersona(p);
         setAccountId(personaData.accountId || '');
+        if (p) {
+          setForm((prev) => {
+            if (dirtyRef.current) return prev; // never overwrite what is being typed
+            const vr = p.voice_rules || {};
+            const toneVal = typeof vr.tone === 'string' ? vr.tone : p.tone || '';
+            return {
+              tone: toneVal || '',
+              directives: Array.isArray(p.directives) ? p.directives.join('\n') : (p.directives || ''),
+              avoidedWords: Array.isArray(vr.avoidedWords) ? vr.avoidedWords.join(', ') : '',
+              greeting: p.greeting_message || '',
+              emoji: p.emoji_usage || 'moderate',
+            };
+          });
+        }
       }
 
       // Load stats
@@ -344,6 +420,121 @@ export default function MyBotPage({ params }: { params: Promise<{ username: stri
           </div>
         ) : (
           <>
+            {/* Editable bot rules — the only place a customer can change what the bot says */}
+            <Section title={t.chatbotPersona.editorTitle} icon={Sparkles} defaultOpen>
+              <div className="space-y-4 pt-4">
+                <p className="text-xs" style={{ color: 'var(--dash-text-2)' }}>{t.chatbotPersona.editorHelp}</p>
+
+                <div>
+                  <label htmlFor="persona-tone" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
+                    {t.chatbotPersona.editTone}
+                  </label>
+                  <input
+                    id="persona-tone"
+                    type="text"
+                    value={form.tone}
+                    onChange={(e) => setField('tone', e.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-sm"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-1)' }}
+                  />
+                  <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{t.chatbotPersona.editToneHelp}</p>
+                </div>
+
+                <div>
+                  <label htmlFor="persona-directives" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
+                    {t.chatbotPersona.editDirectives}
+                  </label>
+                  <textarea
+                    id="persona-directives"
+                    rows={5}
+                    value={form.directives}
+                    onChange={(e) => setField('directives', e.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-sm"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-1)' }}
+                  />
+                  <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{t.chatbotPersona.editDirectivesHelp}</p>
+                </div>
+
+                <div>
+                  <label htmlFor="persona-avoided" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
+                    {t.chatbotPersona.editAvoided}
+                  </label>
+                  <input
+                    id="persona-avoided"
+                    type="text"
+                    value={form.avoidedWords}
+                    onChange={(e) => setField('avoidedWords', e.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-sm"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-1)' }}
+                  />
+                  <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{t.chatbotPersona.editAvoidedHelp}</p>
+                </div>
+
+                <div>
+                  <label htmlFor="persona-greeting" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
+                    {t.chatbotPersona.editGreeting}
+                  </label>
+                  <textarea
+                    id="persona-greeting"
+                    rows={2}
+                    value={form.greeting}
+                    onChange={(e) => setField('greeting', e.target.value)}
+                    className="w-full rounded-lg px-3 py-2 text-sm"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-1)' }}
+                  />
+                  <p className="text-xs mt-1" style={{ color: 'var(--dash-text-3)' }}>{t.chatbotPersona.editGreetingHelp}</p>
+                </div>
+
+                <div>
+                  <label htmlFor="persona-emoji" className="text-xs font-medium block mb-1.5" style={{ color: 'var(--dash-text-2)' }}>
+                    {t.chatbotPersona.editEmoji}
+                  </label>
+                  <select
+                    id="persona-emoji"
+                    value={form.emoji}
+                    onChange={(e) => setField('emoji', e.target.value)}
+                    className="rounded-lg px-3 py-2 text-sm"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-1)' }}
+                  >
+                    <option value="none">{t.chatbotPersona.emojiNone}</option>
+                    <option value="light">{t.chatbotPersona.emojiLight}</option>
+                    <option value="moderate">{t.chatbotPersona.emojiModerate}</option>
+                    <option value="heavy">{t.chatbotPersona.emojiHeavy}</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={savePersona}
+                    disabled={saveState === 'saving' || !dirty}
+                    className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                    style={{ background: 'var(--color-primary)', color: '#fff' }}
+                  >
+                    {saveState === 'saving' ? t.chatbotPersona.saving : t.chatbotPersona.saveChanges}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={restoreAiPersona}
+                    className="px-3 py-2 rounded-lg text-sm"
+                    style={{ border: '1px solid var(--dash-glass-border)', color: 'var(--dash-text-2)' }}
+                  >
+                    {t.chatbotPersona.restoreAi}
+                  </button>
+                  {saveState === 'saved' && (
+                    <span className="text-sm inline-flex items-center gap-1" style={{ color: 'var(--dash-positive)' }}>
+                      <CheckCircle2 className="w-4 h-4" /> {t.chatbotPersona.saved}
+                    </span>
+                  )}
+                  {saveState === 'error' && (
+                    <span className="text-sm inline-flex items-center gap-1" style={{ color: 'var(--dash-negative)' }}>
+                      <XCircle className="w-4 h-4" /> {t.chatbotPersona.saveFailed}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </Section>
+
             {/* Voice & Style */}
             <Section title={t.chatbotPersona.voiceStyleTitle} icon={MessageSquare} defaultOpen>
               <div className="space-y-4 pt-4">

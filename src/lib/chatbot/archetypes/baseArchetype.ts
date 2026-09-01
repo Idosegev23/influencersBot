@@ -457,6 +457,14 @@ export abstract class BaseArchetype {
       if (vr.answerExamples?.length) {
         sections.push(`💡 דפוסי תשובה:\n${vr.answerExamples.map(e => `• ${e}`).join('\n')}`);
       }
+      // The account's own do-not-say list. This was generated, stored and shown
+      // in the dashboard, but never reached the prompt — so a customer editing it
+      // would have been adjusting a decoration. It is a hard rule, not a hint.
+      if (vr.avoidedWords?.length) {
+        sections.push(
+          `🚫 אסור להשתמש במילים ובביטויים האלה, גם לא בנטייה או בתרגום: ${vr.avoidedWords.join(', ')}`,
+        );
+      }
     } else if (config.bio) {
       // Fallback to simple bio
       sections.push(`📋 ביוגרפיה של ${name}:\n${config.bio}`);

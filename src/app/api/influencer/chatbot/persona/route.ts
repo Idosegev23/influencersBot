@@ -162,12 +162,20 @@ export async function PATCH(req: NextRequest) {
     const {
       directives, tone, emoji_usage, greeting_message, bio, interests,
       narrative_perspective, sass_level, storytelling_mode, message_structure,
-      common_phrases,
+      common_phrases, avoided_words,
     } = body;
 
     const updates: any = {
       updated_at: new Date().toISOString(),
     };
+
+    // Read before building the patch: voice_rules is merged, not replaced, and
+    // the edited-field list accumulates across edits.
+    const { data: existingPersona } = await supabase
+      .from('chatbot_persona')
+      .select('*')
+      .eq('account_id', accountId)
+      .maybeSingle();
 
     if (directives !== undefined) updates.directives = directives;
     if (tone !== undefined) updates.tone = tone;
@@ -181,12 +189,37 @@ export async function PATCH(req: NextRequest) {
     if (message_structure !== undefined) updates.message_structure = message_structure;
     if (common_phrases !== undefined) updates.common_phrases = common_phrases;
 
-    // Check if persona exists
-    const { data: existingPersona } = await supabase
-      .from('chatbot_persona')
-      .select('*')
-      .eq('account_id', accountId)
-      .single();
+    // tone and avoided words live in TWO places and the prompt reads only one.
+    //
+    // `chatbot_persona.tone` is what the dashboard displays, but the prompt
+    // builder reads `voice_rules.tone`; writing the column alone would give a
+    // customer an edit box that changes what they see and nothing the bot says.
+    // Avoided words exist only inside voice_rules. So both are mirrored into the
+    // JSON the prompt actually consumes, and the column is kept in step so the
+    // dashboard does not disagree with the bot.
+    const voiceRulesPatch: Record<string, unknown> = {};
+    if (tone !== undefined) voiceRulesPatch.tone = tone;
+    if (avoided_words !== undefined) {
+      voiceRulesPatch.avoidedWords = Array.isArray(avoided_words)
+        ? avoided_words.map((w: unknown) => String(w).trim()).filter(Boolean)
+        : [];
+    }
+
+    if (Object.keys(voiceRulesPatch).length > 0) {
+      updates.voice_rules = { ...((existingPersona?.voice_rules as object) || {}), ...voiceRulesPatch };
+    }
+
+    // Remember which fields a human set, so a later persona rebuild does not
+    // silently overwrite them — see background-scraper.
+    const editedNow = Object.keys(updates).filter(
+      (k) => k !== 'updated_at' && k !== 'ai_snapshot' && k !== 'user_edited_fields',
+    );
+    if (editedNow.length > 0) {
+      const prior: string[] = Array.isArray(existingPersona?.user_edited_fields)
+        ? existingPersona!.user_edited_fields
+        : [];
+      updates.user_edited_fields = [...new Set([...prior, ...editedNow])];
+    }
 
     let persona;
     if (existingPersona) {
