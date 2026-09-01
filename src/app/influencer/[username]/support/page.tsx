@@ -1151,6 +1151,23 @@ function TicketDetail({
     }
   }, [username, ticketId, ticket?.order_number, ticket?.tracking_number]);
 
+  // Does mail to this address actually arrive? An address can be perfectly well-formed and
+  // have no mail server behind it — lililevy42@gmail.com.il passed every check we had, and
+  // the reply bounced while a working phone sat on the same ticket.
+  const [emailDead, setEmailDead] = useState(false);
+  useEffect(() => {
+    const addr = ticket?.customer_email;
+    if (!addr) { setEmailDead(false); return; }
+    let cancelled = false;
+    fetch(`/api/influencer/${username}/email-status?address=${encodeURIComponent(addr)}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setEmailDead(d?.status === 'no_mx' || d?.status === 'bounced'); })
+      // Unknown means "we have not checked", which must read as fine — striking an address
+      // through because a lookup failed would send the agent to the phone for no reason.
+      .catch(() => { if (!cancelled) setEmailDead(false); });
+    return () => { cancelled = true; };
+  }, [ticket?.customer_email, username]);
+
   // Auto-fire on every ticket open. Resets state first so we don't
   // carry over a previous ticket's "found" view.
   useEffect(() => {
@@ -1206,7 +1223,8 @@ function TicketDetail({
   const customerEmail = realEmailOrNull(ticket.customer_email);
   // "Can a human get back to this person at all?" — the question the agent is really asking when
   // they open a ticket. Either channel counts; neither means say so out loud.
-  const reachable = canWhatsApp || !!customerEmail;
+  // An address we know bounces is not a contact route, however well-formed it looks.
+  const reachable = canWhatsApp || (!!customerEmail && !emailDead);
   // A stored-but-unusable number is worth showing: it tells the agent the value exists and is junk,
   // instead of looking identical to "no number was ever given".
   const unusablePhone = !canWhatsApp && !!ticket.customer_phone?.trim();
@@ -1446,7 +1464,18 @@ function TicketDetail({
           </div>
         )}
 
-        {customerEmail && (
+        {customerEmail && emailDead && (
+          <div className="flex items-center gap-2 text-sm" style={{ color: '#fbbf24' }}>
+            <Mail className="w-4 h-4" />
+            <span dir="ltr" className="line-through opacity-70">{customerEmail}</span>
+            <span className="text-[11px]">
+              {t.contactEmailUndeliverable}
+              {canWhatsApp ? ` · ${t.contactEmailUseThePhone}` : ''}
+            </span>
+          </div>
+        )}
+
+        {customerEmail && !emailDead && (
           <div className="flex items-center gap-2 text-sm">
             <a
               href={`mailto:${customerEmail}`}
