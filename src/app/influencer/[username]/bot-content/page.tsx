@@ -329,7 +329,6 @@ export default function BotContentPage({
         body: JSON.stringify({
           source_url: newLink.url.trim(),
           refresh_daily: newLink.refreshDaily,
-          knowledge_type: 'link',
         }),
       });
       const data = await res.json();

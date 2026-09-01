@@ -4,6 +4,11 @@ import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { ingestDocument } from '@/lib/rag/ingest';
 import { normalizeKnowledgeUrl, readLink, indexKnowledgeEntry } from '@/lib/knowledge/link-ingest';
 
+/** Mirrors the CHECK constraint on chatbot_knowledge_base.knowledge_type. */
+const KNOWLEDGE_TYPES = new Set([
+  'active_partnership', 'coupon', 'product', 'faq', 'brand_info', 'custom',
+]);
+
 /**
  * GET /api/influencer/chatbot/knowledge
  * List knowledge base entries
@@ -82,7 +87,10 @@ export async function POST(req: NextRequest) {
         .from('chatbot_knowledge_base')
         .insert({
           account_id: auth.accountId,
-          knowledge_type: knowledge_type || 'link',
+          // knowledge_type is CHECK-constrained to a fixed content classification
+          // and 'link' is not one of them — where the text came from is recorded
+          // by source_type/source_url instead, which is the right axis for it.
+          knowledge_type: KNOWLEDGE_TYPES.has(knowledge_type) ? knowledge_type : 'custom',
           title: title?.trim() || read.title,
           content: read.content,
           keywords: keywords || [],
@@ -116,6 +124,15 @@ export async function POST(req: NextRequest) {
     if (!knowledge_type || !title || !content) {
       return NextResponse.json(
         { error: 'knowledge_type, title, and content are required' },
+        { status: 400 }
+      );
+    }
+
+    // Say which value was wrong. Letting the database reject it produced a 500
+    // reading "Failed to save", which tells the customer nothing actionable.
+    if (!KNOWLEDGE_TYPES.has(knowledge_type)) {
+      return NextResponse.json(
+        { error: `Unknown content type "${knowledge_type}"` },
         { status: 400 }
       );
     }
