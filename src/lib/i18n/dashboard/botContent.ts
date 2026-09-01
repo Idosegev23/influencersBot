@@ -88,7 +88,20 @@ export const botContent = {
     addContentError: 'שגיאה בהוספת תוכן',
     confirmDelete: 'למחוק את הערך הזה?',
     deleteError: 'שגיאה במחיקה',
+      // Add a link
+    linkTitle: 'הוספת קישור',
+    linkHelp: 'הדביקו כתובת של עמוד והבוט יקרא אותו ויוסיף את תוכנו לידע שלו.',
+    linkPlaceholder: 'https://example.com/page',
+    linkRefreshQuestion: 'האם התוכן בעמוד הזה משתנה?',
+    linkOnceLabel: 'לא, זה תוכן קבוע',
+    linkOnceHelp: 'נקרא פעם אחת עכשיו. לא ייסרק שוב.',
+    linkDailyLabel: 'כן, לכלול בסריקה היומית',
+    linkDailyHelp: 'ייקרא מחדש כל יום כדי להישאר מעודכן.',
+    linkAdd: 'הוספת הקישור',
+    linkReading: 'קורא את העמוד…',
+    linkError: 'לא הצלחנו לקרוא את העמוד הזה.',
   },
+
   en: {
     pageTitle: 'Bot content',
     empty: 'No content yet',
@@ -177,5 +190,17 @@ export const botContent = {
     addContentError: 'Failed to add content',
     confirmDelete: 'Delete this entry?',
     deleteError: 'Failed to delete',
+      // Add a link
+    linkTitle: 'Add a link',
+    linkHelp: 'Paste a page address and the bot will read it and add what it says to its knowledge.',
+    linkPlaceholder: 'https://example.com/page',
+    linkRefreshQuestion: 'Does the content on this page change?',
+    linkOnceLabel: 'No, it stays the same',
+    linkOnceHelp: 'Read once, now. It will not be checked again.',
+    linkDailyLabel: 'Yes, include it in the daily scan',
+    linkDailyHelp: 'Re-read every day so the answer stays current.',
+    linkAdd: 'Add link',
+    linkReading: 'Reading the page…',
+    linkError: 'We could not read that page.',
   },
 } as const;

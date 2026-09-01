@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 import { ingestDocument } from '@/lib/rag/ingest';
+import { normalizeKnowledgeUrl, readLink, indexKnowledgeEntry } from '@/lib/knowledge/link-ingest';
 
 /**
  * GET /api/influencer/chatbot/knowledge
@@ -59,7 +60,58 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { knowledge_type, title, content, keywords, priority } = body;
+    const { knowledge_type, title, content, keywords, priority, source_url, refresh_daily } = body;
+
+    // ---------- LINK MODE ----------
+    // The customer gives a url instead of typing content. We read the page now,
+    // store what it says, and remember whether they told us it changes.
+    if (source_url) {
+      const url = normalizeKnowledgeUrl(String(source_url));
+      if (!url) {
+        return NextResponse.json({ error: 'That does not look like a web address' }, { status: 400 });
+      }
+
+      const read = await readLink(url);
+      if (!read.ok) {
+        // Nothing is stored on failure. A link that shows up in the dashboard
+        // while contributing nothing to the assistant is worse than an error.
+        return NextResponse.json({ error: read.error || 'Could not read that page' }, { status: 422 });
+      }
+
+      const { data: linkEntry, error: linkError } = await supabase
+        .from('chatbot_knowledge_base')
+        .insert({
+          account_id: auth.accountId,
+          knowledge_type: knowledge_type || 'link',
+          title: title?.trim() || read.title,
+          content: read.content,
+          keywords: keywords || [],
+          priority: priority || 0,
+          source_type: 'url',
+          source_url: url,
+          refresh_daily: refresh_daily === true,
+          last_fetched_at: new Date().toISOString(),
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (linkError || !linkEntry) {
+        console.error('Failed to create link entry:', linkError);
+        return NextResponse.json({ error: 'Failed to save the link' }, { status: 500 });
+      }
+
+      const indexed = await indexKnowledgeEntry({
+        accountId: auth.accountId,
+        entryId: linkEntry.id,
+        title: linkEntry.title,
+        content: read.content,
+        knowledgeType: linkEntry.knowledge_type,
+        sourceUrl: url,
+      });
+
+      return NextResponse.json({ success: true, knowledge: linkEntry, indexed });
+    }
 
     if (!knowledge_type || !title || !content) {
       return NextResponse.json(

@@ -152,6 +152,10 @@
     {
       "path": "/api/cron/weekly-conversation-report",
       "schedule": "0 6 * * 0"
+    },
+    {
+      "path": "/api/cron/refresh-knowledge-links",
+      "schedule": "20 4 * * *"
     }
   ]
 }

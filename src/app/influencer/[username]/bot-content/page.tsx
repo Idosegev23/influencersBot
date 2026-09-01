@@ -162,6 +162,9 @@ export default function BotContentPage({
   const [knowledgeEntries, setKnowledgeEntries] = useState<KnowledgeEntry[]>([]);
   const [newEntry, setNewEntry] = useState({ knowledge_type: 'faq', title: '', content: '' });
   const [addingEntry, setAddingEntry] = useState(false);
+  const [newLink, setNewLink] = useState({ url: '', refreshDaily: false });
+  const [addingLink, setAddingLink] = useState(false);
+  const [linkError, setLinkError] = useState('');
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
 
   // Collapsible sections
@@ -312,6 +315,36 @@ export default function BotContentPage({
       alert(t.botContent.addContentError);
     } finally {
       setAddingEntry(false);
+    }
+  };
+
+  const handleAddLink = async () => {
+    if (!newLink.url.trim()) return;
+    setAddingLink(true);
+    setLinkError('');
+    try {
+      const res = await fetch(`/api/influencer/chatbot/knowledge?username=${username}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_url: newLink.url.trim(),
+          refresh_daily: newLink.refreshDaily,
+          knowledge_type: 'link',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setKnowledgeEntries((prev) => [data.knowledge, ...prev]);
+        setNewLink({ url: '', refreshDaily: false });
+      } else {
+        // Show what actually went wrong — an unreachable page and a malformed
+        // address need different fixes from the customer.
+        setLinkError(data?.error || t.botContent.linkError);
+      }
+    } catch {
+      setLinkError(t.botContent.linkError);
+    } finally {
+      setAddingLink(false);
     }
   };
 
@@ -852,6 +885,79 @@ export default function BotContentPage({
               )}
               {t.botContent.addToKnowledge}
             </button>
+
+            {/* Add a link */}
+            <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--dash-glass-border)' }}>
+              <h4 className="text-sm font-medium mb-1" style={{ color: 'var(--dash-text)' }}>
+                {t.botContent.linkTitle}
+              </h4>
+              <p className="text-xs mb-3" style={{ color: 'var(--dash-text-2)' }}>
+                {t.botContent.linkHelp}
+              </p>
+
+              <input
+                type="url"
+                inputMode="url"
+                value={newLink.url}
+                onChange={(e) => { setNewLink({ ...newLink, url: e.target.value }); setLinkError(''); }}
+                className="w-full px-3 py-2 rounded-xl text-sm mb-3 focus:outline-none focus:ring-2"
+                style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid var(--dash-glass-border)',
+                  color: 'var(--dash-text)',
+                }}
+                placeholder={t.botContent.linkPlaceholder}
+              />
+
+              <p className="text-xs font-medium mb-2" style={{ color: 'var(--dash-text-2)' }}>
+                {t.botContent.linkRefreshQuestion}
+              </p>
+              <div className="space-y-2 mb-3">
+                <label className="flex items-start gap-2 text-sm cursor-pointer" style={{ color: 'var(--dash-text)' }}>
+                  <input
+                    type="radio"
+                    name="link-refresh"
+                    checked={!newLink.refreshDaily}
+                    onChange={() => setNewLink({ ...newLink, refreshDaily: false })}
+                    className="mt-1"
+                  />
+                  <span>
+                    {t.botContent.linkOnceLabel}
+                    <span className="block text-xs" style={{ color: 'var(--dash-text-2)' }}>
+                      {t.botContent.linkOnceHelp}
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-sm cursor-pointer" style={{ color: 'var(--dash-text)' }}>
+                  <input
+                    type="radio"
+                    name="link-refresh"
+                    checked={newLink.refreshDaily}
+                    onChange={() => setNewLink({ ...newLink, refreshDaily: true })}
+                    className="mt-1"
+                  />
+                  <span>
+                    {t.botContent.linkDailyLabel}
+                    <span className="block text-xs" style={{ color: 'var(--dash-text-2)' }}>
+                      {t.botContent.linkDailyHelp}
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              {linkError && (
+                <p className="text-xs mb-2" style={{ color: 'var(--dash-negative)' }}>{linkError}</p>
+              )}
+
+              <button
+                onClick={handleAddLink}
+                disabled={addingLink || !newLink.url.trim()}
+                className="px-4 py-2 text-sm rounded-xl font-medium transition-colors flex items-center gap-2 disabled:opacity-50 btn-primary"
+              >
+                {addingLink ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {addingLink ? t.botContent.linkReading : t.botContent.linkAdd}
+              </button>
+            </div>
           </div>
 
           {/* Existing entries list */}

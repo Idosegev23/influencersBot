@@ -116,6 +116,96 @@ const PRODUCT_LABELS = {
  * and page-type classification as a plain fetch. Returns the same-host links found
  * on the page, for BFS.
  */
+/**
+ * Strip site chrome and give element boundaries whitespace, in place.
+ *
+ * Exported so anything that turns a page into text — the crawl, and the
+ * "add a link" action — applies exactly the same rules. When these diverge, a
+ * page added by hand reads differently from the same page found by the crawler,
+ * which is impossible for a customer to understand or report.
+ */
+export function stripChromeAndSeparate($: cheerio.CheerioAPI): void {
+  $('script, style, noscript, iframe, svg').remove();
+  $('.cookie-banner, .popup, #cookie-consent, .cookie-notice').remove();
+  $('nav, footer').remove();
+
+  // A <header> is NOT automatically site chrome, and removing every one of
+  // them threw away the facts we were crawling for. Every event page on
+  // buses.org puts its date, time and location in
+  // <header class="article__header"> inside <main><article> — so
+  // "BISC-South in New Orleans, Aug 31 2026, 8:00 am EDT, New Orleans, LA"
+  // was deleted before extraction, and six of fifteen stored event pages had
+  // no date on them at all. ABA asked what events are upcoming and we had
+  // thrown away every answer.
+  //
+  // Page banners live outside the content root or wrap the navigation;
+  // a header inside main/article is the content's own heading block.
+  $('header').each((_, el) => {
+    const $el = $(el);
+    const insideContent = $el.closest('main, article, [role="main"]').length > 0;
+    if (!insideContent || $el.find('nav').length > 0) $el.remove();
+  });
+
+  // Give element boundaries real whitespace before anything calls .text().
+  //
+  // Cheerio concatenates adjacent elements with NOTHING between them, so a
+  // card layout — <span>Aug 26</span><h3>BISC-South in New Orleans</h3> —
+  // flattens to "Aug 26BISC-South in New Orleans". ABA's events page produced
+  // seven of those, and the assistant read one as a single string and told a
+  // member the event was on a different day than it is. A wrong event date
+  // from an association is worse than no date at all.
+  //
+  // Whitespace here can only separate, never join, so this cannot corrupt
+  // text that was already correct; the normaliser below collapses any runs.
+  $('br').replaceWith(' ');
+  $('p,div,li,tr,td,th,h1,h2,h3,h4,h5,h6,section,article,aside,header,footer,span,time,a,label,figcaption,dt,dd').after(' ');
+
+}
+
+/** The selectors a page's main content tends to live in, richest wins. */
+const CONTENT_SELECTORS = [
+  '.product-description', '.product-info', '.product-details', '[data-product]',
+  '.category-description', 'article', '.page-content', 'main', '.content',
+  '.entry-content', '#content', '.post-content', '.page-body',
+];
+
+/**
+ * Pick the richest content region of an already-cleaned document.
+ *
+ * Takes the LONGEST candidate rather than the first one over a threshold: on
+ * buses.org/membership/join/ the first match is a four-block teaser with no
+ * prices, while `main` holds the whole dues table.
+ */
+export function pickRichestRegion($: cheerio.CheerioAPI): string {
+  let best = '';
+  for (const selector of CONTENT_SELECTORS) {
+    const els = $(selector);
+    if (els.length === 0) continue;
+    let candidate = '';
+    els.each((_, el) => {
+      const text = $(el).text().trim();
+      if (text.length > 30) candidate += text + '\n\n';
+    });
+    if (candidate.length > best.length) best = candidate;
+  }
+  const bodyText = $('body').text().trim();
+  if (bodyText.length > best.length) best = bodyText;
+  return best;
+}
+
+/** html → readable text, using the same rules as the crawler. */
+export function extractReadableText(html: string): { title: string; text: string } {
+  const $ = cheerio.load(html);
+  const title = $('title').text().trim() || $('h1').first().text().trim() || '';
+  stripChromeAndSeparate($);
+  const text = pickRichestRegion($)
+    .replace(/[\t ]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^\s+|\s+$/gm, '')
+    .trim();
+  return { title, text };
+}
+
 export async function persistPageHtml(
   url: string,
   html: string,
@@ -144,41 +234,7 @@ export async function persistPageHtml(
       structuredData.push(...fallbacks.structuredData);
     }
 
-    // Remove noise before extraction.
-    $('script, style, noscript, iframe, svg').remove();
-    $('.cookie-banner, .popup, #cookie-consent, .cookie-notice').remove();
-    $('nav, footer').remove();
-
-    // A <header> is NOT automatically site chrome, and removing every one of
-    // them threw away the facts we were crawling for. Every event page on
-    // buses.org puts its date, time and location in
-    // <header class="article__header"> inside <main><article> — so
-    // "BISC-South in New Orleans, Aug 31 2026, 8:00 am EDT, New Orleans, LA"
-    // was deleted before extraction, and six of fifteen stored event pages had
-    // no date on them at all. ABA asked what events are upcoming and we had
-    // thrown away every answer.
-    //
-    // Page banners live outside the content root or wrap the navigation;
-    // a header inside main/article is the content's own heading block.
-    $('header').each((_, el) => {
-      const $el = $(el);
-      const insideContent = $el.closest('main, article, [role="main"]').length > 0;
-      if (!insideContent || $el.find('nav').length > 0) $el.remove();
-    });
-
-    // Give element boundaries real whitespace before anything calls .text().
-    //
-    // Cheerio concatenates adjacent elements with NOTHING between them, so a
-    // card layout — <span>Aug 26</span><h3>BISC-South in New Orleans</h3> —
-    // flattens to "Aug 26BISC-South in New Orleans". ABA's events page produced
-    // seven of those, and the assistant read one as a single string and told a
-    // member the event was on a different day than it is. A wrong event date
-    // from an association is worse than no date at all.
-    //
-    // Whitespace here can only separate, never join, so this cannot corrupt
-    // text that was already correct; the normaliser below collapses any runs.
-    $('br').replaceWith(' ');
-    $('p,div,li,tr,td,th,h1,h2,h3,h4,h5,h6,section,article,aside,header,footer,span,time,a,label,figcaption,dt,dd').after(' ');
+    stripChromeAndSeparate($);
 
     // Metadata
     const title =
