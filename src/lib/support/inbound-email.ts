@@ -20,6 +20,8 @@
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { sendEmail, sendAdminAlert, ADMIN_ALERT_RECIPIENTS } from '@/lib/email';
 import { resolveBrandReplyTo } from '@/lib/support/reply-address';
+import { normalizeEmail } from '@/lib/support/email-deliverability';
+import { markBounced } from '@/lib/support/email-deliverability-store';
 
 // sendAdminAlert defaults to GMAIL_SEND_FROM — the unwatched shared mailbox this whole feature
 // exists to drain. Every alert here must name a human inbox explicitly.
@@ -30,6 +32,8 @@ export interface InboundEmail {
   from: string;          // already lowercased bare address
   subject: string;
   body: string;          // plain-text body, quoted history included
+  /** Gmail's X-Failed-Recipients header, when this is a bounce. The strongest signal. */
+  failedRecipient?: string;
 }
 
 export type InboundOutcome =
@@ -89,6 +93,50 @@ function isAutomated(email: InboundEmail): boolean {
   return /^(automatic reply|out of office|delivery status notification|undelivered mail)/i.test(
     email.subject.trim(),
   );
+}
+
+/** Gmail's own wording, and the RFC 3464 field, around the address that failed. */
+const BOUNCE_BODY_PATTERNS = [
+  /Final-Recipient:\s*rfc822;\s*([^\s<>,;]+@[^\s<>,;]+)/i,
+  /wasn'?t delivered to\s+([^\s<>,;]+@[^\s<>,;]+)/i,
+  /couldn'?t be delivered to\s+([^\s<>,;]+@[^\s<>,;]+)/i,
+  /\u05d4\u05d4\u05d5\u05d3\u05e2\u05d4 \u05e9\u05dc\u05da \u05dc\u05d0 \u05e0\u05e9\u05dc\u05d7\u05d4 \u05d0\u05dc\s+([^\s<>,;]+@[^\s<>,;]+)/,
+];
+
+/**
+ * The address that could not be reached, when this message is a hard bounce.
+ *
+ * A bounce is the only signal that sees past a valid domain to a mailbox that does not
+ * exist, and it already arrives here — poll-gmail read the failure notice for ticket
+ * 99bb08a1 six minutes after the ticket was filed, isAutomated() recognised it, and it was
+ * dropped. Two earlier ones went the same way.
+ *
+ * Deliberately narrow. A (Delay) notice is not a failure — mail delayed is still mail that
+ * may be delivered — and marking an address dead on a delay takes a working route away from
+ * a brand for nothing.
+ */
+export function extractBouncedRecipient(email: InboundEmail): string | null {
+  const from = (email.from || '').toLowerCase();
+  const isDaemon = /^(mailer-daemon|postmaster)/.test(from);
+  const subject = email.subject || '';
+  const isFailure =
+    /delivery status notification \(failure\)|undelivered mail|delivery incomplete|returned mail/i.test(subject)
+    || /^address not found/i.test((email.body || '').trim());
+  if (!isDaemon || !isFailure) return null;
+  if (/\(delay\)/i.test(subject)) return null;
+
+  if (email.failedRecipient) {
+    const fromHeader = normalizeEmail(email.failedRecipient);
+    if (fromHeader) return fromHeader;
+  }
+  for (const re of BOUNCE_BODY_PATTERNS) {
+    const m = re.exec(email.body || '');
+    if (!m) continue;
+    const addr = normalizeEmail(m[1].replace(/[.,;]+$/, ''));
+    // Never mark our own mailbox, or the daemon writing the report, as dead.
+    if (addr && !/^(mailer-daemon|postmaster)@/.test(addr) && !isSelfSent(addr)) return addr;
+  }
+  return null;
 }
 
 async function findByTicketCode(body: string) {
@@ -198,6 +246,14 @@ export async function routeInboundCustomerEmail(
   }
 
   if (isAutomated(email)) {
+    // Still never forwarded to a brand — but no longer thrown away. A hard bounce is the
+    // only evidence that a syntactically perfect address has no mailbox behind it.
+    const bounced = extractBouncedRecipient(email);
+    if (bounced) {
+      await markBounced(bounced, (email.subject || 'bounce').slice(0, 200));
+      await log({ outcome: 'not_a_customer_reply', note: `bounce recorded for ${bounced}` });
+      return { outcome: 'not_a_customer_reply' };
+    }
     await log({ outcome: 'not_a_customer_reply', note: 'automated sender or auto-reply subject' });
     return { outcome: 'not_a_customer_reply' };
   }

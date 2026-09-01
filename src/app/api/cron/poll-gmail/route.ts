@@ -149,6 +149,9 @@ export async function GET(req: NextRequest) {
             from,
             subject,
             body: collected.text || full.data.snippet || '',
+            // The strongest bounce signal, and one only this layer can see — walkParts
+            // collects text/plain bodies, not headers.
+            failedRecipient: headerValue(headers, 'X-Failed-Recipients') || undefined,
           }, { deferAlerts: unroutable }).catch((e: any) => ({ outcome: 'error', note: String(e?.message || e) }));
         }
 
