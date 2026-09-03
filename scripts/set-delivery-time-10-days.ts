@@ -40,7 +40,7 @@ loadDotenv({ path: '.env.local', override: true });
 import { createClient } from '@supabase/supabase-js';
 import { generateEmbeddings } from '../src/lib/rag/embeddings';
 import {
-  CORRECTION_RE, HAS_CORRECTION, MENTIONS_DAYS, SHIPPING_CONTEXT, rewriteDeliveryTime as rewrite,
+  CORRECTION_RE, HAS_CORRECTION, MENTIONS_DAYS, rewriteDeliveryTime as rewrite, unrecognisedDayCount,
 } from './lib/delivery-eta';
 import crypto from 'crypto';
 
@@ -139,22 +139,22 @@ async function updateConfig(brand: Brand) {
   const changes: string[] = [];
 
   // 1. widget FAQ — the answer a customer reads without the model in the loop.
+  // Each brand answers this in its own words, naming its own carrier (Focus for
+  // LA BEAUTÉ, an SMS for STUDIO PASHA), so the number is moved inside the answer
+  // they already have. The canned answer is only for a brand that has none.
   const faq = config?.widget?.prompt?.faq;
   if (Array.isArray(faq)) {
+    let answersDelivery = false;
     for (const entry of faq) {
       if (typeof entry?.answer !== 'string') continue;
-      if (entry.question === FAQ_Q) continue; // handled below, in full
       const next = rewriteDeliveryTime(entry.answer);
       if (next !== entry.answer) {
         changes.push(`widget.prompt.faq "${entry.question}": "${entry.answer}" → "${next}"`);
         entry.answer = next;
       }
+      if (new RegExp(`${DAYS} ימי עסקים`).test(entry.answer)) answersDelivery = true;
     }
-    const entry = faq.find((e: { question?: string }) => e?.question === FAQ_Q);
-    if (entry && entry.answer !== FAQ_A) {
-      changes.push(`widget.prompt.faq "${FAQ_Q}": "${entry.answer}" → "${FAQ_A}"`);
-      entry.answer = FAQ_A;
-    } else if (!entry) {
+    if (!answersDelivery) {
       faq.push({ question: FAQ_Q, answer: FAQ_A });
       changes.push(`widget.prompt.faq += "${FAQ_Q}"`);
     }
@@ -250,10 +250,14 @@ async function upsertPolicyChunk(brand: Brand) {
   const { data: maxRow } = await supabase
     .from('document_chunks').select('chunk_index').eq('document_id', brand.policyDocId)
     .order('chunk_index', { ascending: false }).limit(1).maybeSingle();
-  const { error } = await supabase.from('document_chunks')
-    .insert({ ...row, chunk_index: (maxRow?.chunk_index ?? -1) + 1 });
+  // Return the new id: the stale-chunk scan below excludes the canonical chunk by id,
+  // and this text lists the superseded numbers ("3, 5 או 7 ימי עסקים") on purpose —
+  // without the id it reports its own insert as an unrecognised day count.
+  const { data: inserted, error } = await supabase.from('document_chunks')
+    .insert({ ...row, chunk_index: (maxRow?.chunk_index ?? -1) + 1 })
+    .select('id').single();
   if (error) throw new Error(`${brand.label}: chunk insert failed: ${error.message}`);
-  return undefined;
+  return inserted?.id as string | undefined;
 }
 
 // ------------------------------------------------------- 5-6. everything else
@@ -277,8 +281,8 @@ async function fixStaleChunks(brand: Brand, canonicalId?: string) {
       const text = rewriteDeliveryTime(c.chunk_text).replace(CORRECTION_RE, CORRECTION);
       if (text !== c.chunk_text) {
         updates.push({ id: c.id, text, kind: `${c.entity_type} rewrite` });
-      } else if (MENTIONS_DAYS.test(c.chunk_text) && !new RegExp(`${DAYS} ימי`).test(c.chunk_text)) {
-        // Names days in a shape the anchored patterns do not cover — do not guess.
+      } else if (unrecognisedDayCount(c.chunk_text, DAYS)) {
+        // Counts days in a shape the anchored patterns do not cover — do not guess.
         unhandled.push(c.id);
       }
       continue;
@@ -293,7 +297,7 @@ async function fixStaleChunks(brand: Brand, canonicalId?: string) {
       }
       continue;
     }
-    if (MENTIONS_DAYS.test(c.chunk_text) && SHIPPING_CONTEXT.test(c.chunk_text)) {
+    if (MENTIONS_DAYS.test(c.chunk_text) && /משלוח|שילוח|החבילה|אספקה/.test(c.chunk_text)) {
       updates.push({
         id: c.id,
         text: `${c.chunk_text}\n\n${CORRECTION}`,
