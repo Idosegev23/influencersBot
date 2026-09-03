@@ -22,7 +22,8 @@
     "backup:migrations": "./scripts/backup-migrations.sh",
     "backup:all": "./scripts/backup-all.sh",
     "precommit": "./scripts/build-and-check.sh",
-    "cs:products-e2e": "npx tsx --tsconfig tsconfig.json scripts/cs-products-e2e.ts"
+    "cs:products-e2e": "npx tsx --tsconfig tsconfig.json scripts/cs-products-e2e.ts",
+    "cs:bind-e2e": "npx tsx --tsconfig tsconfig.json scripts/cs-brand-bind-e2e.ts"
   },
   "dependencies": {
     "@google/genai": "^1.38.0",
