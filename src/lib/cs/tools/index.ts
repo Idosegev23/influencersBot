@@ -110,17 +110,63 @@ const listOpenThreadsTool: CsTool = {
   },
 };
 
+// accounts.id is a uuid column: anything else reaches PostgREST as 400/22P02, never a row.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function normRef(s: string): string {
+  return (s || '').toLowerCase().replace(/https?:\/\//g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+// The brain is told to pass the roster's accountId, but the shared number must not go dark when it
+// passes the NAME instead — which is exactly what happened for six weeks (see bind_brand below).
+// So a non-uuid ref is resolved HERE, mechanically, the same way harvestContact reads a typed phone
+// rather than trusting the brain to call remember_contact. EXACT normalized match only, and only
+// against the CS-enabled roster: fuzzy narrowing stays resolve_brand's job (with the shopper
+// confirming), and this can never bind a brand bind_brand was not already allowed to bind.
+async function accountIdFromExactRef(ref: string): Promise<string | null> {
+  try {
+    const { listCsEnabledBrands } = await import('@/lib/cs/brand-resolver');
+    const want = normRef(ref);
+    if (!want) return null;
+    const hits = (await listCsEnabledBrands()).filter((b) =>
+      [b.displayName, b.username, b.domain, b.domain?.replace(/\.[a-z.]+$/i, '')]
+        .some((v) => v && normRef(v) === want));
+    const ids = Array.from(new Set(hits.map((h) => h.accountId)));
+    return ids.length === 1 ? ids[0] : null; // ambiguous → refuse, never guess between tenants
+  } catch (e) { console.warn('[cs-tools] exact-ref brand resolution failed', e); return null; }
+}
+
 const bindBrandTool: CsTool = {
   def: { type: 'function', function: {
     name: 'bind_brand',
     description: 'Bind the conversation to a brand AFTER the shopper confirms in free text (e.g. replies "כן"/"נכון" to your prose confirmation) — never call this before a confirmation. Validates the brand is CS-enabled, opens/attaches its support ticket, and scopes ALL later reads to it.',
-    parameters: { type: 'object', properties: { accountId: { type: 'string' } }, required: ['accountId'] },
+    parameters: { type: 'object', properties: { accountId: { type: 'string', description: "The brand's accountId — a uuid, copied verbatim from the available-brands roster in your instructions or from resolve_brand's output. NEVER the display name or the domain." } }, required: ['accountId'] },
   } },
   async handler(args, ctx): Promise<CsToolResult> {
-    const accountId = String(args?.accountId || '');
-    if (!accountId) return { ok: false, data: { reason: 'missing_accountId' } };
+    const ref = String(args?.accountId || '');
+    if (!ref) return { ok: false, data: { reason: 'missing_accountId' } };
+    const accountId = UUID_RE.test(ref) ? ref : (await accountIdFromExactRef(ref)) || '';
+    if (!accountId) return { ok: false, data: {
+      reason: 'invalid_account_id',
+      hint: 'That is not an accountId and it does not exactly name one brand. Call resolve_brand with what the shopper said, confirm the match with them in prose, and pass the accountId resolve_brand returned.',
+    } };
     // GATE: only CS-enabled brands may be bound (prevents wrong-brand data leakage).
-    const { data: acct } = await supabaseAdmin.from('accounts').select('id, config').eq('id', accountId).single();
+    const { data: acct, error } = await supabaseAdmin.from('accounts').select('id, config').eq('id', accountId).single();
+    // A MALFORMED ARGUMENT IS NOT A POLICY VERDICT. accounts.id is a uuid column, so a brand NAME or
+    // DOMAIN here makes PostgREST answer 400/22P02 and never a row. Discarding `error` collapsed that
+    // into `brand_not_cs_enabled` — the brain, told a brand the prompt had just listed as available
+    // was "not enabled", concluded the connection was broken ("נראה שיש תקלה בחיבור ל-ARGANIA GROUP"),
+    // promised a human, and bound nothing. Separated so the brain can actually recover.
+    // PGRST116 = "no rows" from .single(); a genuinely unknown id, not a bad one.
+    if (error && error.code !== 'PGRST116') {
+      console.warn('[cs-tools] bind_brand lookup failed', accountId, error);
+      return { ok: false, data: {
+        reason: 'invalid_account_id',
+        hint: 'That is not an accountId. Call resolve_brand with the brand name the shopper said and bind_brand with the accountId it returns — never the display name or the domain.',
+      } };
+    }
+    if (!acct) return { ok: false, data: {
+      reason: 'unknown_account',
+      hint: 'No brand has that accountId. Call resolve_brand and use an accountId it returns.',
+    } };
     const cfg = (acct as any)?.config || {};
     if (cfg?.whatsapp_cs?.enabled !== true) return { ok: false, data: { reason: 'brand_not_cs_enabled' } };
     const { openOrAttachCsTicket } = await import('@/lib/cs/cs-ticket'); // Phase D (D1)
@@ -226,7 +272,14 @@ const escalateTool: CsTool = {
     },
   } },
   async handler(args, ctx): Promise<CsToolResult> {
-    if (!ctx.chatSessionId || !ctx.accountId) return { ok: false, data: { reason: 'not_bound' } };
+    // Unbound there is no brand to notify — runCsHandoffCheck needs an accountId, so NOTHING is
+    // filed. A bare `not_bound` read to the brain as "done", and it promised a callback anyway:
+    // פנינה (03/09) and דנה כחלון (25/08) were both told a human would return, and neither has a
+    // single ticket. The refusal has to say what to do and forbid the promise.
+    if (!ctx.chatSessionId || !ctx.accountId) return { ok: false, data: {
+      reason: 'not_bound',
+      hint: 'NOTHING was filed and no human was notified — do NOT promise the shopper a callback. Identify the brand first (resolve_brand, then bind_brand with the accountId it returns) and call escalate_to_human again. If the brand they name is genuinely not one we serve, say so plainly instead of promising a human.',
+    } };
     const reason = String(args?.reason || '').slice(0, 200);
 
     // THE GATE. On a channel that carries no contact details, handing off without any means a

@@ -118,12 +118,18 @@ export async function buildCsSystemPrompt(input: {
     // Brain-led brand matching: hand the LLM the CS-enabled roster directly so it can match
     // "ארגן"→Argania, "פאשה"→Studio Pasha, typos, Hebrew/English straight from context — resolve_brand
     // is then mainly needed once the roster is too large to inline (large-scale narrowing).
+    // The accountId is part of the line, not decoration: this roster is what the brain binds FROM,
+    // and bind_brand takes a uuid. Printing only `name — domain` while instructing "then call
+    // bind_brand" left the uuid reachable solely through resolve_brand — which this list makes look
+    // optional — so the brain bound with "ARGANIA GROUP", accounts.id rejected it as malformed, and
+    // 103 shared-number conversations never bound at all (פנינה, דנה כחלון; 2026-07-22 → 2026-09-03).
     try {
       const brands = await listCsEnabledBrands();
       if (brands.length) {
         lines.push('\n--- מותגים זמינים שאת/ה משרת/ת (בחר/י את זה שהלקוח/ה מתכוון/ת אליו, אשר/י בפרוזה, ואז קרא/י ל-bind_brand; אם הרשימה גדולה מדי / הלקוח/ה מזכיר/ה משהו שלא כאן — הישענ/י על resolve_brand) ---');
+        lines.push('כל שורה: שם — אתר — accountId. ל-bind_brand מעבירים את ה-accountId בדיוק כפי שהוא כתוב כאן, לעולם לא את השם או את כתובת האתר.');
         for (const b of brands.slice(0, MAX_INLINE)) {
-          lines.push(`${b.displayName} — ${b.domain || b.username || '—'}`);
+          lines.push(`${b.displayName} — ${b.domain || b.username || '—'} — accountId: ${b.accountId}`);
         }
       }
     } catch { /* brand roster optional — resolve_brand tool still covers this if the fetch fails */ }

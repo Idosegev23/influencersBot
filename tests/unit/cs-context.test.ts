@@ -164,4 +164,25 @@ describe('cs-context', () => {
     const p = await buildCsSystemPrompt({ accountId: 'acc-1', userMessage: 'אני רוצה נציג', digest: digest({ boundBrand: 'Argania', hasContactRoute: true }) });
     expect(p).not.toContain('remember_contact');
   });
+  // ROOT CAUSE of the 2026-09-03 shared-number failure. The roster told the brain "pick one, then
+  // call bind_brand" while printing only `name — domain`. bind_brand takes an accountId (uuid), and
+  // the ONLY place a uuid appeared was resolve_brand's output — which the roster made look optional.
+  // So the brain bound with "ARGANIA GROUP", PostgREST rejected it, and no conversation ever bound.
+  // Every roster line must carry the exact value bind_brand accepts.
+  it('unbound roster carries each brand accountId — the value bind_brand actually takes', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'ארגניה', digest: digest() });
+    const line = (name: string) => p.split('\n').find((l) => l.startsWith(name));
+    expect(line('Argania')).toContain('acc-argania');
+    expect(line('Argania')).toContain('argania-oil.co.il'); // the human-readable half survives
+    expect(line('LA BEAUTÉ')).toContain('acc-labeaute');
+  });
+
+  it('unbound prompt tells the brain to pass the roster accountId verbatim to bind_brand', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'ארגניה', digest: digest() });
+    expect(p).toMatch(/accountId/);
+    expect(p).toMatch(/bind_brand/);
+  });
+
 });
