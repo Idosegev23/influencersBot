@@ -119,9 +119,10 @@ export function buildDemoConfig(startedAt: Date = new Date()): DemoConfig {
  * demo that still has days left ADDS to it rather than silently shortening it
  * to seven days from today.
  *
- * `locked_at` is cleared so the watch cron can announce the new end when it
- * arrives; without that, an extended-then-re-expired demo would lock in
- * silence and nobody would know to follow up.
+ * `locked_at` is cleared so an extended demo does not read as already closed.
+ * Nothing stamps it any more — the cron that did was removed with the live
+ * WhatsApp moments on 2026-09-03 — but the field is still carried so old rows
+ * keep their shape, and the weekly digest derives lock state from `ends_at`.
  */
 export function extendDemoWindow(
   demo: Partial<DemoConfig> | null | undefined,

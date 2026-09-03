@@ -177,6 +177,12 @@ reaches three people and email reaches five. Adding them later is a constant cha
 
 ### 4.8 Usage visibility
 
+> **Superseded 2026-09-03 — `demo-watch` was removed.** The live WhatsApp moments below no longer
+> exist: the route is deleted, its cron entry is gone from `vercel.json`, and nothing stamps
+> `first_open_at` / `first_chat_at` / `locked_at` any more (the fields are still carried on existing
+> rows). The weekly digest is the only demo report. The section is kept because it explains why the
+> stamps are in the config shape. The **lead** WhatsApp in §4.7 / `/api/demo/lead` is unaffected.
+
 **`/api/cron/demo-watch`, every 15 minutes.** Sweeps accounts with `config.demo` and no `locked_at`,
 joins `chat_sessions` / `chat_messages` by `account_id`, and fires each moment **once**, stamped into
 `config.demo` so a crash or a re-run cannot double-send:
@@ -192,22 +198,26 @@ chat request adds latency to a prospect's reply and gives a Meta API failure a w
 Locking itself needs no cron — `resolveDemoAccess` derives it from `ends_at` — the cron only
 *notifies* and stamps.
 
-**`/api/cron/demo-digest`, daily 08:00 Israel (`0 5 * * *` UTC).** One email to the five, covering
-every account with an unlocked `config.demo`: sessions, messages, time on page, days remaining, and
-then the **verbatim transcripts** of the last 24 hours — what they asked, what the bot answered.
-This doubles as the only mechanism by which we would notice the bot answering badly on a brand we
-are mid-negotiation with.
+**`/api/cron/demo-digest`, weekly Sunday 08:00 Israel (`0 5 * * 0` UTC)** — daily until 2026-09-03,
+when the cadence was cut to once a week for every demo. One email to the five, covering each account
+with a `config.demo` that is open (or that locked within the past week): sessions, messages, days
+remaining, and then the **verbatim transcripts of the last seven days** — what they asked, what the
+bot answered. This is the only mechanism by which we would notice the bot answering badly on a brand
+we are mid-negotiation with, and since the removal of `demo-watch` it is the only demo report at all.
 
-Both crons authenticate with `CRON_SECRET` bearer, matching every other cron in `vercel.json`.
-Two new entries brings the project to 35 crons; Vercel Pro allows 40, so this fits but the headroom
-is worth noting.
+Recently-locked demos are included exactly once so the transcripts of a demo's final days are not
+binned between two Sunday runs — the only other place they surface is the lead email, and that one
+needs the prospect to fill in the form. Lock state comes from `resolveDemoAccess().endsAt`, not from
+a stamp, so it survived the removal of the cron that used to write one.
+
+The cron authenticates with `CRON_SECRET` bearer, matching every other cron in `vercel.json`.
 
 ### 4.9 Admin
 
 `/admin/accounts` gains a days-remaining indicator on demo rows and an **הארך בשבוע** action writing
 `config.demo.extended_to`. Sales reality: a meeting lands on day 9 and the demo cannot die on day 7.
-Extending a locked demo also clears `locked_at`, so the lock notification can fire again on the new
-end date.
+Extending a locked demo also clears `locked_at` so it does not read as closed; since 2026-09-03 no
+notification depends on that field.
 
 ---
 
@@ -222,9 +232,9 @@ demo scan finishes
        │                            ├─ expiring  → amber countdown + normal chat
        │                            └─ locked    → DemoLockedScreen, APIs 403
        │
-       ├─ cron/demo-watch (*/15) ──► first_open / first_chat / locked → WhatsApp ×3
-       │
-       ├─ cron/demo-digest (daily) ─► transcripts + counters → email ×5
+       ├─ cron/demo-digest (Sun) ──► transcripts + counters → email ×5
+       │                              (weekly since 2026-09-03; cron/demo-watch
+       │                               and its ×3 WhatsApp moments were removed)
        │
        └─ "צרו איתי קשר" ──► /api/demo/lead
                                 ├─ support_requests row (demo_expired_lead)

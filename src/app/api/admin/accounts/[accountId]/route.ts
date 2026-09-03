@@ -57,9 +57,8 @@ export async function PATCH(
     //
     // Measured from whichever is later — now, or the current end — so extending
     // a demo that still has days left adds to it rather than shortening it.
-    // Clearing `locked_at` lets the watch cron announce the new end date when it
-    // arrives; without that, an extended-then-re-expired demo would lock in
-    // silence.
+    // `extendDemoWindow` also clears `locked_at` so the reopened demo does not
+    // read as closed; the weekly digest derives lock state from the dates.
     if (body.extendDemoWeek === true && currentConfig.demo) {
       const extended = extendDemoWindow(currentConfig.demo);
       if (extended) updatedConfig.demo = extended;

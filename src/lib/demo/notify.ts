@@ -3,16 +3,18 @@
  *
  * Two channels, split by what each is good at:
  *
- *  - WhatsApp carries MOMENTS. Short, immediate, and only for things worth
- *    interrupting someone over: the demo was opened, somebody is really talking
- *    to it, the window closed. Reaches the three team members whose numbers are
- *    verified (Kfir, Ido, Yoav) via the same `SCAN_NOTIFY_RECIPIENTS` list the
- *    scan-complete notifications already use.
- *  - Email carries DEPTH. Full transcripts, counters, everything. Reaches all
- *    five of SALES_RECIPIENTS.
+ *  - Email carries EVERYTHING about how a demo is going. Full transcripts,
+ *    counters, days left — once a week, to all five of SALES_RECIPIENTS.
+ *  - WhatsApp carries ONE thing: a prospect whose demo ended asked us to call
+ *    them. That is a person waiting for a phone call, so it is worth
+ *    interrupting someone over. Reaches the three team members whose numbers
+ *    are verified (Kfir, Ido, Yoav) via the same `SCAN_NOTIFY_RECIPIENTS` list
+ *    the scan-complete notifications already use.
  *
- * The split is not cosmetic: a WhatsApp template body cannot hold a transcript,
- * and a daily email cannot tell you a prospect is on the page right now.
+ * There used to be a third stream: a 15-minute `demo-watch` cron firing a
+ * WhatsApp on first open / first real conversation / window closed. It was
+ * removed on 2026-09-03 — the interruptions were not wanted, and every one of
+ * those facts is legible in the weekly digest.
  */
 
 import { sendTemplate } from '@/lib/whatsapp-cloud/client';
