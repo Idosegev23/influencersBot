@@ -2816,6 +2816,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   initialProblemType={supportProblemParam}
                   initialCouponCode={supportCouponParam}
                   enableShipmentTracking={(influencer as any)?._rawConfig?.shipment_provider?.enabled === true}
+                  deliveryEtaDays={(influencer as any)?._rawConfig?.shipment_provider?.delivery_eta_business_days}
                   initialMode={supportInitialMode}
                   sessionId={sessionId}
                   refSource={refSourceRef.current}

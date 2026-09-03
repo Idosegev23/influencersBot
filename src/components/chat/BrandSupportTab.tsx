@@ -41,6 +41,13 @@ interface BrandSupportTabProps {
   /** Deep-link prefill: pre-select a coupon by its code (e.g. 'NOA') from a URL param. */
   initialCouponCode?: string | null;
   enableShipmentTracking?: boolean;
+  /**
+   * Order→delivery promise, in business days. Drives the "worth opening a ticket
+   * yet?" hint in the not-found panel, so it has to be the brand's own number
+   * (accounts.config.shipment_provider.delivery_eta_business_days) rather than a
+   * constant that contradicts what the bot and the site promise.
+   */
+  deliveryEtaDays?: number;
   initialMode?: 'support' | 'tracking';
   sessionId?: string | null;
   refSource?: string | null;
@@ -116,7 +123,7 @@ function iconFor(cat: string): string {
 /* ------------------------------------------------------------------ */
 
 export default function BrandSupportTab({
-  accountId, username, brandName, isMobile, coupons = [], initialDetails, initialProblemType, initialCouponCode, enableShipmentTracking, initialMode, sessionId, refSource, language,
+  accountId, username, brandName, isMobile, coupons = [], initialDetails, initialProblemType, initialCouponCode, enableShipmentTracking, deliveryEtaDays = 5, initialMode, sessionId, refSource, language,
 }: BrandSupportTabProps) {
   const isEn = (language || 'he').toLowerCase() === 'en';
   const t = isEn ? {
@@ -530,7 +537,7 @@ export default function BrandSupportTab({
                           <ul className="font-['Heebo:Regular',sans-serif] text-[13px] leading-[20px] text-[#7c2d12] pr-6 list-disc text-right space-y-1">
                             <li>ייתכן שההזמנה עוד לא יצאה מהמחסן — מקבלים מייל מ-Focus כשהיא יוצאת.</li>
                             <li>בדקי שהמספר נכון מאישור הרכישה (או מהמייל של Focus, אם כבר קיבלת).</li>
-                            <li>אם עברו מעל 5 ימי עסקים, אפשר לפתוח פנייה דרך טאב "תמיכה" ונבדוק.</li>
+                            <li>אם עברו מעל {deliveryEtaDays} ימי עסקים, אפשר לפתוח פנייה דרך טאב "תמיכה" ונבדוק.</li>
                           </ul>
                         </div>
                       </div>
