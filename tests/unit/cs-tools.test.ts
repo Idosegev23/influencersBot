@@ -229,7 +229,7 @@ describe('CS tools', () => {
   // Same styled-unicode trap, on the path bind_brand uses when the brain sends a name. The brand
   // this bit is LA BEAUTÉ, whose shoppers were reaching the shared number 51 times over.
   it('bind_brand: resolves a brand whose stored name is styled unicode (𝐋𝐀 𝐁𝐄𝐀𝐔𝐓𝐄) from what a shopper types', async () => {
-    const styled = '\u{1D40B}\u{1D400} \u{1D401}\u{1D404}\u{1D400}\u{1D42E}\u{1D413}\u{1D404}';
+    const styled = '\u{1D40B}\u{1D400} \u{1D401}\u{1D404}\u{1D400}\u{1D414}\u{1D413}\u{1D404}';
     listCsEnabledBrands.mockResolvedValue([
       { accountId: ACC, displayName: styled, username: 'labeaute.israel', domain: 'labeauteisrael.co.il' },
     ]);

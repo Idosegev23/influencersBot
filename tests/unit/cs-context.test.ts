@@ -12,6 +12,10 @@ vi.mock('@/lib/chatbot/hybrid-retrieval', () => ({
 // CS-enabled brands the unbound prompt should inject (brain-led matching, task C5). Also backs the
 // single-row account lookup buildContextDigest would use for boundBrand (unused by these tests, but
 // harmless to keep working).
+// The bound account's config, swappable per test — an orders provider changes what the prompt is
+// allowed to tell the model to do.
+let BOUND_CONFIG: any = { display_name: 'Argania', integrations: { quickshop: { api_key: 'k' } } };
+
 const ENABLED_ROWS = [
   { id: 'acc-argania', config: { username: 'argania', display_name: 'Argania', whatsapp_cs: { enabled: true }, widget: { domain: 'argania-oil.co.il' } } },
   { id: 'acc-labeaute', config: { username: 'labeaute', display_name: 'LA BEAUTÉ', whatsapp_cs: { enabled: true }, domain: 'labeaute.co.il' } },
@@ -23,7 +27,7 @@ vi.mock('@/lib/supabase', () => ({
       ctx.select = () => ctx;
       ctx.eq = () => ctx;
       ctx.filter = () => ctx;
-      ctx.single = async () => ({ data: { config: { display_name: 'Argania' } } });
+      ctx.single = async () => ({ data: { config: BOUND_CONFIG } });
       ctx.then = (resolve: any) => resolve({ data: ENABLED_ROWS, error: null });
       return ctx;
     },
@@ -183,6 +187,29 @@ describe('cs-context', () => {
     const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'ארגניה', digest: digest() });
     expect(p).toMatch(/accountId/);
     expect(p).toMatch(/bind_brand/);
+  });
+
+  // buildCsToolset already withholds lookup_order from a brand with no orders provider — but the
+  // core prompt still described the phone-verification flow unconditionally. Bound to LA BEAUTÉ
+  // (no QuickShop/Shopify), the live model asked 6/6 for "the phone the order was placed with",
+  // for a lookup it has no tool to perform: a dead end that ends in silence, which is the same
+  // shape as the bug this whole thread is about. The prompt must match the toolset.
+  it('a brand with NO orders provider is told it cannot check orders, and not to collect verification', async () => {
+    BOUND_CONFIG = { display_name: 'LA BEAUTE', integrations: {} };
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: 'acc-lb', userMessage: 'איפה ההזמנה שלי?', digest: digest({ boundBrand: 'LA BEAUTE' }) });
+    expect(p).toMatch(/אין .*גישה|לא ניתן לבדוק הזמנות/);
+    expect(p).toMatch(/escalate_to_human/);
+    // The verification instruction is what produced the dead end — it must be gone for this brand.
+    expect(p).not.toMatch(/lookup_order/);
+  });
+
+  it('a brand WITH an orders provider keeps the phone-verification instruction', async () => {
+    BOUND_CONFIG = { display_name: 'Argania', integrations: { quickshop: { api_key: 'k' } } };
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: 'acc-argania', userMessage: 'איפה ההזמנה שלי?', digest: digest({ boundBrand: 'Argania' }) });
+    expect(p).toMatch(/lookup_order/);
+    expect(p).not.toMatch(/לא ניתן לבדוק הזמנות/);
   });
 
 });

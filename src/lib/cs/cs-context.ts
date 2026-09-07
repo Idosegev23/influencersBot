@@ -80,9 +80,31 @@ export async function buildCsSystemPrompt(input: {
   digest: CsContextDigest;
 }): Promise<string> {
   const { accountId, userMessage, digest } = input;
+  // The account's config is read ONCE and reused: the orders/products guidance below and the
+  // toolset must be cut by the same facts, or the prompt describes a flow that has no tool.
+  let boundConfig: any = null;
+  if (accountId) {
+    try {
+      const { data } = await supabaseAdmin.from('accounts').select('config').eq('id', accountId).single();
+      boundConfig = (data as any)?.config || {};
+    } catch { /* config optional — every use below treats null as "no capability" */ }
+  }
+  const { hasOrdersProvider } = await import('@/lib/cs/tools/registry');
+  const canCheckOrders = Boolean(boundConfig) && hasOrdersProvider(boundConfig);
+
   const lines: string[] = [];
   lines.push('את/ה Bestie — שירות הלקוחות של המותגים בוואטסאפ. דבר/י בעברית, בגובה העיניים, קצר וברור, בקול המותג.');
-  lines.push('כללי ליבה: אל תמציא/י פרטי הזמנה או מדיניות — השתמש/י בכלים (tools). אל תחשוף/י פרטי הזמנה לפני אימות טלפון (הכלי lookup_order עושה זאת). אם אינך יכול/ה לעזור או שהלקוח/ה מבקש/ת אדם — הפעל/י escalate_to_human.');
+  // Pre-bind the brand is unknown, so the order rules stay general. Once bound they must match the
+  // toolset buildCsToolset() actually handed over.
+  if (!accountId || canCheckOrders) {
+    lines.push('כללי ליבה: אל תמציא/י פרטי הזמנה או מדיניות — השתמש/י בכלים (tools). אל תחשוף/י פרטי הזמנה לפני אימות טלפון (הכלי lookup_order עושה זאת). אם אינך יכול/ה לעזור או שהלקוח/ה מבקש/ת אדם — הפעל/י escalate_to_human.');
+  } else {
+    // LA BEAUTÉ, 2026-09-07: with no orders provider the model still asked 6/6 for "the phone the
+    // order was placed with" — collecting verification for a lookup it cannot run, which ends in
+    // silence exactly like the hand-off that filed nothing.
+    lines.push('כללי ליבה: אל תמציא/י פרטי הזמנה או מדיניות — השתמש/י בכלים (tools). אם אינך יכול/ה לעזור או שהלקוח/ה מבקש/ת אדם — הפעל/י escalate_to_human.');
+    lines.push('חשוב — למותג הזה אין חיבור למערכת ההזמנות, ולכן לא ניתן לבדוק הזמנות, סטטוס משלוח או פרטי הזמנה בשיחה הזו. אם הלקוח/ה שואל/ת על הזמנה: אל תבקש/י מספר הזמנה ואל תבקש/י טלפון לאימות — זה לא יוביל לשום מקום. אמר/י בכנות ובקצרה שאין לך גישה לפרטי ההזמנה, והפעל/י מיד escalate_to_human כדי שנציג/ה אנושי/ת יבדקו ויחזרו.');
+  }
   lines.push('כשמסלימים לאדם (escalate_to_human): מיד באותו תור כתב/י הודעת סיום קצרה, חמה ואמפתית — הכר/י בבעיה, התנצל/י אם זו תלונה/נזק, והבטח/י שנציג/ה אנושי/ת יחזרו בהקדם. לעולם אל תשאיר/י את הלקוח/ה בשתיקה אחרי הסלמה.');
   if (!digest.hasContactRoute) {
     // Without this the hand-off is a promise nobody can keep: the ticket reaches the brand with no
@@ -166,8 +188,7 @@ export async function buildCsSystemPrompt(input: {
     // Product cards are per-brand opt-in, and so is the guidance: a brand with cards switched off
     // must not get a prompt telling Bestie to reach for tools that will only refuse.
     try {
-      const { data: acct } = await supabaseAdmin.from('accounts').select('config').eq('id', accountId).single();
-      if ((acct as any)?.config?.whatsapp_cs?.products_enabled === true) {
+      if (boundConfig?.whatsapp_cs?.products_enabled === true) {   // reuses the single config read above
         lines.push(
           '\n--- כרטיסי מוצר ---\n' +
           'כשהלקוח/ה מתעניין/ת במוצר, שואל/ת מה מתאים לו/ה, או מבקש/ת לראות מה יש — קרא/י ל-search_products עם מה שהוא/היא תיאר/ה במילים שלו/ה. ' +

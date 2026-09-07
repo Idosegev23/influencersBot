@@ -26,7 +26,9 @@ const PRODUCT_TOOLS = new Set(['search_products', 'show_products']);
 const GOV_ALLOWED = new Set(['remember_name', 'remember_contact', 'escalate_to_human']); // RAG answers come from the system prompt, not a tool
 const NON_BRAND_ALLOWED = new Set(['remember_name', 'remember_contact', 'list_open_threads', 'open_or_attach_ticket', 'escalate_to_human']);
 
-function hasOrdersProvider(config: any): boolean {
+// Exported so the PROMPT can be cut the same way the TOOLSET is. Availability decided in two
+// places by two different rules is how a brand ends up being told to run a flow it has no tool for.
+export function hasOrdersProvider(config: any): boolean {
   const i = config?.integrations || {};
   return Boolean(i?.shopify?.admin_api_token || i?.quickshop?.api_key);
 }

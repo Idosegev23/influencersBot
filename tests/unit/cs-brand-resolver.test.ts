@@ -149,7 +149,7 @@ describe('brand-resolver (brain-led)', () => {
   // folds them to ASCII (and folds É→E while it is there).
   it('matches a brand whose stored name uses styled unicode letters (𝐋𝐀 𝐁𝐄𝐀𝐔𝐓𝐄) and accents', async () => {
     const { trigramSimilarity } = await import('@/lib/cs/brand-resolver');
-    const styled = '\u{1D40B}\u{1D400} \u{1D401}\u{1D404}\u{1D400}\u{1D42E}\u{1D413}\u{1D404}';
+    const styled = '\u{1D40B}\u{1D400} \u{1D401}\u{1D404}\u{1D400}\u{1D414}\u{1D413}\u{1D404}';
     expect(trigramSimilarity(styled, 'LA BEAUTE')).toBe(1);
     expect(trigramSimilarity('LA BEAUTÉ', 'LA BEAUTE')).toBe(1);
     // Presence assertion beside the equality: a matcher that returned 1 for everything would also
