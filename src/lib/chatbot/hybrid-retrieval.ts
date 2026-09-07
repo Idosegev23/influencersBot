@@ -14,7 +14,7 @@ import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
 
 export interface ContentMetadata {
   id: string;
-  type: 'post' | 'transcription' | 'highlight' | 'story' | 'coupon';
+  type: 'post' | 'transcription' | 'highlight' | 'story' | 'coupon' | 'document';
   title: string; // Short preview
   date: string;
   relevanceScore?: number;
@@ -22,7 +22,7 @@ export interface ContentMetadata {
 
 export interface DetailedContent {
   id: string;
-  type: 'post' | 'transcription' | 'highlight' | 'story';
+  type: 'post' | 'transcription' | 'highlight' | 'story' | 'document';
   fullContent: string;
   metadata: any;
 }
@@ -32,6 +32,7 @@ export interface RetrievalRequest {
   transcriptions?: string[];
   highlights?: string[];
   stories?: string[];
+  documents?: string[]; // document_chunks ids — site pages, policies, uploaded files
 }
 
 // ============================================
@@ -84,7 +85,7 @@ export async function searchContentByQuery(
   if (searchResults && searchResults.length > 0) {
     metadata.push(...searchResults.map((r: any) => ({
       id: r.id,
-      type: r.content_type as 'post' | 'transcription',
+      type: r.content_type as ContentMetadata['type'],
       title: truncate(r.content_text, 150),
       date: r.created_at,
       relevanceScore: r.relevance,
@@ -209,6 +210,26 @@ export async function fetchDetailedContent(
     }
   }
 
+  // Fetch requested document chunks (site pages, policies, uploaded files). Stage 1 only shows a
+  // 150-char preview, and a shipping or returns answer rarely fits in 150 characters — without this
+  // the model could see the right chunk listed and had no way to read it.
+  if (request.documents && request.documents.length > 0) {
+    const { data: chunks } = await supabase
+      .from('document_chunks')
+      .select('id, chunk_text, entity_type, topic, created_at')
+      .eq('account_id', accountId)
+      .in('id', request.documents);
+
+    if (chunks) {
+      detailed.push(...chunks.map(c => ({
+        id: c.id,
+        type: 'document' as const,
+        fullContent: c.chunk_text,
+        metadata: c,
+      })));
+    }
+  }
+
   // Fetch requested stories (with transcription if video)
   if (request.stories && request.stories.length > 0) {
     const { data: stories } = await supabase
@@ -261,8 +282,13 @@ function formatPostContent(post: any): string {
 // ============================================
 
 export function formatMetadataForAI(metadata: ContentMetadata[]): string {
+  // Nothing retrieved must produce NOTHING. The fixed preamble below used to be emitted regardless,
+  // so every caller asking "did we find knowledge?" by testing this string got yes for zero hits —
+  // cs-context.ts pushed a "--- ידע רלוונטי מהמותג (RAG) ---" header over an empty body for months.
+  if (!metadata.length) return '';
+
   let prompt = '📋 **תוכן זמין (metadata בלבד):**\n\n';
-  
+
   const postsMeta = metadata.filter(m => m.type === 'post');
   const transcriptionsMeta = metadata.filter(m => m.type === 'transcription');
   const highlightsMeta = metadata.filter(m => m.type === 'highlight');
@@ -307,6 +333,27 @@ export function formatMetadataForAI(metadata: ContentMetadata[]): string {
       prompt += `${i + 1}. ${c.title}\n`;
     });
     prompt += '\n';
+  }
+
+  // Site pages, policy docs and uploaded files. This is where shipping, delivery times and returns
+  // actually live — captions never discuss them — so a service question retrieved nothing usable
+  // until document_chunks joined search_all_content (migration 090).
+  const documentsMeta = metadata.filter(m => m.type === 'document');
+  if (documentsMeta.length > 0) {
+    prompt += `📄 **מידע מהאתר והמסמכים (${documentsMeta.length}):**\n`;
+    documentsMeta.slice(0, 30).forEach((d, i) => {
+      prompt += `${i + 1}. [ID: ${d.id}] ${d.title}\n`;
+    });
+    prompt += '\n';
+  }
+
+  // Anything this function does not know how to render is retrieved and then thrown away. If a new
+  // content_type is added to search_all_content, it MUST get a branch above.
+  const RENDERED = new Set(['post', 'transcription', 'highlight', 'story', 'coupon', 'document']);
+  const dropped = metadata.filter(m => !RENDERED.has(m.type));
+  if (dropped.length) {
+    console.warn('[Hybrid] retrieved content types with no renderer — dropped:',
+      Array.from(new Set(dropped.map(d => d.type))).join(', '));
   }
 
   prompt += `

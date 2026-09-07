@@ -35,7 +35,7 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'fetch_detailed_content',
-      description: 'שלוף תוכן מלא של פוסטים, תמלולים או הילייטס ספציפיים לפי ID. השתמש בזה אחרי שראית את ה-metadata וקבעת מה רלוונטי.',
+      description: 'שלוף תוכן מלא של פוסטים, תמלולים, הילייטס או קטעי מידע מהאתר/מסמכים לפי ID. השתמש בזה אחרי שראית את ה-metadata וקבעת מה רלוונטי. לשאלות על משלוח, זמני אספקה, החזרות ומדיניות — התשובה נמצאת במסמכים (documents), לא בפוסטים.',
       parameters: {
         type: 'object',
         properties: {
@@ -58,6 +58,11 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
             type: 'array',
             items: { type: 'string' },
             description: 'רשימת IDs של סטוריז לשליפה',
+          },
+          documents: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'רשימת IDs של קטעי מידע מהאתר/מסמכים לשליפה — שם נמצאים משלוח, זמני אספקה, החזרות ומדיניות',
           },
         },
         required: [],

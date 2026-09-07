@@ -241,13 +241,24 @@ async function main() {
     // The header alone is not evidence: formatMetadataForAI() returns a non-empty preamble for ZERO
     // hits, so `includes(header)` passed while the model was handed no knowledge at all. Measure the
     // retrieval itself, and report the count rather than a bare tick.
-    // A SENTENCE, deliberately — a bare keyword hides the failure that mattered. Retrieval used to
-    // return 0 here twice over: vectors were NULL (088), and then plainto_tsquery ANDed every word
-    // of the question with no stopword list under 'simple' (089).
-    const hits = await searchContentByQuery(b.accountId, 'יש לכם משהו לשיער יבש?');
-    check(`RAG retrieval returns content for a real shopper QUESTION (${hits.length} items)`, hits.length > 0,
-      hits.length ? '' : '← check migrations 088/089: search_vector populated + maintained by trigger, ' +
-        'and search_all_content ORing the question rather than ANDing it.');
+    // SENTENCES, deliberately — a bare keyword hid this failure three times over. Retrieval returned
+    // 0 because vectors were NULL (088); then because plainto_tsquery ANDed every word of the
+    // question with no stopword list under 'simple' (089); then, for service questions, because
+    // document_chunks was never searched at all (090). Both shapes are asserted: a CONTENT question
+    // that captions can answer, and a SERVICE question only the documents can.
+    for (const [q, kind] of [
+      ['יש לכם משהו לשיער יבש?', 'content'],
+      ['כמה עולה המשלוח ותוך כמה זמן זה מגיע?', 'service'],
+    ] as [string, string][]) {
+      const hits = await searchContentByQuery(b.accountId, q);
+      const kinds = Array.from(new Set(hits.map((h: any) => h.type))).join('+');
+      check(`RAG answers a ${kind} QUESTION (${hits.length} items: ${kinds || 'none'})`, hits.length > 0,
+        hits.length ? '' : '← check migrations 088/089/090');
+      if (kind === 'service') {
+        check('  …and the service answer comes from the documents, not just captions',
+          hits.some((h: any) => h.type === 'document'));
+      }
+    }
 
     // A hand-off with nobody on the other end is the failure this whole thread is about.
     const recips = await resolveRecipients(supabase, b.accountId, cfg.escalation);
