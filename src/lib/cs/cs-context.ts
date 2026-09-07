@@ -150,6 +150,16 @@ export async function buildCsSystemPrompt(input: {
       if (brands.length) {
         lines.push('\n--- מותגים זמינים שאת/ה משרת/ת (בחר/י את זה שהלקוח/ה מתכוון/ת אליו, אשר/י בפרוזה, ואז קרא/י ל-bind_brand; אם הרשימה גדולה מדי / הלקוח/ה מזכיר/ה משהו שלא כאן — הישענ/י על resolve_brand) ---');
         lines.push('כל שורה: שם — אתר — accountId. ל-bind_brand מעבירים את ה-accountId בדיוק כפי שהוא כתוב כאן, לעולם לא את השם או את כתובת האתר.');
+        // The roster is MATCHING MATERIAL, not a catalogue. Measured on the live model: asked
+        // "איזה מותגים יש לכם?" it recited every client by name — one brand's shopper being handed
+        // the list of everyone else we serve, and (once a QA account existed) told about that too.
+        // The confirm/disambiguate flows below stay allowed; only enumerating is forbidden.
+        lines.push(
+          'הרשימה הזו היא לשימושך הפנימי בלבד — כדי לזהות למי הלקוח/ה מתכוון/ת. לעולם אל תקריא/י אותה ואל תמנה/י מותגים שהלקוח/ה לא הזכיר/ה, ' +
+          'גם לא כשנשאלת ישירות ("איזה מותגים יש לכם?" / "עם מי אתם עובדים?") — אלה פרטים של לקוחותינו ולא מידע שאנחנו חולקים. ' +
+          'במקרה כזה ענה/י בקצרה שתשמח/י לעזור, ובקש/י את שם המותג או כתובת האתר שממנו הזמינו. ' +
+          'מותר ואף רצוי לאשר בפרוזה מותג יחיד שהלקוח/ה עצמו/ה הזכיר/ה, או לשאול בין 2-3 מועמדים קרובים כשמה שנאמר מתאים לכמה מהם.'
+        );
         for (const b of brands.slice(0, MAX_INLINE)) {
           lines.push(`${b.displayName} — ${b.domain || b.username || '—'} — accountId: ${b.accountId}`);
         }

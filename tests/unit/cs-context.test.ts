@@ -182,6 +182,28 @@ describe('cs-context', () => {
     expect(line('LA BEAUTÉ')).toContain('acc-labeaute');
   });
 
+  // Measured 2026-09-07 on the live model: asked "איזה מותגים יש לכם?", Bestie recited the whole
+  // client roster — "אנחנו מספקים שירות ל־STUDIO PASHA, LA BEAUTE, ARGANIA GROUP וגם לחשבון
+  // הבדיקות BESTIE QA". One brand's shopper should not be told who else we serve, and a test
+  // account should certainly not be announced. The roster is matching material, not a catalogue.
+  it('unbound prompt forbids reciting the roster, even when asked directly', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'איזה מותגים יש לכם?', digest: digest() });
+    expect(p).toMatch(/לשימושך הפנימי|אל תקריא|אל תמנה/);
+    expect(p).toMatch(/איזה מותגים יש לכם/); // the exact question is named so the rule is unmissable
+  });
+
+  // …without removing the ability to name a brand at all. Confirming one candidate and offering a
+  // choice between close ones is the whole disambiguation flow; a blanket "never say a brand name"
+  // would break it, and this test is what stops the fix above from going that far.
+  it('still allows confirming one brand in prose and choosing between close candidates', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'ארגניה', digest: digest() });
+    expect(p).toMatch(/אשר/);           // prose confirmation of a single match
+    expect(p).toMatch(/התכוונת ל/);      // clarifying question between close candidates
+    expect(p).toMatch(/resolve_brand/);
+  });
+
   it('unbound prompt tells the brain to pass the roster accountId verbatim to bind_brand', async () => {
     const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
     const p = await buildCsSystemPrompt({ accountId: null, userMessage: 'ארגניה', digest: digest() });
