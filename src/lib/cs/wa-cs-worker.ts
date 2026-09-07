@@ -155,21 +155,50 @@ async function csPauseState(job: CsJob): Promise<{ pausedNow: boolean }> {
   try {
     const { supabase } = await import('@/lib/supabase');
     const { data: chat } = await supabase
-      .from('chat_sessions').select('bot_paused_reason').eq('id', chatSessionId).maybeSingle();
+      .from('chat_sessions')
+      // bot_paused_at is what dates an ESCALATION pause: nobody has replied, so there is no
+      // human_last_reply_at to measure from and the clock has to run from the mute itself.
+      .select('bot_paused_reason, bot_paused_at').eq('id', chatSessionId).maybeSingle();
     const { data: acct } = session.active_account_id
       ? await supabase.from('accounts').select('config').eq('id', session.active_account_id).maybeSingle()
       : { data: null };
 
+    const reason: string | null = (chat as any)?.bot_paused_reason ?? null;
     const { shouldAutoResume, idleResumeHours } = await import('@/lib/handoff/auto-resume');
     const resume = shouldAutoResume(
-      { bot_paused_reason: (chat as any)?.bot_paused_reason ?? null,
-        human_last_reply_at: session.human_last_reply_at ?? null },
+      { bot_paused_reason: reason,
+        human_last_reply_at: session.human_last_reply_at ?? null,
+        bot_paused_at: (chat as any)?.bot_paused_at ?? null },
       idleResumeHours((acct as any)?.config),
     );
     if (!resume) return { pausedNow: true };
 
     const { resumeBot } = await import('@/lib/handoff/bot-pause');
     await resumeBot(chatSessionId);
+    console.warn('[cs-worker] pause expired, bot resumed', { chatSessionId, reason });
+
+    // An escalation that expired means a human was promised and never came. The shopper is about to
+    // get the bot back, which is better than silence but is NOT what they asked for — so nudge the
+    // brand again on the way past. Best-effort: the reply matters more than the notification.
+    if (reason && (reason.startsWith('escalate:') || reason.startsWith('handoff:')) && session.active_account_id) {
+      try {
+        const { runCsHandoffCheck } = await import('@/engines/escalation/dispatch');
+        await runCsHandoffCheck({
+          accountId: session.active_account_id,
+          chatSessionId,
+          ticketId: session.active_ticket_id ?? null,
+          waId: job.waId,
+          contactPhone: job.waId,
+          contactEmail: null,
+          userMessage: `תזכורת — הפנייה הוסלמה לנציג/ה לפני יותר מיממה ולא נענתה. הלקוח/ה כתב/ה שוב. סיבת ההסלמה המקורית: ${reason}`,
+          customerName: session.customer_name ?? null,
+          imageUrl: null,
+          force: true,
+        });
+      } catch (e) {
+        console.warn('[cs-worker] re-notify on expired escalation failed (bot resumed anyway)', e);
+      }
+    }
     return { pausedNow: false };
   } catch (e) {
     console.error('[cs-worker] pause is in force and expiry could not be evaluated — staying silent', e);
