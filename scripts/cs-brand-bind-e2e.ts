@@ -260,11 +260,19 @@ async function main() {
       }
     }
 
-    // A hand-off with nobody on the other end is the failure this whole thread is about.
+    // A hand-off with nobody on the other end is the failure this whole thread is about. A test
+    // account is the one case where that is deliberate — but it is still worth printing, because a
+    // demo brand on the shared number means a real shopper CAN reach a hand-off that notifies no one.
     const recips = await resolveRecipients(supabase, b.accountId, cfg.escalation);
-    check(`escalation is on and reaches someone (${recips.length} recipient(s))`,
-      cfg?.escalation?.enabled !== false && recips.length > 0,
-      `→ ${recips.map((r: any) => r.email || r.whatsapp).join(', ') || 'NOBODY'}`);
+    const off = cfg?.escalation?.enabled === false;
+    if (cfg?.isTestAccount && off) {
+      check('escalation is deliberately OFF (test account) — hand-offs here notify nobody', true,
+        '⚠ on the shared number, a real shopper who binds here gets no human');
+    } else {
+      check(`escalation is on and reaches someone (${recips.length} recipient(s))`,
+        !off && recips.length > 0,
+        `→ ${recips.map((r: any) => r.email || r.whatsapp).join(', ') || 'NOBODY'}`);
+    }
   }
 
   // The question LA BEAUTÉ's shoppers actually arrive with, against a brand that cannot look orders
