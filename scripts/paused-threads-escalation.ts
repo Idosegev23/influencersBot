@@ -16,7 +16,11 @@ import { config as loadEnv } from 'dotenv';
 loadEnv({ path: '.env.local' });
 
 const DRY_RUN = process.env.DRY_RUN !== 'false';
-const TEAM_CC = 'triroars@gmail.com';
+// NO internal CC. An escalation belongs to the brand it is about and to nobody else — copying our
+// own mailbox on a brand's customer list is a disclosure the brand never agreed to, and it puts one
+// brand's waiting customers in an inbox that also holds another's. Recipients come from that
+// account's own config.escalation.recipients, and only from there. (A CC was added on the first run
+// on 2026-09-07 and should not have been.)
 
 interface Row {
   brand: string; account_id: string; wa_id: string; name: string;
@@ -140,12 +144,12 @@ async function main() {
 
     const subject = `דחוף — ${list.length} לקוחות של ${brand} ממתינים למענה בוואטסאפ`;
     console.log(`\n=== ${brand}`);
-    console.log(`    to: ${to.join(', ')}  cc: ${TEAM_CC}`);
+    console.log(`    to: ${to.join(', ')}`);
     console.log(`    subject: ${subject}`);
     console.log(`    ${list.length} customers, ${active} active this week, oldest ${list[list.length - 1].days}d`);
 
     if (DRY_RUN) { console.log('    DRY RUN — not sent'); continue; }
-    const res = await sendEmail({ to, cc: TEAM_CC, subject, html });
+    const res = await sendEmail({ to, subject, html });
     console.log(`    ${res.success ? '✅ sent ' + res.messageId : '❌ ' + res.error}`);
   }
 
