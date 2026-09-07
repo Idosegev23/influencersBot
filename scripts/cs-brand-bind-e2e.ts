@@ -241,11 +241,13 @@ async function main() {
     // The header alone is not evidence: formatMetadataForAI() returns a non-empty preamble for ZERO
     // hits, so `includes(header)` passed while the model was handed no knowledge at all. Measure the
     // retrieval itself, and report the count rather than a bare tick.
-    const hits = await searchContentByQuery(b.accountId, 'כמה עולה המשלוח ותוך כמה זמן זה מגיע?');
-    check(`RAG retrieval returns content for a real shopper question (${hits.length} items)`, hits.length > 0,
-      hits.length ? '' : '← migration 033 was never applied to prod: no posts_search_vector_update trigger, ' +
-        'so instagram_posts.search_vector is NULL on every row and search_all_content can never match. ' +
-        'It reports success with 0 rows, so the code\'s if(error) fallback never fires either.');
+    // A SENTENCE, deliberately — a bare keyword hides the failure that mattered. Retrieval used to
+    // return 0 here twice over: vectors were NULL (088), and then plainto_tsquery ANDed every word
+    // of the question with no stopword list under 'simple' (089).
+    const hits = await searchContentByQuery(b.accountId, 'יש לכם משהו לשיער יבש?');
+    check(`RAG retrieval returns content for a real shopper QUESTION (${hits.length} items)`, hits.length > 0,
+      hits.length ? '' : '← check migrations 088/089: search_vector populated + maintained by trigger, ' +
+        'and search_all_content ORing the question rather than ANDing it.');
 
     // A hand-off with nobody on the other end is the failure this whole thread is about.
     const recips = await resolveRecipients(supabase, b.accountId, cfg.escalation);
