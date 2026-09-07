@@ -143,4 +143,18 @@ describe('brand-resolver (brain-led)', () => {
     expect(r.candidates.length).toBeLessThanOrEqual(TOP_K);
     expect(r.candidates[0].accountId).toBe('acc-argania');
   });
+  // LA BEAUTÉ's display_name is stored as MATHEMATICAL BOLD letters (𝐋𝐀 𝐁𝐄𝐀𝐔𝐓𝐄) — a styled name
+  // pasted from Instagram. Those are letters to \p{L} and have no lowercase mapping, so they share
+  // no trigram with anything a shopper types and the brand scores ~0 against its own name. NFKD
+  // folds them to ASCII (and folds É→E while it is there).
+  it('matches a brand whose stored name uses styled unicode letters (𝐋𝐀 𝐁𝐄𝐀𝐔𝐓𝐄) and accents', async () => {
+    const { trigramSimilarity } = await import('@/lib/cs/brand-resolver');
+    const styled = '\u{1D40B}\u{1D400} \u{1D401}\u{1D404}\u{1D400}\u{1D42E}\u{1D413}\u{1D404}';
+    expect(trigramSimilarity(styled, 'LA BEAUTE')).toBe(1);
+    expect(trigramSimilarity('LA BEAUTÉ', 'LA BEAUTE')).toBe(1);
+    // Presence assertion beside the equality: a matcher that returned 1 for everything would also
+    // pass the two above.
+    expect(trigramSimilarity(styled, 'Argania')).toBeLessThan(0.5);
+  });
+
 });

@@ -24,8 +24,14 @@ export interface BrandResolution {
 export const MAX_INLINE = 25;
 export const TOP_K = 12;
 
+// NFKD + mark-stripping FIRST. Brands paste styled names out of Instagram: LA BEAUTÉ is stored as
+// MATHEMATICAL BOLD letters (𝐋𝐀 𝐁𝐄𝐀𝐔𝐓𝐄), which \p{L} accepts and toLowerCase() leaves alone — so
+// the brand shared no trigram with anything a shopper types and scored 0 against its own name.
+// NFKD folds those to ASCII; stripping \p{M} then folds É→E so accents can't split a word either.
 function normalize(s: string): string {
   return (s || '')
+    .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
     .toLowerCase()
     .replace(/https?:\/\//g, '')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')

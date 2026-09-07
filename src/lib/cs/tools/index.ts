@@ -112,8 +112,17 @@ const listOpenThreadsTool: CsTool = {
 
 // accounts.id is a uuid column: anything else reaches PostgREST as 400/22P02, never a row.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// NFKD + \p{M} stripping before anything else — mirrors normalize() in brand-resolver.ts, and for
+// the same reason: a styled display_name (𝐋𝐀 𝐁𝐄𝐀𝐔𝐓𝐄) or an accent (LA BEAUTÉ) must still match
+// what a shopper actually types.
 function normRef(s: string): string {
-  return (s || '').toLowerCase().replace(/https?:\/\//g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  return (s || '')
+    .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+    .replace(/https?:\/\//g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 }
 // The brain is told to pass the roster's accountId, but the shared number must not go dark when it
 // passes the NAME instead — which is exactly what happened for six weeks (see bind_brand below).
