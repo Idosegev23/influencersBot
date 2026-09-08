@@ -76,7 +76,7 @@ export async function processOneCsInbound(job: CsJob): Promise<string | null> {
   if (sent.success && turn.cards?.length) {
     try {
       const { sendProductCards } = await import('@/lib/cs/cs-product-cards');
-      const delivered = await sendProductCards(job.waId, turn.cards);
+      const delivered = await sendProductCards({ channel, to: job.waId, cards: turn.cards });
       if (delivered < turn.cards.length) console.warn('[cs-worker] product cards partially delivered', delivered, '/', turn.cards.length);
     } catch (e) { console.warn('[cs-worker] product cards failed', e); }
   }

@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Sends are channel-scoped now; unit tests must not perform real channel resolution.
 vi.mock('@/lib/whatsapp-cloud/channels', () => ({
+  // The channel the message ARRIVED on — deliberately NOT Bestie's shared number, so an
+  // assertion can tell the two apart.
   resolveWaChannelById: vi.fn(async () => ({
-    id: 'ch-1', accountId: 'acc-1', wabaId: 'waba-1', phoneNumberId: 'PNID_TEST',
-    displayPhoneNumber: '+972 54-390-2030', verifiedName: 'Bestie', token: 'TOK',
+    id: 'ch-1', accountId: 'acc-1', wabaId: 'waba-1', phoneNumberId: 'PNID_INBOUND',
+    displayPhoneNumber: '+972 3-000-0000', verifiedName: 'ARGANIA', token: 'TOK',
     status: 'active', paymentReady: true,
   })),
   getBestieChannel: vi.fn(async () => ({
@@ -118,7 +120,14 @@ describe('processOneCsInbound dispatch', () => {
     const { processOneCsInbound } = await import('@/lib/cs/wa-cs-worker');
     const id = await processOneCsInbound(job);
     expect(sendText).toHaveBeenCalledWith(expect.objectContaining({ body: 'ממליצה על זה 👇' }));
-    expect(sendCards).toHaveBeenCalledWith('972500000000', cards);
+    // The cards must ride the channel the message arrived on — the same one the text just used.
+    // Resolving Bestie's shared number here would split a BYO brand's reply across two threads.
+    expect(sendCards).toHaveBeenCalledWith({
+      channel: expect.objectContaining({ id: 'ch-1', phoneNumberId: 'PNID_INBOUND' }),
+      to: '972500000000',
+      cards,
+    });
+    expect(sendText.mock.calls[0][0].channel.phoneNumberId).toBe('PNID_INBOUND');
     expect(sendCards.mock.invocationCallOrder[0]).toBeGreaterThan(sendText.mock.invocationCallOrder[0]);
     expect(id).toBe('out-1');
   });

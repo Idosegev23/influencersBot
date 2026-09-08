@@ -22,6 +22,7 @@ async function main() {
 
   const { supabase } = await import('../src/lib/supabase');
   const { sendProductCards, productImageUrl, appBaseUrl } = await import('../src/lib/cs/cs-product-cards');
+  const { resolveChannelByAccount, getBestieChannel } = await import('../src/lib/whatsapp-cloud/channels');
 
   let accountId = accountIdArg;
   if (!accountId) {
@@ -73,7 +74,18 @@ async function main() {
     imageUrl: r.image_url,
   }));
 
-  const sent = await sendProductCards(to, cards);
+  // Same rule as the worker: cards go out on the brand's OWN number when it has one, and only
+  // fall back to the shared Bestie number for brands that live on it. Printed, because a card
+  // arriving from the wrong number is the exact failure this check exists to catch.
+  let channel;
+  try {
+    channel = await resolveChannelByAccount(accountId!);
+  } catch {
+    channel = await getBestieChannel();
+  }
+  console.log(`\nSending on ${channel.displayPhoneNumber || channel.phoneNumberId} (${channel.verifiedName || channel.accountId}).`);
+
+  const sent = await sendProductCards({ channel, to, cards });
   console.log(`\nSent ${sent}/${cards.length} cards to ${to}.`);
   console.log('Check the phone: each should show a photo, name + price, and a "לצפייה במוצר" button.');
   process.exit(sent === cards.length ? 0 : 1);

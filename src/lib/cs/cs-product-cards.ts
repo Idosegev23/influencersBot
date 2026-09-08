@@ -7,7 +7,7 @@
  * name + price, and a button straight to the product page.
  */
 import { sendInteractiveCtaUrl, sendText } from '@/lib/whatsapp-cloud/client';
-import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
+import type { WaChannel } from '@/lib/whatsapp-cloud/channels';
 import type { CsProductCard } from '@/lib/cs/tools/types';
 
 const BUTTON_LABEL = 'לצפייה במוצר';   // 12 chars — WhatsApp caps display_text at 20
@@ -48,11 +48,16 @@ export function formatCardBody(card: CsProductCard): string {
  * Send one card. Falls back to a plain text message carrying the same link if the interactive
  * send fails for any reason (a rejected image, a transcode timeout, a Meta hiccup) — the shopper
  * was just told about this product, so they must end up with a way to reach it.
+ *
+ * The channel is passed in, never resolved here: the reply text is already sent on the channel
+ * the message ARRIVED on, and a brand running WhatsApp on its own number would otherwise get its
+ * prose from one number and its cards from the shared Bestie number — two separate chat threads.
  */
-async function sendOneCard(to: string, card: CsProductCard): Promise<boolean> {
+async function sendOneCard(channel: WaChannel, to: string, card: CsProductCard): Promise<boolean> {
   const body = formatCardBody(card);
   try {
-    const res = await sendInteractiveCtaUrl({ channel: await getBestieChannel(),
+    const res = await sendInteractiveCtaUrl({
+      channel,
       to,
       body,
       displayText: BUTTON_LABEL,
@@ -64,7 +69,7 @@ async function sendOneCard(to: string, card: CsProductCard): Promise<boolean> {
     console.warn('[cs-cards] cta_url send threw', card.productId, e);
   }
   try {
-    const res = await sendText({ channel: await getBestieChannel(), to, body: `${body}\n${card.productUrl}` });
+    const res = await sendText({ channel, to, body: `${body}\n${card.productUrl}` });
     if (!res.success) console.warn('[cs-cards] text fallback failed', card.productId);
     return res.success;
   } catch (e) {
@@ -79,10 +84,13 @@ async function sendOneCard(to: string, card: CsProductCard): Promise<boolean> {
  * A card that can't be delivered is logged and skipped — it never fails the turn, because the
  * shopper has already received the actual answer.
  */
-export async function sendProductCards(to: string, cards: CsProductCard[]): Promise<number> {
+export async function sendProductCards(
+  params: { channel: WaChannel; to: string; cards: CsProductCard[] },
+): Promise<number> {
+  const { channel, to, cards } = params;
   let sent = 0;
   for (const card of cards) {
-    if (await sendOneCard(to, card)) sent++;
+    if (await sendOneCard(channel, to, card)) sent++;
   }
   return sent;
 }
