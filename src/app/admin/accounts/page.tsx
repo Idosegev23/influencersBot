@@ -14,6 +14,8 @@ import {
   MoreHorizontal,
   FlaskConical,
   CalendarPlus,
+  MonitorPlay,
+  Check,
 } from 'lucide-react';
 import type { Influencer } from '@/types';
 import { formatNumber } from '@/lib/utils';
@@ -23,6 +25,7 @@ import { PageHeader } from '@/components/admin/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
+import { describeDemoLink } from '@/lib/demo/preview-status';
 import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,7 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 type AccountFilter = 'all' | 'creator' | 'brand' | 'service' | 'demo';
 type SortKey = 'recent' | 'followers' | 'name';
 type DemoWindow = { state: 'open' | 'expiring' | 'locked'; endsAt: string | null; daysLeft: number | null };
-type AccountRow = Influencer & { is_demo?: boolean; demo?: DemoWindow };
+type AccountRow = Influencer & { is_demo?: boolean; demo?: DemoWindow; widget_domain?: string | null };
 
 // Real classification lives in config.archetype (surfaced by /api/admin/accounts),
 // NOT in accounts.type — which is hard-coded to 'creator' at account creation.
@@ -339,6 +342,25 @@ function AccountCard({
   const pct = progress ? Math.round((progress.completed / progress.total) * 100) : null;
   const isDone = pct === 100;
 
+  // The shareable widget demo. This lived only on /admin/websites, which hides
+  // every account without a registered domain — so for exactly the accounts whose
+  // demo was broken, there was nowhere in the admin to get the address at all.
+  const [demoCopied, setDemoCopied] = useState(false);
+  const demoLink = describeDemoLink({
+    widgetDomain: influencer.widget_domain,
+    demoState: influencer.demo?.state ?? null,
+  });
+
+  const handleCopyDemo = () => {
+    const url = `${window.location.origin}/demo/${influencer.id}`;
+    navigator.clipboard.writeText(url);
+    setDemoCopied(true);
+    setTimeout(() => setDemoCopied(false), 2000);
+    // Open it too: seeing what the prospect will see is the point of the button,
+    // and it costs one click instead of a paste into a new tab.
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <Card hover className="group relative overflow-hidden">
       <div className="p-4 flex flex-col gap-3.5">
@@ -434,6 +456,17 @@ function AccountCard({
             <ExternalLink className="w-3.5 h-3.5" />
             צפייה
           </a>
+          <button
+            onClick={handleCopyDemo}
+            className={
+              'ui-btn ui-btn-icon-sm focus-ring ' +
+              (demoLink.kind === 'site' ? 'ui-btn-ghost' : 'ui-btn-ghost opacity-60')
+            }
+            aria-label="העתק ופתח דמו ווידג׳ט"
+            title={`דמו ווידג׳ט — ${demoLink.title}`}
+          >
+            {demoCopied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <MonitorPlay className="w-3.5 h-3.5" />}
+          </button>
           {influencer.demo && influencer.demo.daysLeft !== null && (
             <button
               onClick={onExtendDemo}

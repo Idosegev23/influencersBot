@@ -92,6 +92,10 @@ export async function GET() {
         // Account info
         is_active: account.status === 'active',
         is_demo: config.isDemo === true,
+        // The site the demo link will proxy, or null when there is none. The
+        // admin needs this to know whether /demo/<id> shows the customer's own
+        // website or just the widget on a backdrop, BEFORE sending the link.
+        widget_domain: config.widget?.domain || null,
         // Demo window (null for anything that isn't a timed demo, which is
         // every pre-feature demo and every paying account).
         demo: resolveDemoAccess({ config }),
