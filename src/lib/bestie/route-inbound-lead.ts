@@ -54,7 +54,8 @@ export async function routeInboundToBestieLead(input: {
 }
 
 export async function maybeRouteBestieLead(args: {
-  isItamar: boolean;
+  /** True only when processItamarReply CONSUMED this message as a handoff reply. */
+  handledAsHandoffReply: boolean;
   handledAsAgent: boolean;
   ticketId: string | null;
   waId: string;
@@ -62,7 +63,7 @@ export async function maybeRouteBestieLead(args: {
   msg: any;
   textBody: string | null;
 }): Promise<{ claimed: boolean }> {
-  if (args.isItamar || args.handledAsAgent || args.ticketId) return { claimed: false };
+  if (args.handledAsHandoffReply || args.handledAsAgent || args.ticketId) return { claimed: false };
 
   const supabase = createClient();
   const { data: session } = await supabase
