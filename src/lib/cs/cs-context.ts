@@ -50,12 +50,18 @@ export async function buildContextDigest(
   mode: 'cs' | 'content' = 'cs',
   language: 'he' | 'en' = 'he',
   identity?: CsIdentity,
+  // The caller has usually just read this exact row (cs-agent's loadAccountMeta). Passing it in
+  // leaves this function with no DB work at all; omitting it keeps the original self-contained
+  // behaviour for every other caller.
+  presetConfig?: any | null,
 ): Promise<CsContextDigest> {
   let boundBrand: string | null = null;
   let policy: string | null = null;
   if (session.active_account_id) {
-    const { data } = await supabaseAdmin.from('accounts').select('config').eq('id', session.active_account_id).single();
-    const cfg = (data as any)?.config || {};
+    const cfg = presetConfig ?? await (async () => {
+      const { data } = await supabaseAdmin.from('accounts').select('config').eq('id', session.active_account_id).single();
+      return (data as any)?.config || {};
+    })();
     boundBrand = cfg.display_name || cfg.username || null;
     const p = cfg.whatsapp_cs?.policy;
     policy = typeof p === 'string' && p.trim() ? p : null;
@@ -78,12 +84,19 @@ export async function buildCsSystemPrompt(input: {
   accountId: string | null;
   userMessage: string;
   digest: CsContextDigest;
+  // Same row cs-agent already holds — see buildContextDigest's presetConfig. Without it this was
+  // the THIRD read of one accounts.config row in a single turn.
+  config?: any | null;
+  // Set for a turn whose answer comes from the orders provider rather than from brand content.
+  // Grounding still comes from the persona and the policy block; only the content retrieval is
+  // dropped. Absent/false keeps the original behaviour for every other turn and every other caller.
+  skipRag?: boolean;
 }): Promise<string> {
   const { accountId, userMessage, digest } = input;
   // The account's config is read ONCE and reused: the orders/products guidance below and the
   // toolset must be cut by the same facts, or the prompt describes a flow that has no tool.
-  let boundConfig: any = null;
-  if (accountId) {
+  let boundConfig: any = input.config ?? null;
+  if (accountId && !boundConfig) {
     try {
       const { data } = await supabaseAdmin.from('accounts').select('config').eq('id', accountId).single();
       boundConfig = (data as any)?.config || {};
@@ -190,11 +203,13 @@ export async function buildCsSystemPrompt(input: {
       const slim = { signatureStyle: persona.signatureStyle, commonPhrases: persona.commonPhrases, emojiUsage: persona.emojiUsage, boundaries: persona.boundaries };
       lines.push(`\n--- קול המותג ---\n${JSON.stringify(slim).slice(0, 1500)}`);
     } catch { /* persona optional */ }
-    try {
-      const hits = await searchContentByQuery(accountId, userMessage);
-      const rag = formatMetadataForAI(hits).slice(0, 4000);
-      if (rag.trim()) lines.push(`\n--- ידע רלוונטי מהמותג (RAG) ---\n${rag}`);
-    } catch { /* RAG optional */ }
+    if (!input.skipRag) {
+      try {
+        const hits = await searchContentByQuery(accountId, userMessage);
+        const rag = formatMetadataForAI(hits).slice(0, 4000);
+        if (rag.trim()) lines.push(`\n--- ידע רלוונטי מהמותג (RAG) ---\n${rag}`);
+      } catch { /* RAG optional */ }
+    }
     // Product cards are per-brand opt-in, and so is the guidance: a brand with cards switched off
     // must not get a prompt telling Bestie to reach for tools that will only refuse.
     try {

@@ -235,3 +235,27 @@ describe('cs-context', () => {
   });
 
 });
+
+describe('buildCsSystemPrompt skipRag', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // Presence AND absence, together. An empty prompt, or a RAG block that silently stopped being
+  // built for every turn, would sail through the "absent" half on its own.
+  it('omits the RAG block when skipRag is set, and keeps it when it is not', async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const args = { accountId: 'acc-argania', userMessage: 'איפה ההזמנה שלי 12345', digest: digest({ boundBrand: 'Argania' }) };
+
+    const withRag = await buildCsSystemPrompt(args);
+    expect(withRag).toContain('ידע רלוונטי מהמותג (RAG)');
+    expect(withRag).toContain('שמן ארגן');
+    expect(searchContentByQuery).toHaveBeenCalledTimes(1);
+
+    searchContentByQuery.mockClear();
+    const without = await buildCsSystemPrompt({ ...args, skipRag: true });
+    expect(without).not.toContain('ידע רלוונטי מהמותג (RAG)');
+    // The retrieval is not merely hidden — it is never run. That is where the 638ms goes.
+    expect(searchContentByQuery).not.toHaveBeenCalled();
+    // The rest of the grounding must survive: dropping RAG must not drop the brand's voice.
+    expect(without).toContain('קול המותג');
+  });
+});

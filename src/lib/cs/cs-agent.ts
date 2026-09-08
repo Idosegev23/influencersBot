@@ -20,6 +20,7 @@ import { laneModel } from '@/lib/llm/config';
 import { toWaId } from '@/lib/whatsapp-cloud/client';
 import { whatsappIdentity, identityKey, withClaimedPhone, identityPhone, CS_TICKET_SOURCES, type CsIdentity } from '@/lib/cs/identity';
 import { hasContactRoute, harvestContact } from '@/lib/support/contact';
+import { detectOrderIntent } from '@/lib/cs/fast-path';
 import type { CsJob } from '@/lib/cs/wa-cs-queue';
 
 export interface CsTurnResult {
@@ -246,12 +247,38 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
     : [];
   recentTurns.push({ role: 'user', text: userMessage });
 
+  // 1.5) Fire every read this turn needs, together.
+  //
+  // These nine Supabase round trips used to run one `await` after another, and measured against
+  // production on 2026-09-08 that prelude cost 2,829ms of a 7,671ms order-status turn — MORE than
+  // the model call that picks the tool (1,912ms). They were serial for no reason: past the bind
+  // above, each one depends only on `session`, never on another's result.
+  //
+  // Ordering is unchanged where it matters. Nothing here writes, so the pause and escalation
+  // early-returns below still return before any side effect — they simply discard reads already
+  // in flight. `openThreads` is fetched alongside the digest rather than before it because
+  // buildContextDigest only passes the list through to its result; it never queries with it.
+  const pausePromise: Promise<boolean> = session.active_chat_session_id
+    ? import('@/lib/handoff/bot-pause').then((m) => m.isBotPaused(session.active_chat_session_id!)) // Phase D (D3)
+    : Promise.resolve(false);
+  const accountMetaPromise = loadAccountMeta(session.active_account_id);
+  const priorTextsPromise = priorUserTexts(session.active_chat_session_id);
+  const openThreadsPromise = loadOpenThreads(waId);
+  const historyPromise = session.active_chat_session_id ? loadHistory(session.active_chat_session_id) : Promise.resolve([]);
+  // The digest's ONLY query was a second read of the same accounts.config row loadAccountMeta just
+  // fetched (and buildCsSystemPrompt read it a third time) — three reads of one row per turn.
+  // Chaining it off the one read costs nothing and leaves the digest with no DB work at all.
+  const digestPromise = accountMetaPromise.then((meta) =>
+    buildContextDigest(session, [], input.mode ?? 'cs', input.language ?? 'he', ctx.identity, meta?.config ?? null));
+  // A promise nobody ever awaits — the pause and escalation paths return early — would reject
+  // UNHANDLED and take the worker process down with it. Handled from birth; awaiting still throws.
+  for (const p of [pausePromise, accountMetaPromise, priorTextsPromise, openThreadsPromise, historyPromise, digestPromise]) p.catch(() => {});
+
   // 2) Pause guard — a human owns this thread; the bot stays silent until manual resume. It must
   //    still RECORD the shopper's message so the human sees it: route-inbound no longer files
   //    whatsapp_cs/auto_escalation tickets, so nothing else captures a paused-thread inbound.
   if (session.active_chat_session_id) {
-    const { isBotPaused } = await import('@/lib/handoff/bot-pause'); // Phase D (D3)
-    if (await isBotPaused(session.active_chat_session_id)) {
+    if (await pausePromise) {
       await recordPausedInbound(session, userMessage);
       return { reply: { kind: 'none' }, phase: session.phase };
     }
@@ -262,12 +289,12 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   // genuinely don't know it's an escalation, so we proceed to the model. But once detectHandoff
   // HAS decided this is a known escalation, that decision is final — a known escalation must
   // never reach the model just because the pause/notify dispatch (runCsHandoffCheck) failed.
-  const accountMeta = await loadAccountMeta(session.active_account_id);
+  const accountMeta = await accountMetaPromise;
   let handoff: { triggered: boolean; [k: string]: any } | null = null;
   try {
     const { detectHandoff } = await import('@/engines/escalation/detect'); // Phase D (D2)
     const cfg = accountMeta?.config?.escalation || null;
-    handoff = detectHandoff(userMessage, await priorUserTexts(session.active_chat_session_id), { enabledTriggers: cfg?.triggers, lowConfidenceThreshold: cfg?.lowConfidenceThreshold });
+    handoff = detectHandoff(userMessage, await priorTextsPromise, { enabledTriggers: cfg?.triggers, lowConfidenceThreshold: cfg?.lowConfidenceThreshold });
   } catch (e) {
     console.warn('[cs-agent] detectHandoff failed — treating as unknown, proceeding to the model', e);
   }
@@ -315,10 +342,19 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
     return { reply: { kind: 'text', body: ack }, phase: session.phase };
   }
 
+  // 3.5) Order-status fast path (see fast-path.ts). Gated per brand and OFF unless switched on —
+  // it changes what the brain is handed, so no account gets it silently. An image turn never
+  // qualifies: the photo IS the message, and the caption stand-in must not stand in for it.
+  const fastPathOn = accountMeta?.config?.whatsapp_cs?.fast_path === true;
+  const orderIntent = (fastPathOn && !img) ? detectOrderIntent(userMessage) : { isOrderStatus: false, orderNumbers: [] };
+
   // 4) Build the brand-grounded system prompt (persona + RAG + re-entry digest — NO scripted menu).
-  const openThreads = await loadOpenThreads(waId);
-  const digest = await buildContextDigest(session, openThreads, input.mode ?? 'cs', input.language ?? 'he', ctx.identity);
-  const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest });
+  const [openThreads, digestBase] = await Promise.all([openThreadsPromise, digestPromise]);
+  const digest = { ...digestBase, openThreads };
+  // On an order-status turn the answer comes from the orders provider, never from the brand's
+  // content. Measured live: RAG cost 638ms and returned 43-50 items at 0.02 average relevance for
+  // exactly these queries — paid for, and irrelevant.
+  const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest, config: accountMeta?.config ?? null, skipRag: orderIntent.isOrderStatus });
 
   // 5) Tool-calling loop.
   // ctx was built (and possibly bound) right after session load — see the auto-bind block above.
@@ -331,7 +367,7 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
     preBoundAccountId: input.boundAccountId ?? null,
   });
   const toolMap = new Map(toolset.tools.map((t) => [t.def.function.name, t]));
-  const history = session.active_chat_session_id ? await loadHistory(session.active_chat_session_id) : [];
+  const history = await historyPromise;
   // Image turn → multimodal content (text + image_url) so the brain sees the photo; text turn → string.
   const userContent: any = img?.dataUrl
     ? [{ type: 'text', text: userMessage }, { type: 'image_url', image_url: { url: img.dataUrl } }]
@@ -345,12 +381,11 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   let cards: CsProductCard[] = [];
   const payloads = new Map<string, CsUiPayload>(); // deduped by kind, last wins
 
-  for (let iter = 0; iter < MAX_ITERS; iter++) {
-    const turn = await deps.callModel({ system, messages, tools: toolset.defs });
-    if (!turn.toolCalls?.length) { finalText = turn.text; break; }
-    messages.push({ role: 'assistant', content: turn.text, tool_calls: turn.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.args) } })) });
-
-    for (const tc of turn.toolCalls) {
+  // ONE place where a tool result is applied — used by both the loop below and the fast-path seed
+  // just above it, so a prefetched lookup goes through exactly the same signal handling (bind,
+  // learned contact, payload derivation, transcript shape) as one the model asked for itself.
+  // Two copies of this would drift, and the copy that drifts is the one nobody is watching.
+  const dispatchTool = async (tc: CsModelTurn['toolCalls'][number]): Promise<void> => {
       const tool = toolMap.get(tc.name);
       let result: CsToolResult = { ok: false, data: { reason: 'unknown_tool' } };
       if (tool) { try { result = await tool.handler(tc.args, ctx); } catch (e) { result = { ok: false, data: { reason: 'tool_error' } }; console.warn('[cs-agent] tool threw', tc.name, e); } }
@@ -373,7 +408,25 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
       const payload = derivePayload(tc.name, result);
       if (payload) payloads.set(payload.kind, payload);
       messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result.data ?? { ok: result.ok }) });
-    }
+  };
+
+  // THE FAST PATH. The shopper asked where an order is and handed us a number, so the first model
+  // call would have done one thing: turn that into lookup_order(number). Live, 15/15 samples did
+  // exactly that, for 1,686ms. Run the lookup now and enter the loop with the answer already in
+  // hand — the model still reads the whole message, still writes every word of the reply, and can
+  // still call any tool it likes. Only the round trip that PICKED this tool is skipped, which is
+  // why a false positive costs one read-only lookup (237ms) instead of a wrong answer.
+  if (orderIntent.isOrderStatus && orderIntent.orderNumbers.length && toolMap.has('lookup_order')) {
+    const seeded = { id: `fp_${randomUUID().slice(0, 8)}`, name: 'lookup_order', args: { orderNumber: orderIntent.orderNumbers[0] } };
+    messages.push({ role: 'assistant', content: null, tool_calls: [{ id: seeded.id, type: 'function', function: { name: seeded.name, arguments: JSON.stringify(seeded.args) } }] });
+    await dispatchTool(seeded);
+  }
+
+  for (let iter = 0; iter < MAX_ITERS; iter++) {
+    const turn = await deps.callModel({ system, messages, tools: toolset.defs });
+    if (!turn.toolCalls?.length) { finalText = turn.text; break; }
+    messages.push({ role: 'assistant', content: turn.text, tool_calls: turn.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.args) } })) });
+    for (const tc of turn.toolCalls) await dispatchTool(tc);
     // Do NOT short-circuit on a hand-off. escalate_to_human pauses the bot for FUTURE turns, but the
     // shopper who just reported a problem must get a reply NOW, not silence — so let the loop run one
     // more iteration and let the model compose a brief empathetic hand-off ack from the tool result.
