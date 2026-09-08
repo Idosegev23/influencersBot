@@ -161,7 +161,14 @@ export async function GET(req: NextRequest) {
         enabled: widgetConfig.enabled !== false,
         welcomeMessage: widgetConfig.welcomeMessage || fb.welcome,
         placeholder: widgetConfig.placeholder || fb.placeholder,
-        domain: widgetConfig.domain || config.username || '',
+        // NO fallback to `config.username`. It used to read
+        // `widgetConfig.domain || config.username`, which handed the demo page an
+        // Instagram handle dressed as a domain ("rebarisrael"): the page saw a
+        // truthy domain, framed the preview proxy, and the proxy — reading the
+        // real, absent config.widget.domain — answered 404 JSON inside the frame.
+        // Empty means "no site registered", and the preview route decides what to
+        // show for that (it can still recover one from the Instagram bio).
+        domain: widgetConfig.domain || '',
         analyticsToken,
         modules,
         // Demo window. `state: 'open'` with null dates is what every paying

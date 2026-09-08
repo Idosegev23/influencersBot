@@ -18,38 +18,20 @@
  * already publicly fetchable — anyone could `curl` the customer's site
  * directly.
  */
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { demoAccessFromConfig, demoExpiredBody } from '@/lib/demo/guard';
+import { demoAccessFromConfig } from '@/lib/demo/guard';
+import { rewriteNavigation } from '@/lib/widget/preview-rewrite';
+import { filterUpstreamHeaders } from '@/lib/widget/preview-headers';
+import { resolveWidgetDomain } from '@/lib/widget/resolve-domain';
 
 const FETCH_TIMEOUT_MS = 12000;
-
-// Browsers refuse to render pages with these headers in an iframe. We
-// proxy the customer's site, so we get to decide what headers to send back.
-// X-Frame-Options + frame-ancestors directives are filtered out below.
-//
-// Critical also: encoding/length headers must NOT pass through. Node's fetch
-// transparently decompresses gzip/brotli responses before we touch them, so
-// forwarding the upstream's `Content-Encoding: gzip` would tell the browser
-// to decompress plain text → ERR_CONTENT_DECODING_FAILED → blank iframe.
-// Same for Content-Length (now stale after we mutate the HTML body) and
-// Transfer-Encoding (chunked metadata we shouldn't echo).
-function isBlockingHeader(name: string): boolean {
-  const lower = name.toLowerCase();
-  return lower === 'x-frame-options'
-    || lower === 'content-security-policy'
-    || lower === 'content-security-policy-report-only'
-    || lower === 'permissions-policy'
-    || lower === 'content-encoding'
-    || lower === 'content-length'
-    || lower === 'transfer-encoding';
-}
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: string }> }) {
   const { accountId } = await ctx.params;
 
   if (!accountId) {
-    return NextResponse.json({ error: 'accountId required' }, { status: 400 });
+    return framePage(req, { headline: 'This preview link is incomplete', detail: 'It is missing the account it should show.' });
   }
 
   const supabase = await createClient();
@@ -59,7 +41,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
     .eq('id', accountId)
     .single();
   if (!account) {
-    return NextResponse.json({ error: 'account not found' }, { status: 404 });
+    return framePage(req, { headline: 'This demo link is no longer valid', detail: 'The account it pointed to does not exist any more.' });
   }
 
   const cfg: any = account.config || {};
@@ -70,12 +52,28 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
   // left running keeps re-serving somebody else's storefront from ours.
   const demoAccess = demoAccessFromConfig(cfg);
   if (demoAccess.state === 'locked') {
-    return NextResponse.json(demoExpiredBody(demoAccess), { status: 403 });
+    // Deliberately no widget and no proxying here — an expired demo must stop
+    // re-serving the customer's storefront from our origin. But it says so in
+    // HTML: a 403 JSON body inside the frame just looks broken.
+    return framePage(req, {
+      headline: 'This demo has ended',
+      detail: 'Ask your contact at LDRS to reopen it and the link will work again.',
+    });
   }
 
-  const domain: string | undefined = cfg?.widget?.domain;
+  // An account scanned from an Instagram handle alone never got a websiteUrl, so
+  // finalize registered no domain and this route used to answer a raw 404 JSON
+  // blob — inside the iframe of a demo link already sent to a prospect. Try to
+  // recover the site from the Instagram bio before giving up.
+  const domain = await resolveWidgetDomain(accountId, cfg);
   if (!domain) {
-    return NextResponse.json({ error: 'no widget domain registered for this account' }, { status: 404 });
+    // Nothing to proxy, but the widget itself is real and worth demonstrating.
+    // Never answer a shared demo link with JSON.
+    return framePage(req, {
+      accountId,
+      headline: 'The assistant is live — the site preview is not',
+      detail: 'No website is registered for this account, so there is no site to show the assistant on.',
+    });
   }
 
   // Normalize: strip protocol/trailing slash so we can rebuild safely
@@ -105,7 +103,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
       ),
     ]);
   } catch (err: any) {
-    return standInPage(req, accountId, cleanDomain, `could not be reached (${err?.message || 'network error'})`);
+    return framePage(req, {
+      accountId,
+      headline: 'The assistant is live — the site preview is not',
+      detail: `<code>${escapeHtml(cleanDomain)}</code> could not be reached (${escapeHtml(err?.message || 'network error')}) when we asked for it, so its pages can't be shown here.`,
+    });
   }
 
   if (!upstreamRes.ok) {
@@ -116,7 +118,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
     // raw `{"error":"customer site returned 403"}`. The widget is the thing being
     // demonstrated, not the customer's homepage, so serve it on a plain backdrop
     // and say why the site itself is missing.
-    return standInPage(req, accountId, cleanDomain, `returned ${upstreamRes.status}`);
+    return framePage(req, {
+      accountId,
+      headline: 'The assistant is live — the site preview is not',
+      detail: `<code>${escapeHtml(cleanDomain)}</code> returned ${upstreamRes.status} when we asked for it, so its pages can't be shown here.`,
+    });
   }
 
   // Only HTML pages get the injection treatment; everything else passes through
@@ -125,7 +131,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
   if (!contentType.includes('text/html')) {
     return new Response(await upstreamRes.arrayBuffer(), {
       status: upstreamRes.status,
-      headers: filterHeaders(upstreamRes.headers),
+      headers: filterUpstreamHeaders(upstreamRes.headers),
     });
   }
 
@@ -150,6 +156,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
     html = `<head>${baseHref}</head>` + html;
   }
 
+  // Point in-page links back at this proxy so the demo stays navigable without
+  // escaping to the customer's real origin (which drops the widget, and on a
+  // site with X-Frame-Options leaves the frame blank).
+  html = rewriteNavigation(html, { origin: req.nextUrl.origin, accountId, domain: cleanDomain });
+
   // Inject our widget script. Absolute URL to our own origin so it works
   // regardless of the page path. accountId is the per-account ID the widget
   // uses to fetch its config from /api/widget/config.
@@ -164,7 +175,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
 
   // Return modified HTML with X-Frame-Options + CSP filtered out so the iframe
   // in our admin page can actually render this.
-  const headers = filterHeaders(upstreamRes.headers);
+  const headers = filterUpstreamHeaders(upstreamRes.headers);
   headers.set('Content-Type', 'text/html; charset=utf-8');
   headers.set('Cache-Control', 'no-store');
   // Allow our own admin to iframe this — explicitly relaxed since we just
@@ -190,25 +201,46 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
   return new Response(html, { status: 200, headers });
 }
 
-function filterHeaders(src: Headers): Headers {
-  const out = new Headers();
-  src.forEach((value, key) => {
-    if (!isBlockingHeader(key)) out.append(key, value);
-  });
-  return out;
+
+function escapeHtml(v: string): string {
+  return String(v).replace(/[<>&"]/g, (c) => (
+    c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : '&quot;'
+  ));
 }
 
 /**
- * A backdrop for the widget when the customer's own site cannot be framed.
+ * Every non-success answer this route can give, as a rendered page.
  *
- * Deliberately plain: it must not be mistaken for the customer's site, and it
- * must not pretend the page loaded. It states what happened and puts the real,
- * live widget on top so the demo still demonstrates something true.
+ * This route's entire output is consumed inside an iframe that a prospect is
+ * looking at, often from a link a salesperson sent them. It therefore never
+ * returns JSON and never returns a 4xx: a raw `{"error":...}` body — which is
+ * what a missing widget domain used to produce — reads as a broken product.
+ * Status is always 200 so the frame renders what we wrote.
+ *
+ * Passing `accountId` puts the real, live widget on the page, so a failure to
+ * show the customer's SITE still demonstrates the thing being sold. It is
+ * omitted deliberately for an expired or invalid demo, where showing the
+ * assistant would be showing something the viewer is no longer entitled to.
  */
-function standInPage(req: NextRequest, accountId: string, domain: string, reason: string): Response {
-  const origin = req.nextUrl.origin;
-  const safeDomain = domain.replace(/[<>&"]/g, '');
-  const safeReason = reason.replace(/[<>&"]/g, '');
+function framePage(
+  req: NextRequest,
+  opts: { accountId?: string; headline: string; detail: string },
+): Response {
+  // This is the function that exists so the demo link never shows an error, so
+  // it must not itself throw. `nextUrl` is always present on a real NextRequest;
+  // the fallback keeps a last-resort renderer from becoming a 500.
+  let origin: string;
+  try {
+    origin = req.nextUrl?.origin ?? new URL(req.url).origin;
+  } catch {
+    origin = '';
+  }
+  const widget = opts.accountId
+    ? `<script src="${origin}/widget.js" data-account-id="${escapeHtml(opts.accountId)}" data-preview="true"></script>`
+    : '';
+  const closer = opts.accountId
+    ? ' The assistant below is the real one for this account: open it and ask it anything.'
+    : '';
   const html = `<!doctype html>
 <html lang="en" dir="ltr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -227,11 +259,10 @@ function standInPage(req: NextRequest, accountId: string, domain: string, reason
 </style></head>
 <body>
   <div class="card">
-    <h1>The assistant is live — the site preview is not</h1>
-    <p><code>${safeDomain}</code> ${safeReason} when we asked for it, so its pages can't be shown here.
-       The assistant below is the real one for this account: open it and ask it anything.</p>
+    <h1>${escapeHtml(opts.headline)}</h1>
+    <p>${opts.detail}${closer}</p>
   </div>
-  <script src="${origin}/widget.js" data-account-id="${accountId}" data-preview="true"></script>
+  ${widget}
 </body></html>`;
   return new Response(html, {
     status: 200,

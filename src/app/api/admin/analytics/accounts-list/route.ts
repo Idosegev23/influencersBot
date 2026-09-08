@@ -33,7 +33,9 @@ export async function GET() {
       type: a.type,
       status: a.status,
       has_widget: !!cfg.widget || cfg.archetype === 'brand',
-      widget_domain: cfg.widget?.domain || cfg.username || null,
+      // No `|| cfg.username` fallback: an Instagram handle is not a domain, and
+      // reporting one as the widget domain made accounts with no site look installed.
+      widget_domain: cfg.widget?.domain || null,
     };
   });
 

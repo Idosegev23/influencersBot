@@ -42,10 +42,22 @@ export async function notifyScanComplete(args: {
     const isDemo = state?.options?.isDemo === true;
 
     // 1) Team notification.
+    // `accountId` is what upgrades the message to demo_ready_v2, whose second
+    // button promises "the widget on your site" and opens /demo/<accountId>.
+    // Only send it when a site is actually registered: a scan started from an
+    // Instagram handle alone registers no config.widget.domain, and the button
+    // then opened a demo with nothing to proxy. Without accountId the send falls
+    // back to v1 — the chat link, which always works.
     const send = pickTeamSend(isDemo);
+    const hasSite = typeof config?.widget?.domain === 'string' && config.widget.domain.trim() !== '';
     await Promise.allSettled(
       parseRecipients(process.env.SCAN_NOTIFY_RECIPIENTS).map((to) =>
-        send({ to, brandName: brand, accountUsername: slug, accountId: job.account_id! }),
+        send({
+          to,
+          brandName: brand,
+          accountUsername: slug,
+          accountId: hasSite ? job.account_id! : undefined,
+        }),
       ),
     );
 

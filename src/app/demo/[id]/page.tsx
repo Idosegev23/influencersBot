@@ -99,7 +99,11 @@ export default function DemoPage() {
     );
   }
 
-  const websiteUrl = `https://${config.domain}`;
+  // Empty when no site is registered. The preview route below still renders
+  // something real in that case (it can recover a domain from the Instagram
+  // bio, and falls back to the widget on a plain backdrop), so the frame is
+  // always worth showing — only this outbound link needs the guard.
+  const websiteUrl = config.domain ? `https://${config.domain}` : null;
   const primaryColor = config.theme.primaryColor || '#6366f1';
 
   return (
@@ -140,15 +144,17 @@ export default function DemoPage() {
             <Copy className="w-3.5 h-3.5" />
             קוד הטמעה
           </button>
-          <a
-            href={websiteUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            לאתר
-          </a>
+          {websiteUrl && (
+            <a
+              href={websiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              לאתר
+            </a>
+          )}
         </div>
       </div>
 
@@ -158,40 +164,21 @@ export default function DemoPage() {
           is why this page shows the genuine widget — cards, chips, modules, dark mode —
           rather than a reimplementation that drifts from it. */}
       <div className="flex-1 relative overflow-hidden">
-        {config.domain ? (
-          <iframe
-            src={`/api/widget/preview/${accountId}`}
-            className="w-full h-full border-0"
-            title={`${config.brandName} — דמו ווידג׳ט`}
-            /* Left open on purpose: widget.js needs same-origin storage and fetch. */
-            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-          />
-        ) : (
-          /* No website registered for this account — nothing to overlay the widget onto. */
-          <div
-            className="w-full h-full flex flex-col items-center justify-center relative"
-            style={{ background: `linear-gradient(135deg, ${primaryColor}08 0%, ${primaryColor}15 50%, ${primaryColor}08 100%)` }}
-          >
-            <div className="absolute top-20 right-20 w-72 h-72 rounded-full opacity-[0.07]" style={{ backgroundColor: primaryColor }} />
-            <div className="absolute bottom-32 left-16 w-48 h-48 rounded-full opacity-[0.05]" style={{ backgroundColor: primaryColor }} />
-
-            {config.profilePic ? (
-              <img src={config.profilePic} alt={config.brandName} className="w-20 h-20 rounded-2xl object-cover mb-6 shadow-lg" />
-            ) : (
-              <div
-                className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mb-6 shadow-lg"
-                style={{ backgroundColor: primaryColor }}
-              >
-                {config.brandName.charAt(0)}
-              </div>
-            )}
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">{config.brandName}</h1>
-            <p className="text-gray-500 mb-6 max-w-md text-center">
-              לא הוגדר אתר לחשבון הזה, ולכן אין על מה להציג את הווידג׳ט.
-              הוסיפו דומיין בהגדרות הווידג׳ט כדי להפעיל את הדמו.
-            </p>
-          </div>
-        )}
+        {/* Always framed. The preview route is the single authority on what a demo
+            shows: the customer's real site when we have one, a domain recovered
+            from their Instagram bio when the scan never registered one, and the
+            live widget on a plain backdrop when there is genuinely no site. It
+            never answers with JSON, so this frame is never empty. */}
+        <iframe
+          src={`/api/widget/preview/${accountId}`}
+          className="w-full h-full border-0"
+          title={`${config.brandName} — דמו ווידג׳ט`}
+          /* allow-same-origin + allow-scripts: widget.js needs storage and fetch.
+             allow-popups(-to-escape-sandbox): in-page links to OTHER sites are
+             rewritten to target="_blank" so a click can't replace the demo, and
+             they must open as a normal tab rather than a sandboxed one. */
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+        />
       </div>
     </div>
   );

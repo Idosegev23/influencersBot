@@ -26,7 +26,32 @@ const RATE_LIMITS = {
   widget: { windowMs: 60 * 1000, maxRequests: 200 }, // Public widget — needs high limit
   // Unauthenticated write path — far tighter than the general widget bucket.
   widgetDiagnostics: { windowMs: 60 * 1000, maxRequests: 20 },
+  // The shareable demo proxy. Every in-page click is another full page fetch
+  // through this route, and a prospect team opening one shared link from one
+  // office NAT shares a single IP bucket — the 200/min widget bucket would 429
+  // them mid-browse and put an error where the customer's site should be.
+  widgetPreview: { windowMs: 60 * 1000, maxRequests: 1000 },
 };
+
+/**
+ * Shown inside the demo iframe when the preview bucket is exhausted. Reloads
+ * itself once the window has rolled over, so the prospect gets the site back
+ * without knowing anything happened.
+ */
+const RATE_LIMITED_HTML = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One moment</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         background:linear-gradient(#fafafa,#f4f4f5); color:#71717a; }
+  p { font-size:.85rem; }
+</style></head>
+<body><p>Loading the preview&hellip;</p>
+<script>setTimeout(function(){ location.reload(); }, 8000);</script>
+</body></html>`;
 
 function getClientIP(request: NextRequest): string {
   // Try various headers for client IP
@@ -218,6 +243,10 @@ export async function middleware(request: NextRequest) {
       // for being unauthenticated.
       config = RATE_LIMITS.widgetDiagnostics;
       prefix = 'widgetDiagnostics';
+    } else if (pathname.startsWith('/api/widget/preview')) {
+      // Also before the general /api/widget branch, or it inherits 200/min.
+      config = RATE_LIMITS.widgetPreview;
+      prefix = 'widgetPreview';
     } else if (pathname.startsWith('/api/widget')) {
       config = RATE_LIMITS.widget;
       prefix = 'widget';
@@ -243,6 +272,18 @@ export async function middleware(request: NextRequest) {
     const result = checkRateLimit(key, config);
     
     if (!result.success) {
+      // The demo proxy renders inside an iframe a prospect is looking at. A JSON
+      // body there reads as a broken page, so this one path gets HTML.
+      if (pathname.startsWith('/api/widget/preview')) {
+        return new NextResponse(RATE_LIMITED_HTML, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Retry-After': '60',
+            'Cache-Control': 'no-store',
+          },
+        });
+      }
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
         { 
