@@ -73,19 +73,33 @@ async function alert(key: string, level: 'warning' | 'critical', subject: string
 export async function recordTurnCost(params: {
   accountId: string;
   sessionId?: string | null;
-  usage: TokenUsage | null | undefined;
+  /**
+   * One model call, or every call a single turn made. The CS tool loop (cs-agent.ts) runs up
+   * to MAX_ITERS round trips per turn, and each is separately billed — so each is priced on
+   * its own here and the dollars are summed. Summing the TOKENS instead would be wrong, not
+   * merely imprecise: long-context pricing is per request, so three ordinary 50K calls would
+   * add past the 128K threshold and bill the turn at double rate for a request that never
+   * existed. One call to this function is one turn, so `api_calls` keeps meaning "turns" on
+   * both the chat and CS sides.
+   */
+  usage: TokenUsage | TokenUsage[] | null | undefined;
 }): Promise<void> {
   try {
     const { accountId, sessionId, usage } = params;
     if (!accountId || !usage) return;
 
-    const cost = estimateCostUsd({
-      model: usage.model,
-      inputTokens: usage.inputTokens,
-      cachedInputTokens: usage.cachedInputTokens,
-      outputTokens: usage.outputTokens,
-    });
-    const totalTokens = (usage.inputTokens || 0) + (usage.outputTokens || 0);
+    const calls = (Array.isArray(usage) ? usage : [usage]).filter(Boolean);
+    let cost = 0;
+    let totalTokens = 0;
+    for (const c of calls) {
+      cost += estimateCostUsd({
+        model: c.model,
+        inputTokens: c.inputTokens,
+        cachedInputTokens: c.cachedInputTokens,
+        outputTokens: c.outputTokens,
+      });
+      totalTokens += (c.inputTokens || 0) + (c.outputTokens || 0);
+    }
     if (cost <= 0 && totalTokens <= 0) return; // unknown model or empty turn — no fabricated row
 
     // --- 1. Durable per-account daily total (the RPC returns the running total) ---

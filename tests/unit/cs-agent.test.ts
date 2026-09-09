@@ -43,12 +43,28 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { from: (table: string) => { const c: any = {}; c.select = () => c; c.eq = () => c; c.in = () => c; c.order = () => c; c.limit = () => c; c.single = async () => ({ data: null }); c.maybeSingle = async () => ({ data: null }); c.insert = async (row: any) => { (inserted[table] ||= []).push(row); return { data: null }; }; c.update = table === 'whatsapp_contacts' ? contactsUpdate : () => ({ eq: async () => ({ data: null }) }); c.then = (r: any) => r({ data: [] }); return c; } },
 }));
 
+// Cost accounting: recordTurnCost was called from sandwichBot.ts and NOWHERE else, so every
+// WhatsApp-CS turn ran unpriced — 5,450 assistant turns with no cost_tracking row behind them.
+const recordTurnCost = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/costs/recorder', () => ({ recordTurnCost: (...a: any[]) => recordTurnCost(...a) }));
+
 const job = (textBody: string) => ({ waId: '972501112222', msg: { id: 'w1' }, textBody, contactId: 'c1' } as any);
 const bound = () => ({ wa_id: '972501112222', contact_id: 'c1', phase: 'serving', active_account_id: 'acc-1', active_ticket_id: 't1', active_chat_session_id: 'cs-1', customer_name: 'דנה', context: {}, last_activity_at: new Date().toISOString(), version: 2 });
 const callModel = vi.fn();
 
 describe('runCsTurn (brain-led loop)', () => {
-  beforeEach(() => { store = {}; for (const k in handlers) delete handlers[k]; for (const k in inserted) delete inserted[k]; vi.clearAllMocks(); isBotPaused.mockResolvedValue(false); detectHandoff.mockReturnValue({ triggered: false, triggers: [], severity: 'low', reason: '' }); runCsHandoffCheck.mockResolvedValue({ escalated: true }); });
+  // clearAllMocks() empties call history but keeps queued `...Once` implementations, so a test that
+// queued a one-shot the code under test never consumed leaked it into the NEXT test — an escalating
+// detectHandoff was still queued here and short-circuited later turns before the model. Reset each
+// mock before re-arming its default so every test starts from the same place.
+beforeEach(() => {
+  store = {}; for (const k in handlers) delete handlers[k]; for (const k in inserted) delete inserted[k];
+  vi.clearAllMocks();
+  callModel.mockReset();
+  isBotPaused.mockReset().mockResolvedValue(false);
+  detectHandoff.mockReset().mockReturnValue({ triggered: false, triggers: [], severity: 'low', reason: '' });
+  runCsHandoffCheck.mockReset().mockResolvedValue({ escalated: true });
+});
 
   it('paused thread → {kind:none}, model NOT called, but the inbound IS recorded for the human', async () => {
     isBotPaused.mockResolvedValue(true);
@@ -469,5 +485,77 @@ describe('runCsTurn (brain-led loop)', () => {
     const { runCsTurn } = await import('@/lib/cs/cs-agent');
     await runCsTurn(job('אני רוצה נציג'), { callModel });
     expect(runCsHandoffCheck).toHaveBeenCalledWith(expect.objectContaining({ contactPhone: '972501112222' }));
+  });
+});
+
+
+/**
+ * One CS turn is a LOOP of model calls, not one call. Pricing it needs every call's usage,
+ * and `api_calls` must still tick once per turn or the per-turn averages stop being
+ * comparable to the chat side, which records one call per turn.
+ */
+describe('runCsTurn — cost accounting', () => {
+  const usage = (inputTokens: number) => ({ model: 'gpt-5.6-sol', inputTokens, cachedInputTokens: 0, outputTokens: 40 });
+
+  // This block is a SIBLING of the suite above, so its beforeEach does not reach here — without
+  // its own reset these tests inherit whatever the previous suite's last test left on the mocks
+  // (an escalating detectHandoff, which short-circuits the turn before the model is ever called).
+  beforeEach(() => {
+    store = {}; for (const k in handlers) delete handlers[k]; for (const k in inserted) delete inserted[k];
+    vi.clearAllMocks();
+    callModel.mockReset();
+    isBotPaused.mockReset().mockResolvedValue(false);
+    detectHandoff.mockReset().mockReturnValue({ triggered: false, triggers: [], severity: 'low', reason: '' });
+    runCsHandoffCheck.mockReset().mockResolvedValue({ escalated: true });
+  });
+
+  it('records the turn ONCE with the usage of every model call in the loop', async () => {
+    store['972501112222'] = bound();
+    handlers['lookup_order'] = async () => ({ ok: true, data: { status: 'shipped' } });
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'lookup_order', args: {} }], text: null, usage: usage(5000) })
+      .mockResolvedValueOnce({ toolCalls: [], text: 'ההזמנה נשלחה', usage: usage(5800) });
+
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    await runCsTurn(job('מה עם ההזמנה שלי'), { callModel });
+
+    expect(callModel).toHaveBeenCalledTimes(2);
+    expect(recordTurnCost).toHaveBeenCalledTimes(1);
+    const arg = recordTurnCost.mock.calls[0][0];
+    expect(arg.accountId).toBe('acc-1');
+    expect(arg.sessionId).toBe('cs-1');
+    expect(arg.usage).toEqual([usage(5000), usage(5800)]);
+  });
+
+  it('records a single-call turn too', async () => {
+    store['972501112222'] = bound();
+    callModel.mockResolvedValueOnce({ toolCalls: [], text: 'היי דנה', usage: usage(4800) });
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    await runCsTurn(job('היי'), { callModel });
+    expect(recordTurnCost).toHaveBeenCalledTimes(1);
+    expect(recordTurnCost.mock.calls[0][0].usage).toEqual([usage(4800)]);
+  });
+
+  it('does not record a turn that never reached the model', async () => {
+    isBotPaused.mockResolvedValue(true);
+    store['972501112222'] = bound();
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    await runCsTurn(job('היי'), { callModel });
+    expect(callModel).not.toHaveBeenCalled();
+    expect(recordTurnCost).not.toHaveBeenCalled();
+    // paired presence check: an UNpaused turn on the same session does record, so the
+    // assertion above is failing for the intended reason and not vacuously.
+    isBotPaused.mockResolvedValue(false);
+    callModel.mockResolvedValueOnce({ toolCalls: [], text: 'היי', usage: usage(4800) });
+    await runCsTurn(job('היי'), { callModel });
+    expect(recordTurnCost).toHaveBeenCalledTimes(1);
+  });
+
+  it('a model call that reported no usage never fabricates one', async () => {
+    store['972501112222'] = bound();
+    callModel.mockResolvedValueOnce({ toolCalls: [], text: 'היי' });
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    await runCsTurn(job('היי'), { callModel });
+    expect(recordTurnCost).not.toHaveBeenCalled();
   });
 });

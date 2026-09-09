@@ -148,6 +148,10 @@
     {
       "path": "/api/cron/refresh-knowledge-links",
       "schedule": "20 4 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-cost-report",
+      "schedule": "0 5 * * 0"
     }
   ]
 }

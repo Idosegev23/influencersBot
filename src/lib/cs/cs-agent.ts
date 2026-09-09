@@ -22,6 +22,8 @@ import { whatsappIdentity, identityKey, withClaimedPhone, identityPhone, CS_TICK
 import { hasContactRoute, harvestContact } from '@/lib/support/contact';
 import { detectOrderIntent } from '@/lib/cs/fast-path';
 import type { CsJob } from '@/lib/cs/wa-cs-queue';
+import { recordTurnCost } from '@/lib/costs/recorder';
+import type { TokenUsage } from '@/lib/chatbot/archetypes/types';
 
 export interface CsTurnResult {
   reply:
@@ -47,7 +49,7 @@ export interface CsTurnResult {
 // content is `string` for text turns and an OpenAI multimodal content-part array (text + image_url)
 // for an image turn, so the brain literally SEES the shopper's photo.
 interface CsChatMessage { role: 'user' | 'assistant' | 'tool'; content: string | any[] | null; tool_calls?: any[]; tool_call_id?: string; }
-interface CsModelTurn { toolCalls: Array<{ id: string; name: string; args: any }>; text: string | null; }
+interface CsModelTurn { toolCalls: Array<{ id: string; name: string; args: any }>; text: string | null; usage?: TokenUsage | null; }
 export interface CsAgentDeps {
   callModel(params: { system: string; messages: CsChatMessage[]; tools: OpenAIFunctionDef[] }): Promise<CsModelTurn>;
 }
@@ -75,7 +77,16 @@ async function defaultCallModel(params: { system: string; messages: CsChatMessag
   } as any);
   const msg: any = res.choices?.[0]?.message;
   const toolCalls = (msg?.tool_calls || []).map((tc: any) => ({ id: tc.id, name: tc.function?.name, args: safeJson(tc.function?.arguments) }));
-  return { toolCalls, text: msg?.content ?? null };
+  const u: any = (res as any).usage;
+  const usage: TokenUsage | null = u
+    ? {
+        model: laneModel('money'),
+        inputTokens: u.prompt_tokens ?? 0,
+        cachedInputTokens: u.prompt_tokens_details?.cached_tokens ?? 0,
+        outputTokens: u.completion_tokens ?? 0,
+      }
+    : null;
+  return { toolCalls, text: msg?.content ?? null, usage };
 }
 
 // --- read-helpers used to build the turn context ---
@@ -431,14 +442,29 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
     await dispatchTool(seeded);
   }
 
+  // Every call the loop makes is separately billed, so all of them are collected and priced as
+  // ONE turn below — see recordTurnCost's contract for why the tokens must not simply be summed.
+  const turnUsage: TokenUsage[] = [];
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const turn = await deps.callModel({ system, messages, tools: toolset.defs });
+    if (turn.usage) turnUsage.push(turn.usage);
     if (!turn.toolCalls?.length) { finalText = turn.text; break; }
     messages.push({ role: 'assistant', content: turn.text, tool_calls: turn.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.args) } })) });
     for (const tc of turn.toolCalls) await dispatchTool(tc);
     // Do NOT short-circuit on a hand-off. escalate_to_human pauses the bot for FUTURE turns, but the
     // shopper who just reported a problem must get a reply NOW, not silence — so let the loop run one
     // more iteration and let the model compose a brief empathetic hand-off ack from the tool result.
+  }
+
+  // Cost accounting — fire-and-forget, never throws, never blocks the reply. Until this existed
+  // `recordTurnCost` was called from sandwichBot.ts alone, so `cost_tracking` priced the chat bot
+  // and every WhatsApp-CS turn was invisible to it.
+  if (turnUsage.length) {
+    void recordTurnCost({
+      accountId: session.active_account_id!,
+      sessionId: session.active_chat_session_id,
+      usage: turnUsage,
+    });
   }
 
   // 6/7) Persist + reply. No CS tool returns an interactive payload (purely conversational — see file

@@ -127,3 +127,62 @@ describe('recordTurnCost — org alert (>$80/day)', () => {
     expect(org![0].level).toBe('critical');
   });
 });
+
+/**
+ * A WhatsApp-CS turn is not one model call — it is the tool loop in cs-agent.ts, up to
+ * MAX_ITERS round trips, each one its own billed request. Passing the loop's calls as an
+ * ARRAY prices each request at its own rate and increments api_calls once, so `api_calls`
+ * keeps meaning "turns" on both the chat and CS sides and the two are comparable.
+ *
+ * The rate matters, not just the bookkeeping: long-context pricing is per REQUEST. Summing
+ * a loop's tokens into one usage would let three ordinary 50K calls add up past the 128K
+ * threshold and bill the whole turn at double rate for a request that never existed.
+ */
+describe('recordTurnCost — a turn made of several model calls', () => {
+  const call = { model: 'gpt-5.6-sol', inputTokens: 50_000, cachedInputTokens: 0, outputTokens: 100 };
+
+  it('prices each call separately instead of summing tokens past the long-context threshold', async () => {
+    const { recordTurnCost } = await import('@/lib/costs/recorder');
+    const { estimateCostUsd, LONG_CONTEXT_THRESHOLD_TOKENS } = await import('@/lib/costs/pricing');
+
+    // The trap this guards: 3 x 50K = 150K, which is over the threshold, while no single
+    // request came close to it.
+    expect(50_000 * 3).toBeGreaterThan(LONG_CONTEXT_THRESHOLD_TOKENS);
+    expect(50_000).toBeLessThan(LONG_CONTEXT_THRESHOLD_TOKENS);
+
+    await recordTurnCost({ accountId: 'acc-1', sessionId: 'sess-1', usage: [call, call, call] });
+
+    expect(rpc).toHaveBeenCalledTimes(1); // one row increment = one turn
+    const args = rpc.mock.calls[0][1];
+    const perCall = estimateCostUsd(call);
+    expect(perCall).toBeGreaterThan(0);
+    expect(args.p_cost).toBeCloseTo(perCall * 3, 6);
+    // and NOT the long-context price the summed shape would have produced
+    const summed = estimateCostUsd({ ...call, inputTokens: 150_000, outputTokens: 300 });
+    expect(summed).toBeGreaterThan(perCall * 3);
+    expect(args.p_cost).not.toBeCloseTo(summed, 6);
+  });
+
+  it('totals the tokens across the calls', async () => {
+    const { recordTurnCost } = await import('@/lib/costs/recorder');
+    await recordTurnCost({ accountId: 'acc-1', sessionId: 'sess-1', usage: [call, call, call] });
+    expect(rpc.mock.calls[0][1].p_tokens).toBe(3 * (50_000 + 100));
+  });
+
+  it('still records a turn when only some calls reported usage', async () => {
+    const { recordTurnCost } = await import('@/lib/costs/recorder');
+    const { estimateCostUsd } = await import('@/lib/costs/pricing');
+    await recordTurnCost({ accountId: 'acc-1', sessionId: 'sess-1', usage: [call, null as any, call] });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0][1].p_cost).toBeCloseTo(estimateCostUsd(call) * 2, 6);
+  });
+
+  it('is a no-op for an empty list — a turn served with no model call writes nothing', async () => {
+    const { recordTurnCost } = await import('@/lib/costs/recorder');
+    await recordTurnCost({ accountId: 'acc-1', sessionId: 'sess-1', usage: [] });
+    expect(rpc).not.toHaveBeenCalled();
+    // paired presence check: the same call shape DOES write when a real usage is present
+    await recordTurnCost({ accountId: 'acc-1', sessionId: 'sess-1', usage: [call] });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+});
