@@ -34,6 +34,22 @@ export interface SetupInput {
   scanJobs: number;
 }
 
+/**
+ * What each account and each outside project bills us monthly.
+ *
+ * The three Israeli customers are on a ₪2,500 retainer; Colgate is a separate project with
+ * its own Supabase and its own $200, so it cannot be derived from these tables and is carried
+ * as an `external` line. Revenue is optional throughout — an unconfigured report shows costs
+ * exactly as it did before rather than inventing a zero.
+ */
+export interface RevenueInput {
+  /** username → ILS per month. An account absent here is not a paying customer. */
+  monthlyIls: Record<string, number>;
+  ilsPerUsd: number;
+  /** Projects that bill outside this database entirely. */
+  external?: Array<{ name: string; monthlyUsd: number; monthlyCostUsd: number }>;
+}
+
 export interface RawCostData {
   weekStart: string;
   weekEnd: string;
@@ -43,6 +59,7 @@ export interface RawCostData {
   /** Apify's own billed total for its current cycle. null when the API could not be read. */
   apifyUsd: number | null;
   apifyCycleDays: number | null;
+  revenue?: RevenueInput;
 }
 
 export interface AccountRow {
@@ -55,6 +72,25 @@ export interface AccountRow {
   usdPerConversation: number | null;
   prevUsdPerConversation: number | null;
   deltaPct: number | null;
+  /** null when the account pays nothing — a demo has no margin, it is not -100%. */
+  revenueUsd: number | null;
+  marginPct: number | null;
+}
+
+export interface ExternalRow {
+  name: string;
+  revenueUsd: number;
+  costUsd: number;
+  marginPct: number | null;
+}
+
+export interface RevenueSummary {
+  weekUsd: number;
+  costUsd: number;
+  profitUsd: number;
+  marginPct: number | null;
+  ilsPerUsd: number;
+  external: ExternalRow[];
 }
 
 export interface ScanRow extends ScanInput {
@@ -81,6 +117,8 @@ export interface WeeklyCostReport {
   allTime: { costUsd: number; conversations: number; turns: number; usdPerConversation: number | null };
   comparison: { direction: 'up' | 'down' | 'flat' | 'unknown'; deltaPct: number | null };
   accounts: AccountRow[];
+  /** null when no revenue is configured — the report then reads exactly as a cost report. */
+  revenue: RevenueSummary | null;
   scans: ScanSummary;
   setups: SetupInput[];
   /**
@@ -104,6 +142,13 @@ const NOT_MEASURED = [
   'קריאות ה-LLM של צינור הסריקה — חילוץ מוצרים, יצירת פרסונה, תמלול — אף אחת לא נרשמת',
   'Apify נמדד ברמת הארגון בלבד; ריצה לא נושאת account_id, אז הפיצול לחשבון הוא חלוקה שווה',
 ];
+
+/**
+ * A month is 30.44 days on average, so a seven-day week earns 7/30.44 of a monthly retainer.
+ * Using 7/30 or 7/31 instead would drift against the monthly figures by a percent or so, and
+ * the report is read next to them.
+ */
+const WEEK_OF_MONTH = 7 / 30.44;
 
 /** Divide, or say we cannot — an average over nothing is not zero, it is absent. */
 function per(total: number, count: number): number | null {
@@ -163,6 +208,11 @@ export function aggregateWeeklyCost(raw: RawCostData): WeeklyCostReport {
         usdPerConversation !== null && prevUsdPerConversation !== null && prevUsdPerConversation > 0
           ? ((usdPerConversation - prevUsdPerConversation) / prevUsdPerConversation) * 100
           : null;
+      const monthlyIls = raw.revenue?.monthlyIls?.[a.username];
+      const revenueUsd =
+        raw.revenue && monthlyIls != null && raw.revenue.ilsPerUsd > 0
+          ? (monthlyIls / raw.revenue.ilsPerUsd) * WEEK_OF_MONTH
+          : null;
       return {
         accountId: a.accountId,
         username: a.username,
@@ -172,6 +222,8 @@ export function aggregateWeeklyCost(raw: RawCostData): WeeklyCostReport {
         usdPerConversation,
         prevUsdPerConversation,
         deltaPct: delta,
+        revenueUsd,
+        marginPct: revenueUsd !== null && revenueUsd > 0 ? ((revenueUsd - a.week.costUsd) / revenueUsd) * 100 : null,
       };
     })
     .sort((x, y) => y.costUsd - x.costUsd);
@@ -197,6 +249,28 @@ export function aggregateWeeklyCost(raw: RawCostData): WeeklyCostReport {
       .sort((a, b) => b.runs - a.runs),
   };
 
+  let revenue: RevenueSummary | null = null;
+  if (raw.revenue) {
+    const external: ExternalRow[] = (raw.revenue.external ?? []).map((e) => ({
+      name: e.name,
+      revenueUsd: e.monthlyUsd * WEEK_OF_MONTH,
+      costUsd: e.monthlyCostUsd * WEEK_OF_MONTH,
+      marginPct: e.monthlyUsd > 0 ? ((e.monthlyUsd - e.monthlyCostUsd) / e.monthlyUsd) * 100 : null,
+    }));
+    const revUsd = accounts.reduce((s, a) => s + (a.revenueUsd ?? 0), 0) + external.reduce((s, e) => s + e.revenueUsd, 0);
+    // Every cost the week produced counts against revenue, including demos and internal
+    // accounts — they are a cost of selling, not a separate business.
+    const costUsd = weekCost + external.reduce((s, e) => s + e.costUsd, 0);
+    revenue = {
+      weekUsd: revUsd,
+      costUsd,
+      profitUsd: revUsd - costUsd,
+      marginPct: revUsd > 0 ? ((revUsd - costUsd) / revUsd) * 100 : null,
+      ilsPerUsd: raw.revenue.ilsPerUsd,
+      external,
+    };
+  }
+
   return {
     weekStart: raw.weekStart,
     weekEnd: raw.weekEnd,
@@ -215,6 +289,7 @@ export function aggregateWeeklyCost(raw: RawCostData): WeeklyCostReport {
     },
     comparison: { direction, deltaPct },
     accounts,
+    revenue,
     scans,
     setups: raw.setups,
     notMeasured: NOT_MEASURED,
@@ -237,6 +312,31 @@ export function renderWeeklyCostReportHtml(r: WeeklyCostReport): string {
   const cell = 'padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:13px;';
   const head = 'padding:8px 10px;background:#f3f4f6;font-size:12px;color:#374151;text-align:right;font-weight:600;';
 
+  const rev = r.revenue;
+  const revBlock = rev ? `
+    <h3 style="font-size:14px;margin:0 0 6px;">רווחיות</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+      <tr><th style="${head}">הכנסה</th><th style="${head}">עלות</th><th style="${head}">רווח</th><th style="${head}">שוליים</th></tr>
+      <tr>
+        <td style="${cell}">${usd(rev.weekUsd)}</td>
+        <td style="${cell}">${usd(rev.costUsd)}</td>
+        <td style="${cell}"><b>${usd(rev.profitUsd)}</b></td>
+        <td style="${cell}"><b>${rev.marginPct === null ? '—' : rev.marginPct.toFixed(1) + '%'}</b></td>
+      </tr>
+    </table>
+    ${rev.external.length ? `
+    <h3 style="font-size:14px;margin:0 0 6px;">פרויקטים מחוץ למערכת</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+      <tr><th style="${head}">פרויקט</th><th style="${head}">הכנסה</th><th style="${head}">עלות</th><th style="${head}">שוליים</th></tr>
+      ${rev.external.map((e) => `<tr>
+        <td style="${cell}">${esc(e.name)}</td><td style="${cell}">${usd(e.revenueUsd)}</td>
+        <td style="${cell}">${usd(e.costUsd)}</td>
+        <td style="${cell}">${e.marginPct === null ? '—' : e.marginPct.toFixed(1) + '%'}</td>
+      </tr>`).join('')}
+    </table>
+    <p style="font-size:12px;color:#9ca3af;margin:-10px 0 18px;">אלה מחויבים מחוץ לבסיס הנתונים הזה — הסכומים שלהם הם חלק שבועי מהחודשי, לא מדידה של השבוע. שער ₪${rev.ilsPerUsd} = $1.</p>` : ''}
+  ` : '';
+
   const accountRows = r.accounts.length
     ? r.accounts.map((a) => `<tr>
         <td style="${cell}">${esc(a.username)}</td>
@@ -245,8 +345,9 @@ export function renderWeeklyCostReportHtml(r: WeeklyCostReport): string {
         <td style="${cell}">${usd(a.costUsd)}</td>
         <td style="${cell}"><b>${usd(a.usdPerConversation, 3)}</b></td>
         <td style="${cell}">${pct(a.deltaPct)}</td>
+        <td style="${cell}">${a.marginPct === null ? '—' : a.marginPct.toFixed(1) + '%'}</td>
       </tr>`).join('')
-    : `<tr><td style="${cell}" colspan="6">אין חשבון עם עלות או שיחה השבוע</td></tr>`;
+    : `<tr><td style="${cell}" colspan="7">אין חשבון עם עלות או שיחה השבוע</td></tr>`;
 
   const scanRows = r.scans.rows.length
     ? r.scans.rows.map((s) => `<tr>
@@ -281,6 +382,7 @@ export function renderWeeklyCostReportHtml(r: WeeklyCostReport): string {
       &nbsp;·&nbsp; לתור: ${usd(r.week.usdPerTurn, 4)}
     </p>
 
+    ${revBlock}
     <h3 style="font-size:14px;margin:0 0 6px;">שבוע מול ממוצע כללי</h3>
     <p style="font-size:14px;line-height:1.7;margin:0 0 18px;">
       השבוע ${usd(r.week.usdPerConversation, 3)} מול ${usd(r.allTime.usdPerConversation, 3)} מאז ומתמיד
@@ -290,7 +392,7 @@ export function renderWeeklyCostReportHtml(r: WeeklyCostReport): string {
 
     <h3 style="font-size:14px;margin:0 0 6px;">החשבונות היקרים</h3>
     <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
-      <tr><th style="${head}">חשבון</th><th style="${head}">שיחות</th><th style="${head}">תורים</th><th style="${head}">עלות</th><th style="${head}">$/שיחה</th><th style="${head}">מול שבוע שעבר</th></tr>
+      <tr><th style="${head}">חשבון</th><th style="${head}">שיחות</th><th style="${head}">תורים</th><th style="${head}">עלות</th><th style="${head}">$/שיחה</th><th style="${head}">מול שבוע שעבר</th><th style="${head}">שוליים</th></tr>
       ${accountRows}
     </table>
 
@@ -331,6 +433,45 @@ export function renderWeeklyCostReportHtml(r: WeeklyCostReport): string {
 
 /** USD per 1M tokens for the embedding model the scan pipeline uses. Mirrors costs/pricing.ts. */
 const EMBED_USD_PER_M = 0.13;
+
+/**
+ * What we are paid, by whom. Kept here rather than in the database because it is a commercial
+ * fact about three contracts, not per-account state — and because a number this consequential
+ * should be visible in review rather than editable from an admin screen.
+ *
+ * ILS for the Israeli retainers; `EXTERNAL_PROJECTS` for anything billing outside this
+ * database entirely. Override any of it by env when a contract changes mid-month.
+ */
+const MONTHLY_REVENUE_ILS: Record<string, number> = {
+  argania_group: 2500,
+  'labeaute.israel': 2500,
+  studiopasha_fashion: 2500,
+};
+
+/** Colgate is a separate project on its own Supabase — none of its usage reaches these tables. */
+const EXTERNAL_PROJECTS = [
+  { name: 'colgate', monthlyUsd: 200, monthlyCostUsd: 12.2 },
+];
+
+const ILS_PER_USD = Number(process.env.ILS_PER_USD || '3.7');
+
+function revenueConfig(): RevenueInput {
+  let monthlyIls = MONTHLY_REVENUE_ILS;
+  if (process.env.ACCOUNT_REVENUE_ILS) {
+    // "argania_group=2500,labeaute.israel=2500" — a contract change should not need a deploy.
+    try {
+      monthlyIls = Object.fromEntries(
+        process.env.ACCOUNT_REVENUE_ILS.split(',')
+          .map((pair) => pair.split('='))
+          .filter((kv) => kv.length === 2 && Number(kv[1]) > 0)
+          .map(([k, v]) => [k.trim(), Number(v)])
+      );
+    } catch {
+      /* malformed override falls back to the table above rather than zeroing revenue */
+    }
+  }
+  return { monthlyIls, ilsPerUsd: ILS_PER_USD, external: EXTERNAL_PROJECTS };
+}
 
 /**
  * Apify bills us directly and is the one scan cost with a real number behind it, so it is read
@@ -399,6 +540,7 @@ export async function fetchRawCostData(range: { weekStart: string; weekEnd: stri
       scanJobs: n(r.scan_jobs),
     })),
     ...apify,
+    revenue: revenueConfig(),
   };
 }
 
@@ -473,7 +615,9 @@ export async function runWeeklyCostReport(opts?: {
   try {
     await sendEmail({
       to: COST_REPORT_RECIPIENTS,
-      subject: `דוח עלויות ${range.weekStart}–${range.weekEnd} · ${usd(report.week.costUsd)} · ${usd(avg, 3)} לשיחה`,
+      subject: report.revenue
+        ? `דוח עלויות ${range.weekStart}–${range.weekEnd} · ${usd(report.week.costUsd)} · ${usd(avg, 3)} לשיחה · שוליים ${report.revenue.marginPct === null ? '—' : report.revenue.marginPct.toFixed(0) + '%'}`
+        : `דוח עלויות ${range.weekStart}–${range.weekEnd} · ${usd(report.week.costUsd)} · ${usd(avg, 3)} לשיחה`,
       html: renderWeeklyCostReportHtml(report),
     });
   } catch (err: any) {

@@ -278,3 +278,112 @@ describe('renderWeeklyCostReportHtml', () => {
     }
   });
 });
+
+/**
+ * A weekly cost number with no revenue beside it cannot answer the question the report is
+ * read for — whether an account is worth serving. The three Israeli customers pay ₪2,500 a
+ * month each; Colgate is a separate project on its own Supabase, billing $200.
+ */
+describe('aggregateWeeklyCost — revenue and margin', () => {
+  const paying = (username: string, costUsd: number, conversations: number) =>
+    acct({ username, week: { costUsd, conversations, turns: conversations * 2 } });
+
+  it('turns a monthly retainer into the share earned in the reported week', () => {
+    const r = aggregateWeeklyCost(raw({
+      accounts: [paying('argania_group', 25, 300)],
+      revenue: { monthlyIls: { argania_group: 2500 }, ilsPerUsd: 3.7 },
+    }));
+    // ₪2,500/month at 3.70 is $675.68, and a 7-day week is 7/30.44 of a month.
+    expect(r.revenue!.weekUsd).toBeCloseTo((2500 / 3.7) * (7 / 30.44), 2);
+    expect(r.accounts[0].revenueUsd).toBeCloseTo((2500 / 3.7) * (7 / 30.44), 2);
+  });
+
+  it('reports margin per account and for the week', () => {
+    const r = aggregateWeeklyCost(raw({
+      accounts: [paying('argania_group', 50, 300), paying('labeaute.israel', 30, 200)],
+      revenue: { monthlyIls: { argania_group: 2500, 'labeaute.israel': 2500 }, ilsPerUsd: 3.7 },
+    }));
+    const weekPerCustomer = (2500 / 3.7) * (7 / 30.44);
+    expect(r.revenue!.weekUsd).toBeCloseTo(weekPerCustomer * 2, 2);
+    expect(r.revenue!.marginPct).toBeCloseTo(((weekPerCustomer * 2 - 80) / (weekPerCustomer * 2)) * 100, 2);
+    expect(r.accounts.find((a) => a.username === 'argania_group')!.marginPct)
+      .toBeCloseTo(((weekPerCustomer - 50) / weekPerCustomer) * 100, 2);
+  });
+
+  it('leaves an account that pays nothing without a margin, rather than showing -100%', () => {
+    const r = aggregateWeeklyCost(raw({
+      accounts: [paying('some_demo', 4, 40), paying('argania_group', 20, 200)],
+      revenue: { monthlyIls: { argania_group: 2500 }, ilsPerUsd: 3.7 },
+    }));
+    const demo = r.accounts.find((a) => a.username === 'some_demo')!;
+    expect(demo.revenueUsd).toBeNull();
+    expect(demo.marginPct).toBeNull();
+    // paired presence check: the paying account beside it does get both
+    expect(r.accounts.find((a) => a.username === 'argania_group')!.marginPct).toBeGreaterThan(0);
+  });
+
+  it('carries external projects that bill outside this database', () => {
+    // Colgate has its own Supabase and its own revenue; it belongs on the P&L even though
+    // none of its usage is in these tables.
+    const r = aggregateWeeklyCost(raw({
+      accounts: [paying('argania_group', 20, 200)],
+      revenue: {
+        monthlyIls: { argania_group: 2500 },
+        ilsPerUsd: 3.7,
+        external: [{ name: 'colgate', monthlyUsd: 200, monthlyCostUsd: 12.2 }],
+      },
+    }));
+    expect(r.revenue!.external).toHaveLength(1);
+    const c = r.revenue!.external[0];
+    expect(c.revenueUsd).toBeCloseTo(200 * (7 / 30.44), 2);
+    expect(c.costUsd).toBeCloseTo(12.2 * (7 / 30.44), 2);
+    expect(c.marginPct).toBeCloseTo(((200 - 12.2) / 200) * 100, 2);
+    // and it lands in the week's totals
+    expect(r.revenue!.weekUsd).toBeGreaterThan((2500 / 3.7) * (7 / 30.44));
+  });
+
+  it('says nothing about revenue when none is configured', () => {
+    const r = aggregateWeeklyCost(raw({ accounts: [paying('argania_group', 20, 200)] }));
+    expect(r.revenue).toBeNull();
+    expect(r.accounts[0].revenueUsd).toBeNull();
+    // paired presence check: configuring revenue does produce it
+    const withRev = aggregateWeeklyCost(raw({
+      accounts: [paying('argania_group', 20, 200)],
+      revenue: { monthlyIls: { argania_group: 2500 }, ilsPerUsd: 3.7 },
+    }));
+    expect(withRev.revenue).not.toBeNull();
+  });
+});
+
+describe('renderWeeklyCostReportHtml — revenue', () => {
+  const withRevenue = () => aggregateWeeklyCost(raw({
+    accounts: [acct({
+      username: 'argania_group',
+      week: { costUsd: 24, conversations: 200, turns: 480 },
+      allTime: { costUsd: 100, conversations: 1000, turns: 2400 },
+    })],
+    revenue: {
+      monthlyIls: { argania_group: 2500 },
+      ilsPerUsd: 3.7,
+      external: [{ name: 'colgate', monthlyUsd: 200, monthlyCostUsd: 12.2 }],
+    },
+  }));
+
+  it('puts revenue, profit and margin in the mail', async () => {
+    const { renderWeeklyCostReportHtml } = await import('@/lib/costs/weekly-report');
+    const html = renderWeeklyCostReportHtml(withRevenue());
+    expect(html).toMatch(/רווח/);
+    expect(html).toMatch(/שוליים/);
+    expect(html).toContain('colgate');
+    expect(html).not.toMatch(/NaN|Infinity|undefined/);
+  });
+
+  it('still renders a pure cost report when no revenue is configured', async () => {
+    const { renderWeeklyCostReportHtml } = await import('@/lib/costs/weekly-report');
+    const html = renderWeeklyCostReportHtml(aggregateWeeklyCost(raw({
+      accounts: [acct({ username: 'argania_group', week: { costUsd: 24, conversations: 200, turns: 480 } })],
+    })));
+    expect(html).not.toContain('colgate');
+    expect(html).toContain('<table');   // paired: it really did render
+  });
+});
