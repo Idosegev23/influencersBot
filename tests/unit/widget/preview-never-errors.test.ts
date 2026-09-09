@@ -56,24 +56,41 @@ describe('widget preview never answers a demo link with an error', () => {
   it('renders a page when the account does not exist (was: 404 JSON)', async () => {
     single.mockResolvedValue({ data: null });
     const body = await expectRenderedPage(await get('00000000-0000-0000-0000-000000000000'));
-    expect(body).toContain('no longer valid');
+    expect(body).toContain('אינו תקף יותר');
   });
 
   it('renders a page when no website is registered (was: 404 JSON in the frame)', async () => {
-    single.mockResolvedValue({ data: { config: { username: 'rebarisrael' } } });
+    single.mockResolvedValue({ data: { config: { username: 'rebarisrael' }, language: 'he' } });
     const body = await expectRenderedPage(await get('acct-no-site'));
-    expect(body).toContain('No website is registered');
+    expect(body).toContain('לא רשום אתר');
     // The site is missing, but the product being demonstrated is not: the real
     // widget still loads so the link is worth opening.
     expect(body).toContain('widget.js');
   });
 
+  it('speaks the account language — a Hebrew brand must not hand its prospect an English error', async () => {
+    // Ido's screenshot: a Hebrew account's demo showed an English stand-in.
+    single.mockResolvedValue({ data: { config: { username: 'x' }, language: 'he' } });
+    const he = await expectRenderedPage(await get('acct-he'));
+    expect(he).toContain('לא רשום אתר');
+    expect(he).toContain('dir="rtl"');
+
+    vi.resetModules();
+    single.mockResolvedValue({ data: { config: { username: 'x' }, language: 'en' } });
+    const en = await expectRenderedPage(await get('acct-en'));
+    expect(en).toContain('No website is registered');
+    expect(en).toContain('dir="ltr"');
+  });
+
   it('renders a page when the demo window has closed (was: 403 JSON)', async () => {
     single.mockResolvedValue({
-      data: { config: { widget: { domain: 'example.com' }, demo: { ends_at: '2020-01-01T00:00:00.000Z' } } },
+      data: {
+        config: { widget: { domain: 'example.com' }, demo: { ends_at: '2020-01-01T00:00:00.000Z' } },
+        language: 'he',
+      },
     });
     const body = await expectRenderedPage(await get('acct-expired'));
-    expect(body).toContain('This demo has ended');
+    expect(body).toContain('תקופת ההתנסות הסתיימה');
     // An expired demo must NOT keep serving the assistant it no longer entitles
     // the viewer to — this is the one case where the widget is deliberately absent.
     expect(body).not.toContain('widget.js');

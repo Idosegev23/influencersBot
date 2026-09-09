@@ -23,6 +23,7 @@ import { createClient } from '@/lib/supabase/server';
 import { demoAccessFromConfig } from '@/lib/demo/guard';
 import { rewriteNavigation } from '@/lib/widget/preview-rewrite';
 import { filterUpstreamHeaders } from '@/lib/widget/preview-headers';
+import { resolveBlockedPage } from '@/lib/widget/blocked-site-warmup';
 import { resolveWidgetDomain } from '@/lib/widget/resolve-domain';
 
 const FETCH_TIMEOUT_MS = 12000;
@@ -31,20 +32,23 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
   const { accountId } = await ctx.params;
 
   if (!accountId) {
-    return framePage(req, { headline: 'This preview link is incomplete', detail: 'It is missing the account it should show.' });
+    return framePage(req, { kind: 'incomplete' });
   }
 
   const supabase = await createClient();
   const { data: account } = await supabase
     .from('accounts')
-    .select('config')
+    .select('config, language')
     .eq('id', accountId)
     .single();
   if (!account) {
-    return framePage(req, { headline: 'This demo link is no longer valid', detail: 'The account it pointed to does not exist any more.' });
+    return framePage(req, { kind: 'invalid' });
   }
 
   const cfg: any = account.config || {};
+  // The stand-in pages used to be English on every account, including Hebrew
+  // ones — a demo link a prospect opens should not switch language on them.
+  const lang: 'he' | 'en' = (account as any).language === 'en' ? 'en' : 'he';
 
   // Expired demo — stop proxying the customer's site under our domain. This
   // matters more here than on the chat surfaces: the proxy strips the origin
@@ -55,10 +59,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
     // Deliberately no widget and no proxying here — an expired demo must stop
     // re-serving the customer's storefront from our origin. But it says so in
     // HTML: a 403 JSON body inside the frame just looks broken.
-    return framePage(req, {
-      headline: 'This demo has ended',
-      detail: 'Ask your contact at LDRS to reopen it and the link will work again.',
-    });
+    return framePage(req, { kind: 'expired', lang });
   }
 
   // An account scanned from an Instagram handle alone never got a websiteUrl, so
@@ -69,11 +70,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
   if (!domain) {
     // Nothing to proxy, but the widget itself is real and worth demonstrating.
     // Never answer a shared demo link with JSON.
-    return framePage(req, {
-      accountId,
-      headline: 'The assistant is live — the site preview is not',
-      detail: 'No website is registered for this account, so there is no site to show the assistant on.',
-    });
+    return framePage(req, { kind: 'no-site', lang, accountId });
   }
 
   // Normalize: strip protocol/trailing slash so we can rebuild safely
@@ -82,6 +79,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
   // Path must start with /; anything else is treated as a path fragment
   const safePath = path.startsWith('/') ? path : '/' + path;
   const targetUrl = `https://${cleanDomain}${safePath}`;
+  // Browser warm-up is homepage-only: each page costs a real Apify run (~$0.07,
+  // ~112s measured), and the homepage is what a shared demo link opens.
+  const isHomepage = safePath === '/';
 
   let upstreamRes: Response;
   try {
@@ -103,10 +103,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
       ),
     ]);
   } catch (err: any) {
-    return framePage(req, {
-      accountId,
-      headline: 'The assistant is live — the site preview is not',
-      detail: `<code>${escapeHtml(cleanDomain)}</code> could not be reached (${escapeHtml(err?.message || 'network error')}) when we asked for it, so its pages can't be shown here.`,
+    return blockedOrStandIn(req, {
+      accountId, lang, cleanDomain, targetUrl, isHomepage,
+      reason: err?.message || 'network error',
     });
   }
 
@@ -118,10 +117,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
     // raw `{"error":"customer site returned 403"}`. The widget is the thing being
     // demonstrated, not the customer's homepage, so serve it on a plain backdrop
     // and say why the site itself is missing.
-    return framePage(req, {
-      accountId,
-      headline: 'The assistant is live — the site preview is not',
-      detail: `<code>${escapeHtml(cleanDomain)}</code> returned ${upstreamRes.status} when we asked for it, so its pages can't be shown here.`,
+    return blockedOrStandIn(req, {
+      accountId, lang, cleanDomain, targetUrl, isHomepage,
+      reason: String(upstreamRes.status),
     });
   }
 
@@ -135,7 +133,32 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
     });
   }
 
-  let html = await upstreamRes.text();
+  const html = await upstreamRes.text();
+  return renderProxiedHtml(html, {
+    req, accountId, cleanDomain, safePath,
+    upstreamHeaders: upstreamRes.headers,
+  });
+}
+
+/**
+ * Turn a customer page into the demo page: strip the site's own CSP, rebase its
+ * relative assets, keep its links inside this proxy, and mount the real widget.
+ *
+ * Shared by the live fetch and by HTML recovered from a browser warm-up, so a
+ * blocked site's demo behaves exactly like any other one.
+ */
+function renderProxiedHtml(
+  rawHtml: string,
+  opts: {
+    req: NextRequest;
+    accountId: string;
+    cleanDomain: string;
+    safePath: string;
+    upstreamHeaders?: Headers;
+  },
+): Response {
+  const { req, accountId, cleanDomain, safePath } = opts;
+  let html = rawHtml;
 
   // Strip CSP meta tags from the HTML itself — header-level CSP we already
   // filter out, but some sites set the policy in <meta http-equiv="Content-Security-Policy">.
@@ -156,15 +179,16 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
     html = `<head>${baseHref}</head>` + html;
   }
 
+  const origin = req.nextUrl?.origin ?? new URL(req.url).origin;
+
   // Point in-page links back at this proxy so the demo stays navigable without
   // escaping to the customer's real origin (which drops the widget, and on a
   // site with X-Frame-Options leaves the frame blank).
-  html = rewriteNavigation(html, { origin: req.nextUrl.origin, accountId, domain: cleanDomain });
+  html = rewriteNavigation(html, { origin, accountId, domain: cleanDomain });
 
   // Inject our widget script. Absolute URL to our own origin so it works
   // regardless of the page path. accountId is the per-account ID the widget
   // uses to fetch its config from /api/widget/config.
-  const origin = req.nextUrl.origin;
   const widgetTag = `<script src="${origin}/widget.js" data-account-id="${accountId}" data-preview="true"></script>`;
   if (/<\/body>/i.test(html)) {
     html = html.replace(/<\/body>/i, `${widgetTag}</body>`);
@@ -173,9 +197,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
     html += widgetTag;
   }
 
-  // Return modified HTML with X-Frame-Options + CSP filtered out so the iframe
-  // in our admin page can actually render this.
-  const headers = filterUpstreamHeaders(upstreamRes.headers);
+  const headers = opts.upstreamHeaders ? filterUpstreamHeaders(opts.upstreamHeaders) : new Headers();
   headers.set('Content-Type', 'text/html; charset=utf-8');
   headers.set('Cache-Control', 'no-store');
   // Allow our own admin to iframe this — explicitly relaxed since we just
@@ -184,9 +206,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
   // Override our own platform-level CSP (set in next.config.ts for /api/widget/*)
   // with a permissive policy. The customer site loads scripts/styles/fonts/images
   // from many third-party CDNs (Shopify, Cloudflare, fonts.google.com, etc.) —
-  // 'self' would break visual rendering. We keep frame-ancestors * so we can
-  // iframe this from /admin, and allow * for fetched resources because the page
-  // is sandboxed in our admin iframe and visible only to authenticated admins.
+  // 'self' would break visual rendering.
   headers.set(
     'Content-Security-Policy',
     "default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; " +
@@ -201,12 +221,117 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
   return new Response(html, { status: 200, headers });
 }
 
+/**
+ * A site that refused us. Some sites block server IPs outright — rebar.co.il
+ * answers our production address with 403 on every path while serving an
+ * ordinary home connection normally — so "the site is down" is the wrong
+ * conclusion and the widget-on-a-backdrop is the wrong final answer.
+ *
+ * For the homepage we hand the page to the browser transport this codebase
+ * already uses for bot-challenged crawls, cache the result, and show a
+ * self-refreshing waiting screen meanwhile. Sub-pages fall straight through:
+ * each warm-up is a real, paid run.
+ */
+async function blockedOrStandIn(
+  req: NextRequest,
+  o: {
+    accountId: string;
+    lang: 'he' | 'en';
+    cleanDomain: string;
+    targetUrl: string;
+    isHomepage: boolean;
+    reason: string;
+  },
+): Promise<Response> {
+  const warmupAllowed = o.isHomepage && !!process.env.APIFY_TOKEN;
+  let result: { action: string; html?: string };
+  try {
+    result = await resolveBlockedPage(o.accountId, o.targetUrl, warmupAllowed);
+  } catch {
+    result = { action: 'give-up' };
+  }
+
+  if (result.action === 'serve-cached' && result.html) {
+    return renderProxiedHtml(result.html, {
+      req,
+      accountId: o.accountId,
+      cleanDomain: o.cleanDomain,
+      safePath: '/',
+    });
+  }
+
+  if (result.action === 'warming') {
+    return framePage(req, {
+      kind: 'warming',
+      lang: o.lang,
+      accountId: o.accountId,
+      domain: o.cleanDomain,
+      refreshSeconds: 15,
+    });
+  }
+
+  return framePage(req, {
+    kind: 'unreachable',
+    lang: o.lang,
+    accountId: o.accountId,
+    domain: o.cleanDomain,
+    reason: o.reason,
+  });
+}
 
 function escapeHtml(v: string): string {
   return String(v).replace(/[<>&"]/g, (c) => (
     c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : '&quot;'
   ));
 }
+
+type FrameKind = 'incomplete' | 'invalid' | 'expired' | 'no-site' | 'unreachable' | 'warming';
+
+/**
+ * Copy for every page this route can render, in both languages.
+ *
+ * These used to be English strings inline at each call site, which meant a
+ * Hebrew brand's prospect opened a demo link and got an English error. The
+ * language comes from `accounts.language`.
+ */
+const FRAME_COPY: Record<FrameKind, Record<'he' | 'en', { headline: string; detail: (d: string, r: string) => string }>> = {
+  incomplete: {
+    he: { headline: 'הקישור לתצוגה אינו שלם', detail: () => 'חסר בו החשבון שאותו הוא אמור להציג.' },
+    en: { headline: 'This preview link is incomplete', detail: () => 'It is missing the account it should show.' },
+  },
+  invalid: {
+    he: { headline: 'הקישור לדמו אינו תקף יותר', detail: () => 'החשבון שאליו הוא הצביע אינו קיים עוד.' },
+    en: { headline: 'This demo link is no longer valid', detail: () => 'The account it pointed to does not exist any more.' },
+  },
+  expired: {
+    he: { headline: 'תקופת ההתנסות הסתיימה', detail: () => 'בקשו מאיש הקשר שלכם ב-LDRS לפתוח את הדמו מחדש והקישור יעבוד שוב.' },
+    en: { headline: 'This demo has ended', detail: () => 'Ask your contact at LDRS to reopen it and the link will work again.' },
+  },
+  'no-site': {
+    he: { headline: 'העוזר פעיל — תצוגת האתר לא', detail: () => 'לא רשום אתר לחשבון הזה, ולכן אין על מה להציג את העוזר.' },
+    en: { headline: 'The assistant is live — the site preview is not', detail: () => 'No website is registered for this account, so there is no site to show the assistant on.' },
+  },
+  unreachable: {
+    he: {
+      headline: 'העוזר פעיל — תצוגת האתר לא',
+      detail: (d, r) => `<code>${d}</code> החזיר ${r} כשביקשנו אותו, ולכן אי אפשר להציג כאן את העמודים שלו.`,
+    },
+    en: {
+      headline: 'The assistant is live — the site preview is not',
+      detail: (d, r) => `<code>${d}</code> returned ${r} when we asked for it, so its pages can't be shown here.`,
+    },
+  },
+  warming: {
+    he: {
+      headline: 'מכינים את התצוגה',
+      detail: (d) => `<code>${d}</code> חוסם שרתים, אז אנחנו טוענים אותו בדפדפן אמיתי. זה לוקח כשתי דקות בפעם הראשונה — העמוד יתרענן לבד.`,
+    },
+    en: {
+      headline: 'Preparing the preview',
+      detail: (d) => `<code>${d}</code> blocks servers, so we are loading it in a real browser. This takes about two minutes the first time — the page will refresh itself.`,
+    },
+  },
+};
 
 /**
  * Every non-success answer this route can give, as a rendered page.
@@ -224,7 +349,15 @@ function escapeHtml(v: string): string {
  */
 function framePage(
   req: NextRequest,
-  opts: { accountId?: string; headline: string; detail: string },
+  opts: {
+    kind: FrameKind;
+    lang?: 'he' | 'en';
+    accountId?: string;
+    domain?: string;
+    reason?: string;
+    /** Seconds until the page reloads itself. Only the warming page sets this. */
+    refreshSeconds?: number;
+  },
 ): Response {
   // This is the function that exists so the demo link never shows an error, so
   // it must not itself throw. `nextUrl` is always present on a real NextRequest;
@@ -235,34 +368,53 @@ function framePage(
   } catch {
     origin = '';
   }
+
+  const lang = opts.lang === 'en' ? 'en' : 'he';
+  const copy = FRAME_COPY[opts.kind][lang];
+  const detail = copy.detail(escapeHtml(opts.domain || ''), escapeHtml(opts.reason || ''));
+
   const widget = opts.accountId
     ? `<script src="${origin}/widget.js" data-account-id="${escapeHtml(opts.accountId)}" data-preview="true"></script>`
     : '';
   const closer = opts.accountId
-    ? ' The assistant below is the real one for this account: open it and ask it anything.'
+    ? (lang === 'he'
+        ? ' העוזר שלמטה הוא האמיתי של החשבון הזה — פתחו אותו ושאלו אותו כל דבר.'
+        : ' The assistant below is the real one for this account: open it and ask it anything.')
     : '';
+  const refresh = opts.refreshSeconds
+    ? `<script>setTimeout(function(){ location.reload(); }, ${Math.round(opts.refreshSeconds * 1000)});</script>`
+    : '';
+  const spinner = opts.refreshSeconds ? '<div class="spin" aria-hidden="true"></div>' : '';
+
   const html = `<!doctype html>
-<html lang="en" dir="ltr"><head><meta charset="utf-8">
+<html lang="${lang}" dir="${lang === 'he' ? 'rtl' : 'ltr'}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Widget preview</title>
+<title>${escapeHtml(copy.headline)}</title>
 <style>
   :root { color-scheme: light; }
   body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
          background:
            radial-gradient(1200px 600px at 50% -10%, #ede9fe 0%, transparent 60%),
            linear-gradient(#fafafa, #f4f4f5); }
   .card { text-align:center; max-width:34rem; padding:2rem; color:#3f3f46; }
   .card h1 { font-size:1.05rem; font-weight:600; margin:0 0 .5rem; color:#18181b; }
   .card p { font-size:.85rem; line-height:1.6; margin:0; color:#71717a; }
-  code { background:#e4e4e7; padding:.1rem .35rem; border-radius:.25rem; font-size:.8rem; }
+  code { background:#e4e4e7; padding:.1rem .35rem; border-radius:.25rem; font-size:.8rem;
+         direction:ltr; unicode-bidi:embed; display:inline-block; }
+  .spin { width:1.5rem; height:1.5rem; margin:0 auto 1rem; border-radius:50%;
+          border:2px solid #d4d4d8; border-top-color:#9334EB; animation:s .8s linear infinite; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 </style></head>
 <body>
   <div class="card">
-    <h1>${escapeHtml(opts.headline)}</h1>
-    <p>${opts.detail}${closer}</p>
+    ${spinner}
+    <h1>${escapeHtml(copy.headline)}</h1>
+    <p>${detail}${closer}</p>
   </div>
   ${widget}
+  ${refresh}
 </body></html>`;
   return new Response(html, {
     status: 200,
