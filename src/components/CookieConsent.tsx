@@ -127,10 +127,15 @@ export default function CookieConsent() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 100, opacity: 0 }}
           transition={{ type: 'spring', damping: 25 }}
-          className="fixed bottom-0 left-0 right-0 z-50 p-4"
+          // The wrapper spans the full viewport width but only the centred card
+          // inside it is visible. Without pointer-events-none the transparent
+          // strip either side of that card swallowed every click in the bottom
+          // ~97px of the page — which is exactly where a chat bubble sits. On
+          // /demo/<id> in incognito that made the widget completely unclickable.
+          className="fixed bottom-0 left-0 right-0 z-50 p-4 pointer-events-none"
           dir={dir}
         >
-          <div className="max-w-5xl mx-auto bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="max-w-5xl mx-auto pointer-events-auto bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
             <AnimatePresence mode="wait">
               {!showSettings ? (
                 <motion.div
