@@ -105,12 +105,21 @@ async function loadOpenThreads(waId: string): Promise<Array<{ ticketId: string; 
 
 // Apply a bind side-effect: create/reuse the chat_session, set ctx + session (phase='serving').
 async function applyBind(session: CsSessionRow, ctx: CsToolCtx, bind: { accountId: string; ticketId?: string | null }): Promise<CsSessionRow> {
+  // The shared number is a GATE: one thread, many brands, and the shopper moves between them.
+  // A brand change is therefore a real boundary — everything scoped to the old brand is dropped.
+  const brandChanged = session.active_account_id !== bind.accountId;
   let chatSessionId = session.active_chat_session_id;
-  if (!chatSessionId || session.active_account_id !== bind.accountId) {
+  if (!chatSessionId || brandChanged) {
     chatSessionId = randomUUID();
     await supabaseAdmin.from('chat_sessions').insert({ id: chatSessionId, account_id: bind.accountId, message_count: 0, anon_id: `wa_${session.wa_id}_${bind.accountId}` });
   }
-  const patch = { active_account_id: bind.accountId, active_ticket_id: bind.ticketId ?? session.active_ticket_id, active_chat_session_id: chatSessionId, phase: 'serving' as CsPhase, last_activity_at: new Date().toISOString() };
+  // A ticket belongs to exactly one brand. Carrying the old one across a switch would file this
+  // brand's messages onto the other brand's ticket — appendCsTicketHistory takes ticket_id and
+  // account_id as given and checks neither. Reached whenever the bind arrives without a ticket:
+  // bind_brand falls back to ctx.ticketId when openOrAttachCsTicket throws, and the web pre-bind
+  // (input.boundAccountId) never passes one at all.
+  const carriedTicket = brandChanged ? null : session.active_ticket_id;
+  const patch = { active_account_id: bind.accountId, active_ticket_id: bind.ticketId ?? carriedTicket, active_chat_session_id: chatSessionId, phase: 'serving' as CsPhase, last_activity_at: new Date().toISOString() };
   await saveCsSession(session, patch);
   ctx.accountId = bind.accountId; ctx.ticketId = patch.active_ticket_id; ctx.chatSessionId = chatSessionId;
   return { ...session, ...patch, version: session.version + 1 };

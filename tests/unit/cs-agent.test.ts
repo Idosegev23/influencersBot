@@ -63,6 +63,58 @@ describe('runCsTurn (brain-led loop)', () => {
     expect(inserted['support_ticket_history']).toContainEqual(expect.objectContaining({ ticket_id: 't1', action: 'customer_reply', actor: 'customer' }));
   });
 
+  // The WhatsApp number is a GATE: one thread, many brands, and the shopper switches between them
+  // ("עכשיו בוא נדבר על בסטי-טסט"). A ticket belongs to exactly one brand, so it must never survive
+  // that switch — support_ticket_history has no tenant guard, and a carried id writes the new
+  // brand's messages onto the old brand's ticket.
+  describe('switching brands mid-conversation', () => {
+    it('does not carry the previous brand ticket when the new brand ticket cannot be opened', async () => {
+      store['972501112222'] = bound();   // bound to acc-1, ticket t1
+      // bind_brand opens the new brand's ticket; when that throws it returns no ticketId.
+      handlers['bind_brand'] = vi.fn().mockResolvedValue({ ok: true, bind: { accountId: 'acc-2' }, data: { brand: 'בסטי-טסט' } });
+      callModel
+        .mockResolvedValueOnce({ toolCalls: [{ id: 'tc', name: 'bind_brand', args: { accountId: 'acc-2' } }], text: null })
+        .mockResolvedValueOnce({ toolCalls: [], text: 'עברנו לבסטי-טסט 🙂' });
+
+      const { runCsTurn } = await import('@/lib/cs/cs-agent');
+      await runCsTurn(job('עכשיו בוא נדבר על בסטי-טסט'), { callModel });
+
+      const session = store['972501112222'];
+      expect(session.active_account_id).toBe('acc-2');
+      expect(session.active_ticket_id).toBeNull();          // t1 belongs to acc-1
+    });
+
+    it('keeps the ticket when re-binding the SAME brand', async () => {
+      store['972501112222'] = bound();   // acc-1 / t1
+      handlers['bind_brand'] = vi.fn().mockResolvedValue({ ok: true, bind: { accountId: 'acc-1' }, data: { brand: 'Argania' } });
+      callModel
+        .mockResolvedValueOnce({ toolCalls: [{ id: 'tc', name: 'bind_brand', args: { accountId: 'acc-1' } }], text: null })
+        .mockResolvedValueOnce({ toolCalls: [], text: 'ממשיכים 🙂' });
+
+      const { runCsTurn } = await import('@/lib/cs/cs-agent');
+      await runCsTurn(job('כן, ארגניה'), { callModel });
+
+      const session = store['972501112222'];
+      expect(session.active_account_id).toBe('acc-1');
+      expect(session.active_ticket_id).toBe('t1');
+    });
+
+    it('gives the new brand its own chat session so no transcript crosses brands', async () => {
+      store['972501112222'] = bound();   // acc-1 / chat cs-1
+      handlers['bind_brand'] = vi.fn().mockResolvedValue({ ok: true, bind: { accountId: 'acc-2', ticketId: 't2' }, data: { brand: 'בסטי-טסט' } });
+      callModel
+        .mockResolvedValueOnce({ toolCalls: [{ id: 'tc', name: 'bind_brand', args: { accountId: 'acc-2' } }], text: null })
+        .mockResolvedValueOnce({ toolCalls: [], text: 'עברנו 🙂' });
+
+      const { runCsTurn } = await import('@/lib/cs/cs-agent');
+      await runCsTurn(job('בסטי-טסט בבקשה'), { callModel });
+
+      const session = store['972501112222'];
+      expect(session.active_ticket_id).toBe('t2');
+      expect(session.active_chat_session_id).not.toBe('cs-1');
+    });
+  });
+
   it('detectHandoff backstop fires → runCsHandoffCheck + handoff ack, model NOT called', async () => {
     detectHandoff.mockReturnValue({ triggered: true, triggers: ['refund_return'], severity: 'medium', reason: 'refund' });
     store['972501112222'] = bound();
