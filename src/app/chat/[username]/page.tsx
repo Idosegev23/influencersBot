@@ -63,13 +63,9 @@ import SupportForm from '@/components/SupportForm';
 import { LeadCapturePopup } from '@/components/chat/LeadCapturePopup';
 import { ConferenceLeadPopup } from '@/components/chat/ConferenceLeadPopup';
 import { ConferenceForYouTab } from '@/components/chat/ConferenceForYouTab';
-import { AskItamarButton } from '@/components/chat/AskItamarButton';
 import { track, setAnalyticsContext, identify } from '@/lib/analytics/track';
 import { startSessionTracker, setSessionTab, endSessionTracker } from '@/lib/analytics/session-end';
 
-// Itamar handoff button kill-switch is now DB-driven:
-// accounts.config.features.handoff_button_enabled (boolean).
-// Toggle live from /admin/handoff without deploying.
 import type { Influencer, ContentItem, InfluencerType } from '@/types';
 import CsPayloadBlocks from '@/components/chat/CsPayloadBlocks';
 import type { CsUiPayload } from '@/lib/cs/payloads';
@@ -115,7 +111,7 @@ interface Message {
   suggestions?: string[]; // AI-generated follow-up suggestions
   csPayloads?: CsUiPayload[]; // CS-engine structured screens (spec §6) — persist in scrollback
   metadata?: {
-    source?: 'whatsapp_personal' | 'handoff_system_note' | 'handoff_fallback_note' | string;
+    source?: string;
     author_label?: string;
     ref_code?: string;
     sent_at?: string;
@@ -401,10 +397,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
 
-  // Personal handoff (Itamar via WhatsApp) — poll for replies while a
-  // handoff is in flight so the visitor sees Itamar's reply land in chat.
-  const [handoffActive, setHandoffActive] = useState(false);
-  const handoffSinceRef = useRef<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [responseId, setResponseId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -1112,88 +1104,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     }
   }, [messages]);
 
-  // Poll for Itamar's WhatsApp handoff replies while a handoff is active.
-  // Runs every 8s; merges any new chat_messages with metadata.source set
-  // (handoff system note + whatsapp_personal Itamar replies) into state.
-  useEffect(() => {
-    if (!handoffActive || !sessionId) return;
-    let cancelled = false;
-    let stopAt = Date.now() + 24 * 60 * 60 * 1000; // safety: stop after 24h
-
-    const tick = async () => {
-      try {
-        const since = handoffSinceRef.current
-          ? `&since=${encodeURIComponent(handoffSinceRef.current)}`
-          : '';
-        const res = await fetch(
-          `/api/chat/handoff/poll?sessionId=${encodeURIComponent(sessionId)}${since}`,
-          { cache: 'no-store' },
-        );
-        if (!res.ok) return;
-        const data = await res.json();
-        const fresh: Array<{
-          id: string;
-          role: 'user' | 'assistant';
-          content: string;
-          created_at: string;
-          metadata: any;
-        }> = data?.messages || [];
-
-        if (fresh.length) {
-          handoffSinceRef.current = fresh[fresh.length - 1].created_at;
-          // Append any handoff-related messages we don't already have
-          setMessages((prev) => {
-            const existingIds = new Set(prev.map((m) => m.id));
-            const additions: Message[] = [];
-            for (const m of fresh) {
-              if (existingIds.has(m.id)) continue;
-              const src = m.metadata?.source;
-              if (src !== 'whatsapp_personal' && src !== 'handoff_system_note') continue;
-              additions.push({
-                id: m.id,
-                role: m.role,
-                content: m.content,
-                metadata: m.metadata,
-                createdAt: m.created_at,
-              });
-            }
-            return additions.length ? [...prev, ...additions] : prev;
-          });
-        }
-
-        // Keep polling as long as the handoff isn't TRULY closed.
-        // 'replied' means Itamar answered once but the conversation can
-        // continue — visitors send follow-ups and Itamar replies again.
-        // We only stop when every handoff for this session is in a
-        // terminal state (fallback_sent / failed) AND there are no
-        // open ones still expecting replies.
-        const handoffs: Array<{ status: string }> = data?.handoffs || [];
-        const stillLive = handoffs.some(
-          (h) => h.status === 'forwarded' || h.status === 'pending' || h.status === 'replied',
-        );
-        if (!stillLive && handoffs.length > 0) {
-          if (!cancelled) setHandoffActive(false);
-          return;
-        }
-      } catch (err) {
-        console.error('[handoff poll] failed', err);
-      }
-    };
-
-    tick(); // immediate
-    const id = setInterval(() => {
-      if (cancelled || Date.now() > stopAt) {
-        clearInterval(id);
-        return;
-      }
-      tick();
-    }, 8000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [handoffActive, sessionId]);
 
   // Handle support flow input (from form or brand selection)
   const handleSupportInput = async (value: string) => {
@@ -1909,25 +1819,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           </div>
                         )}
 
-                        {/* Conference handoff button — also rendered in
-                            empty state so visitors can go straight to
-                            Itamar without chatting with the bot first. */}
-                        {(influencer as any).features?.handoff_button_enabled === true &&
-                          isConferenceMode &&
-                          username === 'ldrs_group' && (
-                            <div className="flex justify-center mt-3">
-                              <AskItamarButton
-                                sessionId={sessionId}
-                                source="conf"
-                                visitorName={null}
-                                visitorMeta="מהכנס · 30.4.2026"
-                                onSubmitted={({ sessionId: returnedSid }) => {
-                                  if (returnedSid) setSessionId(returnedSid);
-                                  setHandoffActive(true);
-                                }}
-                              />
-                            </div>
-                          )}
                       </motion.div>
 
                       {/* No customer-service mode picker here, by design. It was
@@ -2022,7 +1913,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           ? { type: streamCards.cardsType, data: streamCards.items as BrandCardData[] }
                           : msg.cardsPayload;
                         
-                        const isPersonalReply = msg.metadata?.source === 'whatsapp_personal';
                         return (
                         <motion.div
                           key={msg.id}
@@ -2030,22 +1920,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                           animate={{ opacity: 1, x: 0, y: 0 }}
                           transition={{ duration: 0.3, ease: 'easeOut' }}
                         >
-                          {isPersonalReply && (
-                            <div className="flex justify-end items-center gap-1.5 mb-1.5 px-1">
-                              <span
-                                className="text-[10.5px] font-bold tracking-[2px] uppercase"
-                                style={{ color: '#5FD4F5' }}
-                              >
-                                ✓ {msg.metadata?.author_label || 'Itamar'} · אישי
-                              </span>
-                              <span
-                                className="text-[10.5px]"
-                                style={{ color: '#9aa3b0' }}
-                              >
-                                · WhatsApp
-                              </span>
-                            </div>
-                          )}
                           <div
                             // CSS `justify-start/end` is physical, not logical — under LTR
                             // `justify-start` = left and we need user bubbles on the right
@@ -2061,14 +1935,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                             {/* Bot avatar (assistant messages only) - hidden on mobile via CSS */}
                             {msg.role === 'assistant' && influencer.avatar_url && (
                               <div
-                                className={`bot-avatar-inline relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 mb-5 ${
-                                  isPersonalReply ? 'ring-2 ring-offset-1' : ''
-                                }`}
-                                style={
-                                  isPersonalReply
-                                    ? { boxShadow: '0 0 0 2px #5FD4F5' }
-                                    : undefined
-                                }
+                                className="bot-avatar-inline relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0 mb-5"
                               >
                                 <Image
                                   src={getProxiedImageUrl(influencer.avatar_url)}
@@ -2426,27 +2293,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   style={{ background: 'transparent' }}
                 >
                   <div className={`mx-auto ${isMobile ? 'max-w-2xl' : 'max-w-[670px]'}`}>
-                    {/* Personal handoff CTA — conference visitors only.
-                        TEMPORARILY DISABLED: Cloud API number pending
-                        2FA registration. Flip HANDOFF_BUTTON_ENABLED to
-                        true once the WhatsApp number is registered. */}
-                    {(influencer as any).features?.handoff_button_enabled === true &&
-                      isConferenceMode &&
-                      username === 'ldrs_group' &&
-                      messages.length > 0 && (
-                        <div className="flex justify-end mb-2">
-                          <AskItamarButton
-                            sessionId={sessionId}
-                            source="conf"
-                            visitorName={null}
-                            visitorMeta="מהכנס · 30.4.2026"
-                            onSubmitted={({ sessionId: returnedSid }) => {
-                              if (returnedSid) setSessionId(returnedSid);
-                              setHandoffActive(true);
-                            }}
-                          />
-                        </div>
-                      )}
                     <ChatInput
                       value={inputValue}
                       onChange={setInputValue}

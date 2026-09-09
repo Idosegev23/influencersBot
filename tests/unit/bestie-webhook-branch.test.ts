@@ -41,7 +41,6 @@ vi.mock('@/lib/whatsapp-cloud/channels', () => ({
 const knownLead = { wa_id: '972501234567', lead_id: 'L1', bot_paused: false };
 
 const base = {
-  handledAsHandoffReply: false,
   handledAsAgent: false,
   ticketId: null as string | null,
   waId: '972501234567',
@@ -65,13 +64,7 @@ describe('the fifth branch', () => {
     expect(enqueue).not.toHaveBeenCalled();
   });
 
-  // The next three protect flows already running in production.
-  it('never claims a message already consumed as a handoff reply', async () => {
-    h.session.row = knownLead;
-    expect((await maybeRouteBestieLead({ ...base, handledAsHandoffReply: true })).claimed).toBe(false);
-    expect(enqueue).not.toHaveBeenCalled();
-  });
-
+  // The next two protect flows already running in production.
   it('never claims a registered agent', async () => {
     h.session.row = knownLead;
     expect((await maybeRouteBestieLead({ ...base, handledAsAgent: true })).claimed).toBe(false);

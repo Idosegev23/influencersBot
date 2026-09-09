@@ -24,7 +24,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyWhatsAppSignature } from '@/lib/whatsapp-cloud/signature';
 import { createClient } from '@/lib/supabase';
-import { isItamarSender, processItamarReply } from '@/lib/handoff/process-itamar-reply';
 import { routeInboundToTicket } from '@/lib/support/route-inbound';
 import { toWaId, sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
 import { getBestieChannel } from '@/lib/whatsapp-cloud/channels';
@@ -183,45 +182,6 @@ async function processWebhook(payload: any): Promise<void> {
         const profileName: string | undefined =
           value.contacts?.find((c: any) => c.wa_id === waId)?.profile?.name;
 
-        // Personal handoff (Itamar via WhatsApp): if the sender is on the
-        // allow-list, attempt to route this reply back into a Bestie chat
-        // session. We still proceed with the standard whatsapp_messages
-        // upsert below for audit, but skip incrementing unread_count for
-        // this conversation since it's not a customer-facing thread.
-        //
-        // What gates the branches below is whether this message was ACTUALLY
-        // consumed as a handoff reply — not who sent it. Being on the allow-list
-        // means "may answer a handoff", not "can never be a customer": keying the
-        // branches off isItamarSender() made every non-handoff message from that
-        // number vanish (live 2026-09-08 — 12 messages over 3 weeks, zero replies,
-        // because ITAMAR_WHATSAPP_NUMBER held a phone that was also testing the bot).
-        const inboundText: string | null =
-          msg.text?.body ??
-          msg.button?.text ??
-          msg.interactive?.button_reply?.title ??
-          msg.interactive?.list_reply?.title ??
-          null;
-        let handledAsHandoffReply = false;
-        if (isItamarSender(waId) && inboundText) {
-          try {
-            handledAsHandoffReply = await processItamarReply({
-              fromWaId: waId,
-              text: inboundText,
-              contextWaMessageId: msg.context?.id,
-              waMessageId: msg.id,
-              sentAt: msg.timestamp
-                ? new Date(Number(msg.timestamp) * 1000).toISOString()
-                : undefined,
-            });
-          } catch (err) {
-            // We can no longer tell whether it matched a pending handoff. Fail CLOSED:
-            // a reply meant for a visitor must never become a shopper conversation. The
-            // cost is silence on a rare error path, which is what already happened here.
-            handledAsHandoffReply = true;
-            console.error('[whatsapp webhook] handoff routing failed', err);
-          }
-        }
-
         // upsert contact
         const { data: contact } = await supabase
           .from('whatsapp_contacts')
@@ -296,20 +256,18 @@ async function processWebhook(payload: any): Promise<void> {
         // a forwarded price-quote (AI parse → quote → tailored reply) and SKIP
         // support routing — an agent's WhatsApp is not a customer thread.
         let handledAsAgent = false;
-        if (!handledAsHandoffReply) {
-          try {
-            handledAsAgent = await maybeEnqueueAgentJob({ waId, msg, textBody });
-          } catch (err) {
-            console.error('[whatsapp webhook] agent enqueue failed', err);
-          }
+        try {
+          handledAsAgent = await maybeEnqueueAgentJob({ waId, msg, textBody });
+        } catch (err) {
+          console.error('[whatsapp webhook] agent enqueue failed', err);
         }
 
         // Route this inbound to a support ticket if we can identify
-        // one. Skips a consumed handoff reply and agent senders — those
-        // flows have their own handling above. Best-effort: errors are
-        // swallowed because the raw message is already persisted.
+        // one. Skips agent senders — that flow has its own handling
+        // above. Best-effort: errors are swallowed because the raw
+        // message is already persisted.
         let ticketMatch: string | null = null;
-        if (!handledAsHandoffReply && !handledAsAgent) {
+        if (!handledAsAgent) {
           try {
             const res = await routeInboundToTicket({
               waId,
@@ -331,7 +289,6 @@ async function processWebhook(payload: any): Promise<void> {
         let claimedAsLead = false;
         try {
           claimedAsLead = (await maybeRouteBestieLead({
-            handledAsHandoffReply,
             handledAsAgent,
             ticketId: ticketMatch,
             waId,
@@ -348,7 +305,6 @@ async function processWebhook(payload: any): Promise<void> {
         await maybeRouteCs({
           channel: waChannel,
           boundAccountId: inbound.boundAccountId,   // null on Bestie's shared number
-          handledAsHandoffReply,
           handledAsAgent,
           ticketId: ticketMatch,
           waId,
@@ -460,14 +416,14 @@ export function extractTicketId(
 }
 
 /**
- * The customer-service 4th branch. Reached only when the inbound is NOT Itamar, NOT a registered
- * agent, and did NOT match an open support ticket — the unknown-sender slot that used to dead-end.
- * Claims the message into the CS queue/worker pipeline. Best-effort: the raw message is already
- * persisted to whatsapp_messages, so a failure here just leaves it for manual triage.
+ * The customer-service branch — the default destination for an inbound on Bestie's number.
+ * Reached whenever the sender is not a registered agent and the message did not match an open
+ * support ticket. Claims the message into the CS queue/worker pipeline, where the brain asks
+ * which brand it is about, binds it, and answers wearing that brand's persona.
+ * Best-effort: the raw message is already persisted to whatsapp_messages, so a failure here
+ * just leaves it for manual triage.
  */
 export async function maybeRouteCs(args: {
-  /** True only when processItamarReply CONSUMED this message as a handoff reply. */
-  handledAsHandoffReply: boolean;
   handledAsAgent: boolean;
   ticketId: string | null;
   waId: string;
@@ -477,7 +433,7 @@ export async function maybeRouteCs(args: {
   channel: WaChannel;
   boundAccountId?: string | null;
 }): Promise<void> {
-  if (args.handledAsHandoffReply || args.handledAsAgent || args.ticketId) return;
+  if (args.handledAsAgent || args.ticketId) return;
   try {
     await routeInboundToCustomerService({
       waChannelId: args.channel.id,
