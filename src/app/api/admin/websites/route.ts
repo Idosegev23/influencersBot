@@ -73,14 +73,44 @@ export async function GET() {
 
     if (error) throw new Error(error.message);
 
+    // Filter on `domain` (registered widgets) rather than `enabled` so the
+    // admin sees both on AND off widgets and can flip the toggle either way.
+    // Accounts that never had a widget registered (no domain) stay out of view.
+    const sites = (accounts || []).filter((a: any) => a.config?.widget?.domain);
+
+    // Capability badges for every site in ONE round trip. This used to be three
+    // `count: 'exact'` queries inside this loop — the inner Promise.all only
+    // parallelised the three counts within one account, so 44 accounts meant
+    // 132 queries in 44 SERIAL round trips: measured 22,995 ms against 69–336 ms
+    // for the grouped function (migration 091). Each individual count is ~2 ms;
+    // the cost was entirely round trips, not the database.
+    //
+    // Do NOT "simplify" this to .in(ids) + counting rows client-side: PostgREST
+    // caps at 1000 rows by default and document_chunks holds 124,657, so that
+    // silently under-reports instead of failing.
+    const counts = new Map<string, { pages: number; chunks: number; products: number }>();
+    if (sites.length > 0) {
+      const { data: countRows, error: countErr } = await supabase.rpc('admin_widget_content_counts', {
+        p_account_ids: sites.map((a: any) => a.id),
+      });
+      // Badges are decoration; the toggles are why this page exists. A counts
+      // failure degrades to zeros rather than blanking the admin's controls.
+      if (countErr) {
+        console.error('[Admin Websites] counts query failed, showing zeros:', countErr.message);
+      }
+      for (const row of countRows || []) {
+        counts.set(row.account_id, {
+          pages: Number(row.pages) || 0,
+          chunks: Number(row.chunks) || 0,
+          products: Number(row.products) || 0,
+        });
+      }
+    }
+
     const websites = [];
 
-    for (const account of accounts || []) {
+    for (const account of sites) {
       const widgetConfig = account.config?.widget;
-      // Filter on `domain` (registered widgets) rather than `enabled` so the
-      // admin sees both on AND off widgets and can flip the toggle either way.
-      // Accounts that never had a widget registered (no domain) stay out of view.
-      if (!widgetConfig?.domain) continue;
 
       const domain = widgetConfig.domain || account.config?.username || '';
       const displayName = account.config?.display_name || domain;
@@ -91,12 +121,10 @@ export async function GET() {
         bookings: { enabled: modulesRaw.bookings?.enabled === true },
       };
 
-      // Capability badges — what does this widget actually have wired up?
-      const [{ count: pagesCount }, { count: chunksCount }, { count: productsCount }] = await Promise.all([
-        supabase.from('documents').select('id', { count: 'exact', head: true }).eq('account_id', account.id),
-        supabase.from('document_chunks').select('id', { count: 'exact', head: true }).eq('account_id', account.id),
-        supabase.from('widget_products').select('id', { count: 'exact', head: true }).eq('account_id', account.id).eq('is_available', true),
-      ]);
+      // An account with no rows at all gets no row back from the grouped
+      // aggregate — that's a zero, not a missing badge.
+      const { pages: pagesCount, chunks: chunksCount, products: productsCount } =
+        counts.get(account.id) || { pages: 0, chunks: 0, products: 0 };
 
       websites.push({
         id: account.id,
