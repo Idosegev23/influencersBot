@@ -23,7 +23,6 @@ import { createClient } from '@/lib/supabase/server';
 import { demoAccessFromConfig } from '@/lib/demo/guard';
 import { rewriteNavigation } from '@/lib/widget/preview-rewrite';
 import { filterUpstreamHeaders } from '@/lib/widget/preview-headers';
-import { resolveBlockedPage } from '@/lib/widget/blocked-site-warmup';
 import { resolveWidgetDomain } from '@/lib/widget/resolve-domain';
 
 const FETCH_TIMEOUT_MS = 12000;
@@ -79,9 +78,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
   // Path must start with /; anything else is treated as a path fragment
   const safePath = path.startsWith('/') ? path : '/' + path;
   const targetUrl = `https://${cleanDomain}${safePath}`;
-  // Browser warm-up is homepage-only: each page costs a real Apify run (~$0.07,
-  // ~112s measured), and the homepage is what a shared demo link opens.
-  const isHomepage = safePath === '/';
 
   let upstreamRes: Response;
   try {
@@ -103,9 +99,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
       ),
     ]);
   } catch (err: any) {
-    return blockedOrStandIn(req, {
-      accountId, lang, cleanDomain, targetUrl, isHomepage,
-      reason: err?.message || 'network error',
+    return framePage(req, {
+      kind: 'unreachable', lang, accountId,
+      domain: cleanDomain, reason: err?.message || 'network error',
     });
   }
 
@@ -117,9 +113,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ accountId: 
     // raw `{"error":"customer site returned 403"}`. The widget is the thing being
     // demonstrated, not the customer's homepage, so serve it on a plain backdrop
     // and say why the site itself is missing.
-    return blockedOrStandIn(req, {
-      accountId, lang, cleanDomain, targetUrl, isHomepage,
-      reason: String(upstreamRes.status),
+    return framePage(req, {
+      kind: 'unreachable', lang, accountId,
+      domain: cleanDomain, reason: String(upstreamRes.status),
     });
   }
 
@@ -221,71 +217,13 @@ function renderProxiedHtml(
   return new Response(html, { status: 200, headers });
 }
 
-/**
- * A site that refused us. Some sites block server IPs outright — rebar.co.il
- * answers our production address with 403 on every path while serving an
- * ordinary home connection normally — so "the site is down" is the wrong
- * conclusion and the widget-on-a-backdrop is the wrong final answer.
- *
- * For the homepage we hand the page to the browser transport this codebase
- * already uses for bot-challenged crawls, cache the result, and show a
- * self-refreshing waiting screen meanwhile. Sub-pages fall straight through:
- * each warm-up is a real, paid run.
- */
-async function blockedOrStandIn(
-  req: NextRequest,
-  o: {
-    accountId: string;
-    lang: 'he' | 'en';
-    cleanDomain: string;
-    targetUrl: string;
-    isHomepage: boolean;
-    reason: string;
-  },
-): Promise<Response> {
-  const warmupAllowed = o.isHomepage && !!process.env.APIFY_TOKEN;
-  let result: { action: string; html?: string };
-  try {
-    result = await resolveBlockedPage(o.accountId, o.targetUrl, warmupAllowed);
-  } catch {
-    result = { action: 'give-up' };
-  }
-
-  if (result.action === 'serve-cached' && result.html) {
-    return renderProxiedHtml(result.html, {
-      req,
-      accountId: o.accountId,
-      cleanDomain: o.cleanDomain,
-      safePath: '/',
-    });
-  }
-
-  if (result.action === 'warming') {
-    return framePage(req, {
-      kind: 'warming',
-      lang: o.lang,
-      accountId: o.accountId,
-      domain: o.cleanDomain,
-      refreshSeconds: 15,
-    });
-  }
-
-  return framePage(req, {
-    kind: 'unreachable',
-    lang: o.lang,
-    accountId: o.accountId,
-    domain: o.cleanDomain,
-    reason: o.reason,
-  });
-}
-
 function escapeHtml(v: string): string {
   return String(v).replace(/[<>&"]/g, (c) => (
     c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : '&quot;'
   ));
 }
 
-type FrameKind = 'incomplete' | 'invalid' | 'expired' | 'no-site' | 'unreachable' | 'warming';
+type FrameKind = 'incomplete' | 'invalid' | 'expired' | 'no-site' | 'unreachable';
 
 /**
  * Copy for every page this route can render, in both languages.
@@ -321,16 +259,6 @@ const FRAME_COPY: Record<FrameKind, Record<'he' | 'en', { headline: string; deta
       detail: (d, r) => `<code>${d}</code> returned ${r} when we asked for it, so its pages can't be shown here.`,
     },
   },
-  warming: {
-    he: {
-      headline: 'מכינים את התצוגה',
-      detail: (d) => `<code>${d}</code> חוסם שרתים, אז אנחנו טוענים אותו בדפדפן אמיתי. זה לוקח כשתי דקות בפעם הראשונה — העמוד יתרענן לבד.`,
-    },
-    en: {
-      headline: 'Preparing the preview',
-      detail: (d) => `<code>${d}</code> blocks servers, so we are loading it in a real browser. This takes about two minutes the first time — the page will refresh itself.`,
-    },
-  },
 };
 
 /**
@@ -355,8 +283,6 @@ function framePage(
     accountId?: string;
     domain?: string;
     reason?: string;
-    /** Seconds until the page reloads itself. Only the warming page sets this. */
-    refreshSeconds?: number;
   },
 ): Response {
   // This is the function that exists so the demo link never shows an error, so
@@ -381,10 +307,6 @@ function framePage(
         ? ' העוזר שלמטה הוא האמיתי של החשבון הזה — פתחו אותו ושאלו אותו כל דבר.'
         : ' The assistant below is the real one for this account: open it and ask it anything.')
     : '';
-  const refresh = opts.refreshSeconds
-    ? `<script>setTimeout(function(){ location.reload(); }, ${Math.round(opts.refreshSeconds * 1000)});</script>`
-    : '';
-  const spinner = opts.refreshSeconds ? '<div class="spin" aria-hidden="true"></div>' : '';
 
   const html = `<!doctype html>
 <html lang="${lang}" dir="${lang === 'he' ? 'rtl' : 'ltr'}"><head><meta charset="utf-8">
@@ -402,19 +324,13 @@ function framePage(
   .card p { font-size:.85rem; line-height:1.6; margin:0; color:#71717a; }
   code { background:#e4e4e7; padding:.1rem .35rem; border-radius:.25rem; font-size:.8rem;
          direction:ltr; unicode-bidi:embed; display:inline-block; }
-  .spin { width:1.5rem; height:1.5rem; margin:0 auto 1rem; border-radius:50%;
-          border:2px solid #d4d4d8; border-top-color:#9334EB; animation:s .8s linear infinite; }
-  @keyframes s { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 </style></head>
 <body>
   <div class="card">
-    ${spinner}
     <h1>${escapeHtml(copy.headline)}</h1>
     <p>${detail}${closer}</p>
   </div>
   ${widget}
-  ${refresh}
 </body></html>`;
   return new Response(html, {
     status: 200,
