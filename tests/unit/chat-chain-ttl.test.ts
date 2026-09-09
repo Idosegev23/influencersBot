@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   CHAIN_TTL_MS,
+  MAX_CHAINED_TURNS,
   isChainStale,
   resolvePreviousResponseId,
 } from '@/lib/chatbot/chain-ttl';
@@ -21,8 +22,8 @@ const ISO = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
 const MIN = 60_000;
 
 describe('CHAIN_TTL_MS', () => {
-  it('is 30 minutes', () => {
-    expect(CHAIN_TTL_MS).toBe(30 * MIN);
+  it('is 10 minutes', () => {
+    expect(CHAIN_TTL_MS).toBe(10 * MIN);
   });
 });
 
@@ -32,11 +33,11 @@ describe('isChainStale', () => {
   });
 
   it('is fresh just inside the window', () => {
-    expect(isChainStale(ISO(29 * MIN))).toBe(false);
+    expect(isChainStale(ISO(9 * MIN))).toBe(false);
   });
 
   it('is stale just outside the window', () => {
-    expect(isChainStale(ISO(31 * MIN))).toBe(true);
+    expect(isChainStale(ISO(11 * MIN))).toBe(true);
   });
 
   it('is stale for the 6-hour session that caused the incident', () => {
@@ -63,6 +64,76 @@ describe('isChainStale', () => {
   });
 });
 
+/**
+ * The idle TTL cannot catch the session that actually costs money. Measured over
+ * 2026-08-03..09-08, the conversations that ran longest on one chain were RAPID: 21, 25 and
+ * 28 turns with mean gaps of 0.6, 1.4 and 1.0 minutes and not one gap over ten. No idle
+ * timeout touches those — and 28 turns is past the 128K threshold for argania_group, where
+ * every further turn bills at double rate. The 2026-07-25 session was the same shape: 194
+ * messages in 6 hours, a message every 1.9 minutes.
+ *
+ * So the chain is also capped by LENGTH. Past the cap the chain is simply not sent: each
+ * turn costs what turn 1 costs, forever, and rolling_summary + conversationHistory carry
+ * the context exactly as they do after an idle reset.
+ */
+describe('MAX_CHAINED_TURNS', () => {
+  it('is 20 — under the earliest measured 128K crossing (turn 23, labeaute.israel)', () => {
+    expect(MAX_CHAINED_TURNS).toBe(20);
+  });
+});
+
+describe('resolvePreviousResponseId — the length cap', () => {
+  // message_count is incremented by 2 per turn (one user + one assistant message).
+  const turns = (n: number) => n * 2;
+
+  it('drops the chain on a rapid-fire session that never went idle', () => {
+    // The 28-turn conversation from the window: last turn one minute ago, never idle.
+    expect(resolvePreviousResponseId({
+      last_response_id: 'resp_x',
+      last_turn_at: ISO(1 * MIN),
+      message_count: turns(28),
+    })).toBeNull();
+  });
+
+  it('keeps the chain just under the cap', () => {
+    expect(resolvePreviousResponseId({
+      last_response_id: 'resp_x',
+      last_turn_at: ISO(1 * MIN),
+      message_count: turns(19),
+    })).toBe('resp_x');
+  });
+
+  it('drops it exactly at the cap', () => {
+    expect(resolvePreviousResponseId({
+      last_response_id: 'resp_x',
+      last_turn_at: ISO(1 * MIN),
+      message_count: turns(20),
+    })).toBeNull();
+  });
+
+  it('does not drop the chain for a session with no message_count', () => {
+    // CS sessions are created with message_count 0 and never increment it; they do not chain
+    // at all, so a missing counter must not be read as "very long".
+    expect(resolvePreviousResponseId({
+      last_response_id: 'resp_x',
+      last_turn_at: ISO(1 * MIN),
+    })).toBe('resp_x');
+    expect(resolvePreviousResponseId({
+      last_response_id: 'resp_x',
+      last_turn_at: ISO(1 * MIN),
+      message_count: 0,
+    })).toBe('resp_x');
+  });
+
+  it('still drops an idle session that is well under the cap — both brakes apply', () => {
+    expect(resolvePreviousResponseId({
+      last_response_id: 'resp_x',
+      last_turn_at: ISO(11 * MIN),
+      message_count: turns(3),
+    })).toBeNull();
+  });
+});
+
 describe('resolvePreviousResponseId', () => {
   it('keeps the chain on an active session', () => {
     expect(resolvePreviousResponseId({ last_response_id: 'resp_abc', last_turn_at: ISO(2 * MIN) }))
@@ -70,7 +141,7 @@ describe('resolvePreviousResponseId', () => {
   });
 
   it('drops the chain once the session has gone idle', () => {
-    expect(resolvePreviousResponseId({ last_response_id: 'resp_abc', last_turn_at: ISO(45 * MIN) }))
+    expect(resolvePreviousResponseId({ last_response_id: 'resp_abc', last_turn_at: ISO(15 * MIN) }))
       .toBeNull();
   });
 
