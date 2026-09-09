@@ -95,3 +95,48 @@ describe('estimateCostUsd', () => {
     expect(total).toBeLessThan(400);
   });
 });
+
+/**
+ * Gemini runs on the chat path — the rolling summary fires at message 3 and every 6 after,
+ * and RAG rerank runs during retrieval — plus most of the scan pipeline. None of it was
+ * priced: the SDK hands back `usageMetadata`, gemini-chat.ts even reads it, and then it was
+ * dropped on the floor because the price table had no Gemini row at all, so estimateCostUsd
+ * returned $0 for every Gemini call ever made.
+ */
+describe('estimateCostUsd — Gemini', () => {
+  it('prices the model the rolling summary and rerank actually use', async () => {
+    const { estimateCostUsd } = await import('@/lib/costs/pricing');
+    const cost = estimateCostUsd({ model: 'gemini-3.5-flash', inputTokens: 1_000_000, outputTokens: 0 });
+    expect(cost).toBeGreaterThan(0);
+  });
+
+  it('charges output above input, as every provider does', async () => {
+    const { estimateCostUsd } = await import('@/lib/costs/pricing');
+    const inOnly = estimateCostUsd({ model: 'gemini-3.5-flash', inputTokens: 1_000_000, outputTokens: 0 });
+    const outOnly = estimateCostUsd({ model: 'gemini-3.5-flash', inputTokens: 0, outputTokens: 1_000_000 });
+    expect(outOnly).toBeGreaterThan(inOnly);
+  });
+
+  it('prices the pro tier above the flash tier', async () => {
+    const { estimateCostUsd } = await import('@/lib/costs/pricing');
+    const flash = estimateCostUsd({ model: 'gemini-3.5-flash', inputTokens: 1_000_000, outputTokens: 100_000 });
+    const pro = estimateCostUsd({ model: 'gemini-3.1-pro-preview', inputTokens: 1_000_000, outputTokens: 100_000 });
+    expect(pro).toBeGreaterThan(flash);
+  });
+
+  it('still returns $0 for a model nobody has priced — a stale table under-reports, it never invents', async () => {
+    const { estimateCostUsd } = await import('@/lib/costs/pricing');
+    expect(estimateCostUsd({ model: 'gemini-99-imaginary', inputTokens: 1_000_000, outputTokens: 1_000_000 })).toBe(0);
+    // paired presence check: a model that IS in the table prices, so the zero above is the
+    // unknown-model branch and not a table that stopped working.
+    expect(estimateCostUsd({ model: 'gemini-3.5-flash', inputTokens: 1_000_000, outputTokens: 0 })).toBeGreaterThan(0);
+  });
+
+  it('marks the Gemini rates as list-price, not derived from our own billing', async () => {
+    // Every OpenAI rate here was derived by dividing our invoices by our token counts. We have
+    // no Google billing access, so these are published rates — the one exception in the file,
+    // and it has to stay visible or someone will trust them equally.
+    const { GEMINI_RATES_ARE_LIST_PRICE } = await import('@/lib/costs/pricing');
+    expect(GEMINI_RATES_ARE_LIST_PRICE).toBe(true);
+  });
+});

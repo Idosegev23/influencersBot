@@ -22,6 +22,14 @@
  */
 export const LONG_CONTEXT_THRESHOLD_TOKENS = 128_000;
 
+/**
+ * True while the Gemini rows in this table are Google's published rates rather than rates
+ * derived from our own invoices, as every other row is. Flip it to false in the same commit
+ * that re-derives them from a real Google bill — the weekly cost report reads this to label
+ * the Gemini line, so a reader can never mistake one kind of number for the other.
+ */
+export const GEMINI_RATES_ARE_LIST_PRICE = true;
+
 export interface ModelPricing {
   /** USD per 1M uncached input tokens. */
   inputPerM: number;
@@ -70,6 +78,41 @@ const PRICES: Record<string, ModelPricing> = {
   'gpt-5-nano': {
     inputPerM: 0.05, cachedInputPerM: 0.005, outputPerM: 0.4,
     longContextInputPerM: 0.1, longContextOutputPerM: 0.8,
+  },
+  // --- Gemini ---------------------------------------------------------------
+  // THE ONE EXCEPTION in this file. Every rate above was DERIVED by dividing our own
+  // invoices by our own token counts. We have no Google billing API access, so these are
+  // Google's PUBLISHED rates — see GEMINI_RATES_ARE_LIST_PRICE. They are good enough to stop
+  // reporting $0 for a real cost, and they must be re-derived the moment a Google invoice is
+  // available. Gemini has no long-context tier on these models, so those fields mirror the
+  // base rate rather than doubling it.
+  'gemini-3.5-flash': {
+    inputPerM: 0.3, cachedInputPerM: 0.03, outputPerM: 2.5,
+    longContextInputPerM: 0.3, longContextOutputPerM: 2.5,
+  },
+  'gemini-2.5-flash': {
+    inputPerM: 0.3, cachedInputPerM: 0.03, outputPerM: 2.5,
+    longContextInputPerM: 0.3, longContextOutputPerM: 2.5,
+  },
+  'gemini-2.5-flash-lite': {
+    inputPerM: 0.1, cachedInputPerM: 0.01, outputPerM: 0.4,
+    longContextInputPerM: 0.1, longContextOutputPerM: 0.4,
+  },
+  'gemini-3.1-flash-lite-preview': {
+    inputPerM: 0.1, cachedInputPerM: 0.01, outputPerM: 0.4,
+    longContextInputPerM: 0.1, longContextOutputPerM: 0.4,
+  },
+  'gemini-3.1-pro-preview': {
+    inputPerM: 1.25, cachedInputPerM: 0.125, outputPerM: 10,
+    longContextInputPerM: 1.25, longContextOutputPerM: 10,
+  },
+  'gemini-3-pro-preview': {
+    inputPerM: 1.25, cachedInputPerM: 0.125, outputPerM: 10,
+    longContextInputPerM: 1.25, longContextOutputPerM: 10,
+  },
+  'gemini-embedding-001': {
+    inputPerM: 0.15, cachedInputPerM: 0.15, outputPerM: 0,
+    longContextInputPerM: 0.15, longContextOutputPerM: 0,
   },
   'text-embedding-3-large': {
     inputPerM: 0.13, cachedInputPerM: 0.13, outputPerM: 0,

@@ -8,6 +8,8 @@
  */
 
 import { chatWithGemini } from '@/lib/gemini-chat';
+import { recordTurnCost } from '@/lib/costs/recorder';
+import { AI_MODELS } from '@/lib/gemini-chat';
 import { supabase } from '@/lib/supabase';
 
 // ---------------------------------------------------------------------------
@@ -44,7 +46,7 @@ export async function buildConversationContext(
   // Load rolling summary from DB
   const { data: session } = await supabase
     .from('chat_sessions')
-    .select('rolling_summary')
+    .select('rolling_summary, account_id')
     .eq('id', sessionId)
     .single();
 
@@ -79,7 +81,7 @@ export async function updateRollingSummary(
   // Load current summary
   const { data: session, error: loadError } = await supabase
     .from('chat_sessions')
-    .select('rolling_summary')
+    .select('rolling_summary, account_id')
     .eq('id', sessionId)
     .single();
 
@@ -119,6 +121,26 @@ export async function updateRollingSummary(
       });
 
       const newSummary = result.text.trim();
+
+      // Cost accounting — the rolling summary is a Gemini call on the chat path, roughly one
+      // per conversation. Its usage came back from the SDK and was dropped, so it priced at $0
+      // even before Gemini had a row in the price table. Fire-and-forget; never throws.
+      if (result.usage?.totalTokens && session?.account_id) {
+        try {
+          void recordTurnCost({
+            accountId: session.account_id,
+            sessionId,
+            usage: {
+              model: AI_MODELS.CHAT_RESPONSES,
+              inputTokens: result.usage.promptTokens || 0,
+              cachedInputTokens: 0,
+              outputTokens: result.usage.completionTokens || 0,
+            },
+          });
+        } catch (e) {
+          console.error('[Memory] cost accounting failed (non-fatal)', e);
+        }
+      }
 
       // Persist to DB
       const { error: writeError } = await supabase
