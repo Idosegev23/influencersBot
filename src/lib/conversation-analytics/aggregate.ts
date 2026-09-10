@@ -5,6 +5,7 @@
  */
 
 import { INQUIRY_TYPE_LABEL_HE, COMPLAINT_KIND_LABEL_HE, type InquiryType } from './taxonomy';
+import type { WatchKeywordCount } from './keyword-watch';
 
 export const ALL_CHANNELS = ['web', 'whatsapp', 'instagram'] as const;
 
@@ -64,6 +65,12 @@ export interface ConversationReport {
   };
   channels: Array<{ channel: string; count: number; connected: boolean }>;
   keywords: Array<{ keyword: string; count: number }>;
+  /**
+   * Terms the brand asked us to track by name, counted from conversation text
+   * and split by complaint. The split matters: Argania's "פגום" is 110
+   * conversations of which 61 are customers describing their own hair.
+   */
+  watchKeywords: WatchKeywordCount[];
 }
 
 /**
@@ -119,6 +126,7 @@ export function buildReport(opts: {
   /** Same, for the comparison period. Lets consumers tell a real change from an
    *  uneven classification run. */
   previousSessionsInRange?: number;
+  watchKeywords?: WatchKeywordCount[];
 }): ConversationReport {
   const { current, previous, connectedChannels } = opts;
   const universe = opts.sessionsInRange ?? current.length;
@@ -263,5 +271,6 @@ export function buildReport(opts: {
       .map(([keyword, count]) => ({ keyword, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 40),
+    watchKeywords: opts.watchKeywords ?? [],
   };
 }

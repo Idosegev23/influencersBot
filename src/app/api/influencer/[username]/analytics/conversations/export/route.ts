@@ -17,6 +17,7 @@ import { parseRange } from '@/lib/conversation-analytics/range';
 import {
   fetchClassificationRows,
   fetchConnectedChannels,
+  fetchWatchKeywords,
   filtersFromParams,
 } from '@/lib/conversation-analytics/query';
 
@@ -43,13 +44,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ username: s
     const range = parseRange(sp, new Date());
     const filters = filtersFromParams(sp);
 
-    const [rows, previous, channels] = await Promise.all([
+    const [rows, previous, channels, watchKeywords] = await Promise.all([
       fetchClassificationRows({ accountId: influencer.id, fromIso: range.fromIso, toIso: range.toIso, filters }),
       fetchClassificationRows({ accountId: influencer.id, fromIso: range.prevFromIso, toIso: range.prevToIso, filters }),
       fetchConnectedChannels(influencer.id),
+      fetchWatchKeywords({ accountId: influencer.id, fromIso: range.fromIso, toIso: range.toIso }),
     ]);
 
-    const report = buildReport({ current: rows, previous, connectedChannels: channels });
+    const report = buildReport({ current: rows, previous, connectedChannels: channels, watchKeywords });
     const wb = new ExcelJS.Workbook();
 
     addSheet(wb, 'סקירה', ['מדד', 'ערך'], [
@@ -95,6 +97,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ username: s
         c.count,
         c.connected ? 'כן' : 'לא מחובר',
       ]));
+
+    if (report.watchKeywords.length) {
+      addSheet(wb, 'מילות מעקב', ['מילה', 'שיחות', 'מהן תלונות', 'לא תלונות'],
+        report.watchKeywords.map((k) => [k.term, k.sessions, k.complaintSessions, k.otherSessions]));
+    }
 
     addSheet(wb, 'מילות מפתח', ['מילה', 'כמות'],
       report.keywords.map((k) => [k.keyword, k.count]));

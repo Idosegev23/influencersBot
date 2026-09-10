@@ -7,6 +7,11 @@
 
 import { supabase } from '@/lib/supabase';
 import type { ClassificationLite } from './aggregate';
+import {
+  buildHebrewTermPattern,
+  watchTermsFromConfig,
+  type WatchKeywordCount,
+} from './keyword-watch';
 
 /** Columns every surface needs, joined to the canonical topic and product name. */
 const SELECT =
@@ -179,4 +184,46 @@ export async function countSessionsInRange(opts: {
 
   if (error) throw new Error(error.message);
   return count || 0;
+}
+
+/**
+ * Counts the account's watch keywords over conversation text.
+ *
+ * Patterns are built here rather than in SQL so the Hebrew prefix, suffix and
+ * final-form rules live in one tested place; the RPC just applies them.
+ */
+export async function fetchWatchKeywords(opts: {
+  accountId: string;
+  fromIso: string;
+  toIso: string;
+}): Promise<WatchKeywordCount[]> {
+  const { data: acc } = await supabase
+    .from('accounts')
+    .select('config')
+    .eq('id', opts.accountId)
+    .single();
+
+  const terms = watchTermsFromConfig((acc as any)?.config);
+  if (!terms.length) return [];
+
+  const { data, error } = await supabase.rpc('count_watch_keywords', {
+    p_account_id: opts.accountId,
+    p_from: opts.fromIso,
+    p_to: opts.toIso,
+    p_terms: terms,
+    p_patterns: terms.map(buildHebrewTermPattern),
+  });
+
+  if (error) {
+    // The rest of the report is still valid without this section.
+    console.error('[watch-keywords]', error.message);
+    return [];
+  }
+
+  return (data || []).map((r: any) => ({
+    term: r.term,
+    sessions: r.sessions ?? 0,
+    complaintSessions: r.complaint_sessions ?? 0,
+    otherSessions: r.other_sessions ?? 0,
+  }));
 }

@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { buildReport, type ClassificationLite, type ConversationReport } from './aggregate';
 import { generateInsights, ALLOWED_INSIGHT_TYPES, type GeneratedInsight } from './insights';
 import { sendEmail } from '@/lib/email';
+import { fetchWatchKeywords } from './query';
 import OpenAI from 'openai';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -36,6 +37,7 @@ export interface WeeklyDeps {
   fetchPreviousRows: (accountId: string, fromIso: string, toIso: string) => Promise<ClassificationLite[]>;
   fetchConnectedChannels: (accountId: string) => Promise<string[]>;
   countSessions: (accountId: string, fromIso: string, toIso: string) => Promise<number>;
+  fetchWatch: (accountId: string, fromIso: string, toIso: string) => Promise<any[]>;
   generate: (report: ConversationReport) => Promise<GeneratedInsight[]>;
   saveSnapshot: (accountId: string, periodStart: string, periodEnd: string, payload: any) => Promise<void>;
   saveInsights: (accountId: string, insights: GeneratedInsight[], periodStart: string, periodEnd: string) => Promise<void>;
@@ -53,17 +55,18 @@ export async function runWeeklyReport(opts: {
   const w = lastFullWeek(now);
   const deps: WeeklyDeps = { ...defaultDeps(), ...(opts.deps || {}) } as WeeklyDeps;
 
-  const [current, previous, connected, sessionsInRange, previousSessionsInRange] = await Promise.all([
+  const [current, previous, connected, sessionsInRange, previousSessionsInRange, watchKeywords] = await Promise.all([
     deps.fetchRows(opts.accountId, w.startIso, w.endIso),
     deps.fetchPreviousRows(opts.accountId, w.prevStartIso, w.prevEndIso),
     deps.fetchConnectedChannels(opts.accountId),
     deps.countSessions(opts.accountId, w.startIso, w.endIso),
     deps.countSessions(opts.accountId, w.prevStartIso, w.prevEndIso),
+    deps.fetchWatch(opts.accountId, w.startIso, w.endIso),
   ]);
 
   const report = buildReport({
     current, previous, connectedChannels: connected,
-    sessionsInRange, previousSessionsInRange,
+    sessionsInRange, previousSessionsInRange, watchKeywords,
   });
   const insights = current.length ? await deps.generate(report) : [];
 
@@ -118,6 +121,10 @@ function defaultDeps(): WeeklyDeps {
   return {
     fetchRows: selectRows,
     fetchPreviousRows: selectRows,
+
+    fetchWatch(accountId, fromIso, toIso) {
+      return fetchWatchKeywords({ accountId, fromIso, toIso });
+    },
 
     async countSessions(accountId, fromIso, toIso) {
       const { count } = await supabase
@@ -266,6 +273,15 @@ insight_type חייב להיות אחד מאלה בדיוק: ${ALLOWED_INSIGHT_T
       const series = r.series.byComplaintRate.slice(0, 5).map((sx: any) =>
         `<li>${sx.line} — ${sx.complaints}/${sx.mentions} (<b>${sx.complaintRate}%</b>)${sx.belowSampleFloor ? ' <i>(מדגם קטן)</i>' : ''}</li>`);
 
+      // Watched terms: the brand named these, so they lead with their own
+      // numbers. The complaint split travels with them — without it "פגום"
+      // reads as three times the damage problem it is.
+      const watch = (r.watchKeywords || []).filter((k: any) => k.sessions > 0).map((k: any) =>
+        `<li>${k.term} — <b>${k.sessions}</b> שיחות, מהן <b style="color:#dc2626">${k.complaintSessions}</b> תלונות` +
+        `${k.otherSessions ? ` ו-${k.otherSessions} לא תלונות` : ''}</li>`);
+
+      const unusedWatch = (r.watchKeywords || []).filter((k: any) => k.sessions === 0).map((k: any) => k.term);
+
       const insightList = payload.insights.length
         ? `<ul style="margin:4px 0 12px;padding-inline-start:20px">${payload.insights
             .map((i: any) => `<li><b>${i.title}</b> — ${i.content}</li>`).join('')}</ul>`
@@ -293,6 +309,12 @@ insight_type חייב להיות אחד מאלה בדיוק: ${ALLOWED_INSIGHT_T
 
           <h3 style="margin-bottom:2px">סדרות לפי שיעור תלונה</h3>
           ${series.length ? rows(series) : '<p style="color:#6b7280">אין תלונות המשויכות לסדרה.</p>'}
+
+          ${(r.watchKeywords || []).length ? `
+          <h3 style="margin-bottom:2px">מילות מעקב</h3>
+          ${watch.length ? rows(watch) : '<p style="color:#6b7280">אף אחת מהמילים לא הופיעה השבוע.</p>'}
+          ${unusedWatch.length ? `<p style="color:#6b7280;font-size:13px">לא הופיעו כלל: ${unusedWatch.join(', ')}</p>` : ''}
+          ` : ''}
 
           <p style="color:#6b7280;font-size:13px;border-top:1px solid #e5e7eb;padding-top:8px">
             כיסוי: ${r.coverage.classifiedPct}% מהשיחות סווגו ·

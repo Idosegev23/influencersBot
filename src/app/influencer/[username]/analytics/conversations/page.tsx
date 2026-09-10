@@ -58,6 +58,7 @@ interface Report {
   };
   channels: Array<{ channel: string; count: number; connected: boolean }>;
   keywords: Array<{ keyword: string; count: number }>;
+  watchKeywords: Array<{ term: string; sessions: number; complaintSessions: number; otherSessions: number }>;
 }
 
 interface Insight {
@@ -424,7 +425,46 @@ export default function ConversationAnalyticsPage({
               </div>
             </Section>
 
-            {/* 8. Keywords */}
+            {/* 8a. Watched keywords — the terms the brand named, counted in the
+                 text and split by complaint so one word cannot read as two
+                 different problems at once. */}
+            {report.watchKeywords.length > 0 && (
+              <Section title={t.sectionWatchKeywords}>
+                <p className="text-xs mb-3" style={{ color: 'var(--dash-text-3)' }}>{t.watchHint}</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ color: 'var(--dash-text-3)' }} className="border-b border-[var(--dash-glass-border)]">
+                        <th className="text-start py-2 px-2 font-medium">{t.watchColTerm}</th>
+                        <th className="text-start py-2 px-2 font-medium">{t.watchColSessions}</th>
+                        <th className="text-start py-2 px-2 font-medium">{t.watchColComplaints}</th>
+                        <th className="text-start py-2 px-2 font-medium">{t.watchColOther}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.watchKeywords.map((k) => (
+                        <tr key={k.term} className="border-b border-[var(--dash-glass-border)]/40">
+                          <td className="py-2 px-2 font-medium" style={{ color: 'var(--dash-text)' }}>{k.term}</td>
+                          <td className="py-2 px-2" style={{ color: 'var(--dash-text)' }}>
+                            {k.sessions === 0
+                              ? <span style={{ color: 'var(--dash-text-3)' }}>{t.watchUnused}</span>
+                              : formatNumber(k.sessions)}
+                          </td>
+                          <td className="py-2 px-2 font-semibold" style={{ color: k.complaintSessions ? '#ef4444' : 'var(--dash-text-2)' }}>
+                            {k.sessions === 0 ? '—' : formatNumber(k.complaintSessions)}
+                          </td>
+                          <td className="py-2 px-2" style={{ color: 'var(--dash-text-2)' }}>
+                            {k.sessions === 0 ? '—' : formatNumber(k.otherSessions)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Section>
+            )}
+
+            {/* 8b. Keywords the classifier surfaced on its own */}
             <Section title={t.sectionKeywords}>
               {report.keywords.length === 0 ? <Empty text={t.empty} /> : (
                 <div className="flex flex-wrap gap-1.5">
