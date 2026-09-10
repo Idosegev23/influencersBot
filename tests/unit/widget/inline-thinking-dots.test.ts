@@ -2,23 +2,25 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { bootWidget } from './helpers/boot-widget';
 
 /**
- * The hero waits with dots, not with chatter.
+ * Every web surface waits with dots, not with chatter.
  *
- * `/api/widget/chat` emits a `thinking` event carrying one of four random
- * phrases — "רגע, בודק... 🔍", "שנייה, בודק...", "אחלה, תן לי רגע...",
- * "בודק את זה..." (`src/app/api/widget/chat/route.ts:49`). Both emitters draw
- * from that same list, so there is never anything specific in it: no
- * "searching the catalogue", no "checking stock", just four ways to say
- * "hang on".
+ * `/api/widget/chat` used to emit a `thinking` event carrying one of four
+ * random phrases — "רגע, בודק... 🔍", "שנייה, בודק...", "אחלה, תן לי רגע...",
+ * "בודק את זה...". Both emitters drew from that same list, so there was never
+ * anything specific in it: no "searching the catalogue", no "checking stock",
+ * just four ways to say "hang on". `/api/chat/stream` had a much larger
+ * version of the same thing (`src/lib/chatbot/thinking-messages.ts`, deleted)
+ * that guessed a topic from keywords and answered "מדליקה את הכיריים... 🔥".
  *
- * That is filler in a corner bubble and actively wrong in this hero. Two lines
+ * That is filler in a corner bubble and actively wrong in a hero. Two lines
  * above the indicator sits `מ־2009 · 4,000 קמפיינים · 350 מותגים`; "אחלה, תן
  * לי רגע" is a shop assistant, and it spends exactly the authority the eyebrow
  * just bought. Three dots are language-neutral, register-neutral, read by
  * everyone as "someone is composing", and can never say anything foolish.
  *
- * The floating panel keeps the phrases — seven live customers run it and
- * nobody asked for that to change.
+ * Both widget surfaces are covered here — the hero and the floating panel.
+ * WhatsApp is the one channel that keeps its waiting copy: it has no typing
+ * indicator to fall back on.
  */
 const HERO = `
   <style>
@@ -181,9 +183,52 @@ describe('the hero waits with dots', () => {
     expect(shadow().querySelector('style')!.textContent || '').toContain('.dots');
   });
 
-  it('leaves the floating panel free to keep the phrases', async () => {
-    // The panel is what seven live customers run; nobody asked for it to change.
-    const src = await import('node:fs').then((fs) => fs.readFileSync('public/widget.js', 'utf8'));
-    expect(src).toContain('var indicatorContent = thinkingText');
+});
+
+describe('the floating panel waits with dots too', () => {
+  /** Open the corner bubble and put a turn in flight in the panel. */
+  async function openPanelAndSend(text: string) {
+    (document.getElementById('ibot-trigger') as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 0));
+    const input = document.getElementById('ibot-input') as HTMLInputElement;
+    input.value = text;
+    (document.getElementById('ibot-send') as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 0));
+  }
+
+  /** The three bouncing spans the indicator bubble is made of. */
+  function panelDots() {
+    return Array.from(document.querySelectorAll('#ibot-messages span')).filter(
+      (el) => (el.getAttribute('style') || '').indexOf('ibot-bounce') !== -1,
+    );
+  }
+
+  it('shows three dots and never the server chatter, even when the server sends it', async () => {
+    await bootWidget({ html: '<main><h1>חנות</h1></main>', config: { placeholder: 'שאלו אותי' } });
+    const stream = controllableStream();
+    await openPanelAndSend('מה יש לכם?');
+    stream.send({ type: 'thinking', text: CHATTER });
+    await settle();
+
+    // Presence first: a panel that never opened would satisfy the absence below
+    // for entirely the wrong reason.
+    expect(document.getElementById('ibot-messages')).not.toBeNull();
+    expect(panelDots()).toHaveLength(3);
+
+    const text = document.getElementById('ibot-messages')!.textContent || '';
+    expect(text).not.toContain(CHATTER);
+    expect(text).not.toContain('בודק');
+  });
+
+  it('gives way to the reply once it starts arriving', async () => {
+    await bootWidget({ html: '<main><h1>חנות</h1></main>', config: { placeholder: 'שאלו אותי' } });
+    const stream = controllableStream();
+    await openPanelAndSend('מה יש לכם?');
+    await settle();
+    expect(panelDots()).toHaveLength(3);
+
+    stream.send({ type: 'delta', text: 'יש לנו שלוש סדרות' });
+    await until(() => (document.getElementById('ibot-messages')!.textContent || '').indexOf('שלוש סדרות') !== -1);
+    expect(panelDots()).toHaveLength(0);
   });
 });

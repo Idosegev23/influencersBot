@@ -134,10 +134,9 @@
   var sessionId = localStorage.getItem('ibot_widget_' + ACCOUNT_ID) || null;
   var messages = [];
   var isLoading = false;
-  var thinkingText = null;
   // render() rebuilds the whole panel via innerHTML, so every entry animation
   // inside it replays on every rebuild — and one reply triggers 4-6 rebuilds
-  // (thinking, first delta, cards, action, stream end, chips). These two guards
+  // (first delta, cards, action, stream end, chips). These two guards
   // make the entry animations play once instead of once per rebuild: the panel
   // slides up only on open, and a message row slides in only the first time it
   // is painted.
@@ -2336,7 +2335,6 @@
         // diagnostic alone only makes that failure loud; this makes it
         // recoverable, and mirrors what the fetch's own .catch does.
         isLoading = false;
-        thinkingText = null;
         var last = messages[messages.length - 1];
         if (last && last.role === 'assistant' && !last.content) last.content = locale.connectionError;
         try { render(); } catch (e2) { /* */ }
@@ -2694,7 +2692,7 @@
 
   // ---- The engaged inline surface --------------------------------------------
   // One instance, one session, two renderers. Nothing here talks to the network
-  // or owns any state: `messages`, `isLoading`, `thinkingText` and sendMessage()
+  // or owns any state: `messages`, `isLoading` and sendMessage()
   // are the same module-level ones the floating panel reads, so a visitor who
   // talks in the hero and then opens the corner bubble is in the same thread.
 
@@ -2730,20 +2728,11 @@
       if (!m.content) {
         // The empty assistant row sendMessage() pushes ahead of the reply.
         if (isLoading && isLast) {
-          // Dots, never the server's `thinking` phrase.
-          //
-          // The chat route picks that phrase at random from four ways of
-          // saying "hang on" (src/app/api/widget/chat/route.ts) — both of its
-          // emitters draw from the same list, so there is never anything
-          // specific in it to lose. In a corner bubble that is filler; here it
-          // is worse. Two lines above this sits the account's eyebrow — for the
-          // pilot, `מ־2009 · 4,000 קמפיינים · 350 מותגים` — and "אחלה, תן לי
-          // רגע" is a shop assistant answering it. Dots are language-neutral,
-          // register-neutral, read by everyone as "someone is composing", and
-          // cannot say anything foolish on a customer's own homepage.
-          //
-          // The floating panel still renders `thinkingText`; seven live
-          // customers run it and nobody asked for that to change.
+          // Dots, everywhere. The waiting phrase the chat route used to
+          // stream ("אחלה, תן לי רגע...") is gone from every web surface —
+          // dots are language-neutral, register-neutral, read by everyone as
+          // "someone is composing", and cannot say anything foolish on a
+          // customer's own homepage.
           out += '<div class="row bot"><div class="say">' +
             '<span class="dots"><i></i><i></i><i></i></span>' +
             '</div></div>';
@@ -3807,11 +3796,10 @@
 
       // Typing / thinking indicator
       if (isEmpty) {
-        var indicatorContent = thinkingText
-          ? '<span style="animation:ibot-fade-in 0.3s ease-out;">' + escapeHtml(thinkingText) + '</span>'
-          : '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out infinite;"></span>' +
-            '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out 0.15s infinite;"></span>' +
-            '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out 0.3s infinite;"></span>';
+        var indicatorContent =
+          '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out infinite;"></span>' +
+          '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out 0.15s infinite;"></span>' +
+          '<span style="width:6px;height:6px;border-radius:50%;background:#676767;animation:ibot-bounce 1.2s ease-in-out 0.3s infinite;"></span>';
         msgsHtml +=
           '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;' + rowAnim + '">' +
           '<div style="display:flex;align-items:flex-end;gap:8px;max-width:85%;">' +
@@ -4141,7 +4129,6 @@
           reader.read().then(function (result) {
             if (result.done) {
               isLoading = false;
-              thinkingText = null;
               var clean = fullText
                 .replace(/<<SUGGESTIONS>>[\s\S]*?<<\/SUGGESTIONS>>/g, '')
                 .replace(/<<INTENT>>[\s\S]*?<<\/INTENT>>/g, '')
@@ -4173,10 +4160,7 @@
             for (var i = 0; i < lines.length; i++) {
               try {
                 var event = JSON.parse(lines[i]);
-                if (event.type === 'thinking' && event.text) {
-                  thinkingText = event.text;
-                  scheduleRender();
-                } else if (event.type === 'delta' && event.text) {
+                if (event.type === 'delta' && event.text) {
                   fullText += event.text;
                   // Strip all three envelope types while streaming so partial
                   // tokens never flash on screen (incl. <<ACTION>> which arrives
@@ -4257,7 +4241,6 @@
             read();
           }).catch(function () {
             isLoading = false;
-            thinkingText = null;
             messages[messages.length - 1].content = locale.connectionError;
             render();
           });
@@ -4267,7 +4250,6 @@
       })
       .catch(function () {
         isLoading = false;
-        thinkingText = null;
         messages[messages.length - 1].content = locale.connectionError;
         render();
       });
@@ -5304,7 +5286,7 @@
       var msg = messages[messages.length - 1];
       if (!msg || msg.role !== 'assistant') return;
       var streamingEl = document.getElementById('ibot-streaming-bubble');
-      if (streamingEl && !thinkingText) {
+      if (streamingEl) {
         streamingEl.innerHTML = formatMessage(msg.content, false);
         var msgsScroll = document.getElementById('ibot-messages');
         if (msgsScroll) msgsScroll.scrollTop = msgsScroll.scrollHeight;
@@ -5317,12 +5299,10 @@
         // streaming node rather than falling through to a full render(), which
         // would rebuild the entire thread AND the (hidden) floating bubble on
         // every token. renderInline() is the fallback for the first paint after
-        // the thinking dots, when no streaming node exists yet.
-        thinkingText = null;
+        // the dots, when no streaming node exists yet.
         try { if (!paintInlineStream()) renderInline(); } catch (e) { report('inline_render_failed', e); }
       } else {
-        // First paint after thinking dots — full render to swap dot bubble for text bubble.
-        thinkingText = null;
+        // First paint after the dots — full render to swap dot bubble for text bubble.
         render();
       }
     });

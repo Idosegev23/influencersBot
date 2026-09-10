@@ -656,7 +656,6 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
     meta: streamMeta,
     cards: streamCards,
     text: streamText,
-    thinkingText,
     sendMessage: sendStreamMessageRaw,
     cancel: cancelStream,
   } = useStreamChat({
@@ -1292,7 +1291,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
         const assistantMessageId = (Date.now() + 1).toString();
         setStreamingMessageId(assistantMessageId);
         setMessages((prev) => [...prev, { id: assistantMessageId, role: 'assistant', content: '' }]);
-        // Keep isTyping=true — thinking message / dots stay visible until first stream token
+        // Keep isTyping=true — the dots stay visible until the first stream token
         // Inject hidden conference context — drives the bot to push for a meeting throughout
         const apiMessage =
           isConferenceMode && username === 'ldrs_group'
@@ -2096,7 +2095,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                           content: '',
                                         };
                                         setMessages((prev) => [...prev, streamingMessage]);
-                                        // Keep isTyping=true — thinking message / dots stay visible until first stream token
+                                        // Keep isTyping=true — the dots stay visible until the first stream token
                                         await sendStreamMessage({
                                           message: text,
                                           username,
@@ -2241,7 +2240,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                         );
                       })()}
 
-                      {(isTyping || (isStreamActive && thinkingText && !streamText)) && (
+                      {isTyping && (
                         <motion.div
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -2259,17 +2258,11 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                               />
                             </div>
                           )}
-                          {thinkingText ? (
-                            <div className="thinking-message bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl rounded-br-md px-4 py-2 text-sm text-gray-600 dark:text-gray-300">
-                              {thinkingText}
-                            </div>
-                          ) : (
-                            <div className="typing-indicator">
-                              <div className="typing-dot" />
-                              <div className="typing-dot" />
-                              <div className="typing-dot" />
-                            </div>
-                          )}
+                          <div className="typing-indicator">
+                            <div className="typing-dot" />
+                            <div className="typing-dot" />
+                            <div className="typing-dot" />
+                          </div>
                         </motion.div>
                       )}
                       {messages.length > 0 && !isTyping && !isStreamActive && (

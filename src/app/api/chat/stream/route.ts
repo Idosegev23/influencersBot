@@ -72,7 +72,6 @@ import { buildConversationContext, trimToTokenBudget, updateRollingSummary, shou
 import { createPipelineMetrics, withMetrics, logPipelineMetrics, recordMetrics } from '@/lib/metrics/pipeline-metrics';
 import { getCachedSuggestionRAG, cacheSuggestionRAG, prewarmSuggestionRAG, type CachedRAGResult } from '@/lib/suggestion-cache';
 import { buildPersonalityFromDB } from '@/lib/chatbot/personality-wrapper';
-import { getSmartThinkingMessage } from '@/lib/chatbot/thinking-messages';
 import { demoAccessFromConfig } from '@/lib/demo/guard';
 import { recordBotGaveUp } from '@/lib/telemetry/bot-quality';
 
@@ -117,18 +116,13 @@ interface StreamDone {
   fullText: string;
 }
 
-interface StreamThinking {
-  type: 'thinking';
-  text: string;
-}
-
 interface StreamError {
   type: 'error';
   message: string;
   code?: string;
 }
 
-type StreamEvent = StreamMeta | StreamCards | StreamDelta | StreamDone | StreamError | StreamThinking;
+type StreamEvent = StreamMeta | StreamCards | StreamDelta | StreamDone | StreamError;
 
 // ============================================
 // Helper: Encode NDJSON
@@ -923,12 +917,6 @@ export async function POST(req: NextRequest) {
           experiments: [],
         };
         controller.enqueue(encodeEvent(metaEvent));
-
-        // === SEND THINKING INDICATOR (immediate — reduces perceived latency) ===
-        controller.enqueue(encodeEvent({
-          type: 'thinking',
-          text: getSmartThinkingMessage(message, (influencer as any).language || 'he'),
-        }));
 
         // === SEND CARDS (if needed) ===
         if (decision.uiDirectives.showCardList === 'brands' && brands.length > 0) {

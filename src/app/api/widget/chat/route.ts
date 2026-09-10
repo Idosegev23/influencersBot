@@ -36,22 +36,19 @@ function encodeEvent(event: Record<string, any>): Uint8Array {
 // ============================================
 // Locale strings for server-side widget responses.
 // Mirrors the LOCALES table in public/widget.js — anything the client renders
-// from a server-sourced field (CTAs, thinking indicators, errors) needs an
-// entry here so the language flips end-to-end.
+// from a server-sourced field (CTAs, errors) needs an entry here so the
+// language flips end-to-end.
 // ============================================
 const WIDGET_LOCALES: Record<string, {
   cta: { sale: string; default: string };
-  thinking: string[];
   errorProcessing: string;
 }> = {
   he: {
     cta: { sale: 'קני במבצע', default: 'לפרטים נוספים' },
-    thinking: ['רגע, בודק... 🔍', 'שנייה, בודק...', 'אחלה, תן לי רגע...', 'בודק את זה...'],
     errorProcessing: 'שגיאה בעיבוד הבקשה',
   },
   en: {
     cta: { sale: 'Shop the deal', default: 'View details' },
-    thinking: ['One sec, checking... 🔍', 'Just a moment...', 'Looking into it...', 'Pulling that up...'],
     errorProcessing: 'Something went wrong processing your request',
   },
 };
@@ -151,7 +148,6 @@ export async function POST(req: NextRequest) {
         async start(controller) {
           try {
             controller.enqueue(encodeEvent({ type: 'meta', sessionId: sessionId || 'pending' }));
-            controller.enqueue(encodeEvent({ type: 'thinking', text: loc.thinking[Math.floor(Math.random() * loc.thinking.length)] }));
             await emitWebCsEvents((e) => controller.enqueue(encodeEvent(e)), {
               channel: 'widget',
               accountId,
@@ -180,14 +176,6 @@ export async function POST(req: NextRequest) {
           // Send meta event
           controller.enqueue(
             encodeEvent({ type: 'meta', sessionId: sessionId || 'pending' }),
-          );
-
-          // Send thinking indicator (immediate — reduces perceived latency)
-          controller.enqueue(
-            encodeEvent({
-              type: 'thinking',
-              text: loc.thinking[Math.floor(Math.random() * loc.thinking.length)],
-            }),
           );
 
           // Process message with streaming

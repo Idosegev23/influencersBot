@@ -42,11 +42,6 @@ interface StreamDone {
   fullText: string;
 }
 
-interface StreamThinking {
-  type: 'thinking';
-  text: string;
-}
-
 interface StreamError {
   type: 'error';
   message: string;
@@ -59,7 +54,7 @@ interface StreamPayload {
   payload: { kind: string; [k: string]: unknown };
 }
 
-type StreamEvent = StreamMeta | StreamCards | StreamDelta | StreamDone | StreamError | StreamThinking | StreamPayload;
+type StreamEvent = StreamMeta | StreamCards | StreamDelta | StreamDone | StreamError | StreamPayload;
 
 // ============================================
 // Hook State
@@ -69,7 +64,6 @@ interface StreamState {
   isStreaming: boolean;
   meta: StreamMeta | null;
   cards: StreamCards | null;
-  thinkingText: string | null;
   text: string;
   done: StreamDone | null;
   error: StreamError | null;
@@ -78,7 +72,6 @@ interface StreamState {
 interface UseStreamChatOptions {
   onMeta?: (meta: StreamMeta) => void;
   onCards?: (cards: StreamCards) => void;
-  onThinking?: (text: string) => void;
   onDelta?: (delta: string, fullText: string) => void;
   onDone?: (done: StreamDone) => void;
   onError?: (error: StreamError) => void;
@@ -94,7 +87,6 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
     isStreaming: false,
     meta: null,
     cards: null,
-    thinkingText: null,
     text: '',
     done: null,
     error: null,
@@ -129,7 +121,6 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
       isStreaming: true,
       meta: null,
       cards: null,
-      thinkingText: null,
       text: '',
       done: null,
       error: null,
@@ -184,14 +175,9 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
                 options.onCards?.(event);
                 break;
 
-              case 'thinking':
-                setState(s => ({ ...s, thinkingText: event.text }));
-                options.onThinking?.(event.text);
-                break;
-
               case 'delta':
                 currentText += event.text;
-                setState(s => ({ ...s, text: currentText, thinkingText: null }));
+                setState(s => ({ ...s, text: currentText }));
                 options.onDelta?.(event.text, currentText);
                 break;
 
@@ -262,7 +248,6 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
       isStreaming: false,
       meta: null,
       cards: null,
-      thinkingText: null,
       text: '',
       done: null,
       error: null,
@@ -277,5 +262,5 @@ export function useStreamChat(options: UseStreamChatOptions = {}) {
   };
 }
 
-export type { StreamMeta, StreamCards, StreamThinking, StreamDelta, StreamDone, StreamError, StreamEvent };
+export type { StreamMeta, StreamCards, StreamDelta, StreamDone, StreamError, StreamEvent };
 
