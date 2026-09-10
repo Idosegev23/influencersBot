@@ -276,9 +276,17 @@ insight_type חייב להיות אחד מאלה בדיוק: ${ALLOWED_INSIGHT_T
       // Watched terms: the brand named these, so they lead with their own
       // numbers. The complaint split travels with them — without it "פגום"
       // reads as three times the damage problem it is.
-      const watch = (r.watchKeywords || []).filter((k: any) => k.sessions > 0).map((k: any) =>
-        `<li>${k.term} — <b>${k.sessions}</b> שיחות, מהן <b style="color:#dc2626">${k.complaintSessions}</b> תלונות` +
-        `${k.otherSessions ? ` ו-${k.otherSessions} לא תלונות` : ''}</li>`);
+      const watch = (r.watchKeywords || []).filter((k: any) => k.sessions > 0).map((k: any) => {
+        // An unclassified conversation is not a clean one. Say which it is.
+        if (k.complaintSessions + k.otherSessions === 0) {
+          return `<li>${k.term} — <b>${k.sessions}</b> שיחות, <i>טרם סווגו</i></li>`;
+        }
+        const pending = k.unclassifiedSessions
+          ? ` (<i>${k.unclassifiedSessions} טרם סווגו</i>)` : '';
+        return `<li>${k.term} — <b>${k.sessions}</b> שיחות, מהן ` +
+          `<b style="color:#dc2626">${k.complaintSessions}</b> תלונות` +
+          `${k.otherSessions ? ` ו-${k.otherSessions} לא תלונות` : ''}${pending}</li>`;
+      });
 
       const unusedWatch = (r.watchKeywords || []).filter((k: any) => k.sessions === 0).map((k: any) => k.term);
 

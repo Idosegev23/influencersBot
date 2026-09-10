@@ -99,8 +99,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ username: s
       ]));
 
     if (report.watchKeywords.length) {
-      addSheet(wb, 'מילות מעקב', ['מילה', 'שיחות', 'מהן תלונות', 'לא תלונות'],
-        report.watchKeywords.map((k) => [k.term, k.sessions, k.complaintSessions, k.otherSessions]));
+      // "Not yet classified" is its own column here for the same reason it is on
+      // the page: folded into "not complaints" it reads as a clean bill of health.
+      addSheet(wb, 'מילות מעקב', ['מילה', 'שיחות', 'מהן תלונות', 'לא תלונות', 'טרם סווגו'],
+        report.watchKeywords.map((k) => [
+          k.term, k.sessions, k.complaintSessions, k.otherSessions, k.unclassifiedSessions,
+        ]));
     }
 
     addSheet(wb, 'מילות מפתח', ['מילה', 'כמות'],
