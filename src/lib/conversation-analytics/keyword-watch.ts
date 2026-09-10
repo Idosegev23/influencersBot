@@ -101,6 +101,8 @@ export interface WatchKeywordCount {
  * Reads the watchlist off an account's config.
  * Empty list = the section is simply absent, not an error.
  */
-export function watchTermsFromConfig(config: any): string[] {
-  return normalizeWatchTerms(config?.conversation_analytics?.watch_keywords);
+export function watchTermsFromConfig(config: unknown): string[] {
+  const analytics = (config as { conversation_analytics?: { watch_keywords?: unknown } } | null)
+    ?.conversation_analytics;
+  return normalizeWatchTerms(analytics?.watch_keywords);
 }
