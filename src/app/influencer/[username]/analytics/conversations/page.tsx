@@ -58,7 +58,7 @@ interface Report {
   };
   channels: Array<{ channel: string; count: number; connected: boolean }>;
   keywords: Array<{ keyword: string; count: number }>;
-  watchKeywords: Array<{ term: string; sessions: number; complaintSessions: number; otherSessions: number }>;
+  watchKeywords: Array<{ term: string; sessions: number; complaintSessions: number; otherSessions: number; unclassifiedSessions: number }>;
 }
 
 interface Insight {
@@ -430,7 +430,10 @@ export default function ConversationAnalyticsPage({
                  different problems at once. */}
             {report.watchKeywords.length > 0 && (
               <Section title={t.sectionWatchKeywords}>
-                <p className="text-xs mb-3" style={{ color: 'var(--dash-text-3)' }}>{t.watchHint}</p>
+                <p className="text-xs mb-1" style={{ color: 'var(--dash-text-3)' }}>{t.watchHint}</p>
+                {report.watchKeywords.some((k) => k.unclassifiedSessions > 0) && (
+                  <p className="text-xs mb-3" style={{ color: '#f59e0b' }}>{t.watchPendingHint}</p>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -439,6 +442,7 @@ export default function ConversationAnalyticsPage({
                         <th className="text-start py-2 px-2 font-medium">{t.watchColSessions}</th>
                         <th className="text-start py-2 px-2 font-medium">{t.watchColComplaints}</th>
                         <th className="text-start py-2 px-2 font-medium">{t.watchColOther}</th>
+                        <th className="text-start py-2 px-2 font-medium">{t.watchColUnclassified}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -451,10 +455,18 @@ export default function ConversationAnalyticsPage({
                               : formatNumber(k.sessions)}
                           </td>
                           <td className="py-2 px-2 font-semibold" style={{ color: k.complaintSessions ? '#ef4444' : 'var(--dash-text-2)' }}>
-                            {k.sessions === 0 ? '—' : formatNumber(k.complaintSessions)}
+                            {k.sessions === 0
+                              ? '—'
+                              : k.complaintSessions + k.otherSessions === 0
+                                ? <span style={{ color: 'var(--dash-text-3)', fontWeight: 400 }}>{t.watchNotYetKnown}</span>
+                                : formatNumber(k.complaintSessions)}
                           </td>
                           <td className="py-2 px-2" style={{ color: 'var(--dash-text-2)' }}>
-                            {k.sessions === 0 ? '—' : formatNumber(k.otherSessions)}
+                            {k.sessions === 0 || k.complaintSessions + k.otherSessions === 0
+                              ? '—' : formatNumber(k.otherSessions)}
+                          </td>
+                          <td className="py-2 px-2" style={{ color: 'var(--dash-text-3)' }}>
+                            {k.unclassifiedSessions ? formatNumber(k.unclassifiedSessions) : '—'}
                           </td>
                         </tr>
                       ))}

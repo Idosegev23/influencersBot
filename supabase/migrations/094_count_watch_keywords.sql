@@ -15,9 +15,16 @@
 --
 -- Patterns are built in TypeScript (keyword-watch.ts) so the Hebrew prefix,
 -- suffix and final-form rules have one home and unit tests.
+--
+-- "Not a complaint" and "not classified yet" are separate columns. Collapsing
+-- them made an account whose backfill had not run report every term as
+-- "110 conversations, 0 complaints" — which reads as good news when the truth is
+-- that nothing had been looked at. LA BEAUTÉ surfaced this before launch.
 -- ==================================================
 
-CREATE OR REPLACE FUNCTION public.count_watch_keywords(
+DROP FUNCTION IF EXISTS public.count_watch_keywords(UUID, TIMESTAMPTZ, TIMESTAMPTZ, TEXT[], TEXT[]);
+
+CREATE FUNCTION public.count_watch_keywords(
   p_account_id UUID,
   p_from       TIMESTAMPTZ,
   p_to         TIMESTAMPTZ,
@@ -25,10 +32,11 @@ CREATE OR REPLACE FUNCTION public.count_watch_keywords(
   p_patterns   TEXT[]
 )
 RETURNS TABLE (
-  term               TEXT,
-  sessions           INTEGER,
-  complaint_sessions INTEGER,
-  other_sessions     INTEGER
+  term                  TEXT,
+  sessions              INTEGER,
+  complaint_sessions    INTEGER,
+  other_sessions        INTEGER,
+  unclassified_sessions INTEGER
 )
 LANGUAGE sql
 STABLE
@@ -42,7 +50,7 @@ AS $$
     SELECT DISTINCT
       terms.term,
       s.id AS session_id,
-      COALESCE(c.is_complaint, FALSE) AS is_complaint
+      c.is_complaint
     FROM terms
     JOIN public.chat_sessions s
       ON s.account_id = p_account_id
@@ -58,8 +66,9 @@ AS $$
   SELECT
     terms.term,
     COALESCE(COUNT(hits.session_id), 0)::INTEGER,
-    COALESCE(COUNT(hits.session_id) FILTER (WHERE hits.is_complaint), 0)::INTEGER,
-    COALESCE(COUNT(hits.session_id) FILTER (WHERE NOT hits.is_complaint), 0)::INTEGER
+    COALESCE(COUNT(hits.session_id) FILTER (WHERE hits.is_complaint IS TRUE), 0)::INTEGER,
+    COALESCE(COUNT(hits.session_id) FILTER (WHERE hits.is_complaint IS FALSE), 0)::INTEGER,
+    COALESCE(COUNT(hits.session_id) FILTER (WHERE hits.is_complaint IS NULL), 0)::INTEGER
   FROM terms
   LEFT JOIN hits ON hits.term = terms.term
   GROUP BY terms.term
@@ -67,6 +76,6 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.count_watch_keywords IS
-  'Watch-keyword counts over conversation text, split by complaint. Patterns are built in TS (keyword-watch.ts) so Hebrew prefix/suffix/final-form handling has one home and unit tests.';
+  'Watch-keyword counts over conversation text, split into complaint / not-complaint / not-yet-classified. Unknown is reported as unknown, never folded into zero. Patterns are built in TS (keyword-watch.ts) so Hebrew prefix/suffix/final-form handling has one home and unit tests.';
 
 REVOKE ALL ON FUNCTION public.count_watch_keywords FROM PUBLIC, anon, authenticated;

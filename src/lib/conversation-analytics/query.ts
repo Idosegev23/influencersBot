@@ -225,5 +225,6 @@ export async function fetchWatchKeywords(opts: {
     sessions: r.sessions ?? 0,
     complaintSessions: r.complaint_sessions ?? 0,
     otherSessions: r.other_sessions ?? 0,
+    unclassifiedSessions: r.unclassified_sessions ?? 0,
   }));
 }

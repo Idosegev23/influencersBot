@@ -95,6 +95,38 @@ export interface WatchKeywordCount {
   sessions: number;
   complaintSessions: number;
   otherSessions: number;
+  /**
+   * Conversations that matched but have not been classified yet. Kept apart
+   * from `otherSessions` because "we have not looked" must never render as
+   * "none were complaints" — that reads as good news and is not news at all.
+   */
+  unclassifiedSessions: number;
+}
+
+/**
+ * Share of a term's conversations that must be classified before its complaint
+ * split is worth showing as fact rather than as a partial count.
+ */
+const KNOWN_THRESHOLD = 0.8;
+
+export function splitWatchCounts(k: {
+  sessions: number;
+  complaintSessions: number;
+  otherSessions: number;
+  unclassifiedSessions: number;
+}): {
+  known: boolean;
+  complaintSessions: number;
+  otherSessions: number;
+  unclassifiedSessions: number;
+} {
+  const classified = k.complaintSessions + k.otherSessions;
+  return {
+    known: k.sessions > 0 && classified / k.sessions >= KNOWN_THRESHOLD,
+    complaintSessions: k.complaintSessions,
+    otherSessions: k.otherSessions,
+    unclassifiedSessions: k.unclassifiedSessions,
+  };
 }
 
 /**

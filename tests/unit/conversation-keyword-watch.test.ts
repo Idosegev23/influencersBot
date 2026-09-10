@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildHebrewTermPattern,
   normalizeWatchTerms,
+  splitWatchCounts,
   MAX_WATCH_TERMS,
 } from '@/lib/conversation-analytics/keyword-watch';
 
@@ -114,5 +115,24 @@ describe('normalizeWatchTerms', () => {
   // A one-character term would match a letter inside half the corpus.
   it('rejects terms shorter than two characters', () => {
     expect(normalizeWatchTerms(['א', 'פגום'])).toEqual(['פגום']);
+  });
+});
+
+describe('watch keyword shape', () => {
+  // LA BEAUTÉ surfaced this before launch: with no classifications yet, every
+  // session fell into "not a complaint" and the page would have reported
+  // "פגום: 110 conversations, 0 complaints" — which reads as good news when the
+  // truth is that nothing had been classified. Unknown must not look like zero.
+  it('keeps unclassified conversations separate from non-complaints', () => {
+    expect(splitWatchCounts({ sessions: 110, complaintSessions: 0, otherSessions: 0, unclassifiedSessions: 110 }))
+      .toEqual({ known: false, complaintSessions: 0, otherSessions: 0, unclassifiedSessions: 110 });
+
+    expect(splitWatchCounts({ sessions: 110, complaintSessions: 49, otherSessions: 61, unclassifiedSessions: 0 }))
+      .toEqual({ known: true, complaintSessions: 49, otherSessions: 61, unclassifiedSessions: 0 });
+  });
+
+  it('treats a mostly-classified term as known', () => {
+    expect(splitWatchCounts({ sessions: 100, complaintSessions: 90, otherSessions: 5, unclassifiedSessions: 5 }).known)
+      .toBe(true);
   });
 });
