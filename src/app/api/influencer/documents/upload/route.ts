@@ -1,20 +1,13 @@
 // Upload documents to Supabase Storage
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
 import { getCurrentUser, checkPermission, isAccountOwner } from '@/lib/auth/middleware';
-import { verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // Allow longer execution for large files (max 5 minutes on Pro plan)
 export const maxDuration = 300;
-
-// Check influencer authentication
-async function checkAuth(username: string): Promise<boolean> {
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get(`influencer_session_${username}`);
-  return verifySessionToken(authCookie?.value, influencerSubject(username));
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,12 +25,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Auth check: Support both cookie-based (influencer) and Supabase Auth (admin/agent)
-    let isAuthenticated = false;
+    // Auth: admin cookie (any account) → influencer/support-agent session for
+    // `username` (only that username's own account) → Supabase Auth user.
+    let isAuthenticated = (await requireAdminAuth()) === null;
 
-    if (username) {
-      // Try cookie auth first
-      isAuthenticated = await checkAuth(username);
+    if (!isAuthenticated && username && (await checkInfluencerAuth(username))) {
+      // The session proves who the caller is, not which account they write to:
+      // accountId comes from the form body, so bind it to the session's account.
+      const influencer = await getInfluencerByUsername(username);
+      if (!influencer || influencer.id !== accountId) {
+        return NextResponse.json(
+          { error: 'Forbidden - not account owner' },
+          { status: 403 }
+        );
+      }
+      isAuthenticated = true;
     }
 
     if (!isAuthenticated) {
@@ -72,7 +74,6 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    // Cookie auth users can only upload to their own account (verified by cookie)
 
     if (files.length === 0) {
       return NextResponse.json(
