@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { supabase, getInfluencerByUsername } from '@/lib/supabase';
-import { verifySessionToken, influencerSubject } from '@/lib/auth/session-token';
-
-// Check influencer authentication
-async function checkAuth(username: string): Promise<boolean> {
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get(`influencer_session_${username}`);
-  return verifySessionToken(authCookie?.value, influencerSubject(username));
-}
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 /**
  * POST - Save document metadata after client-side upload
@@ -41,20 +34,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check authentication (optional - allow unauthenticated for new partnership creation flow)
-    const isAuth = await checkAuth(username);
-    
-    // If not authenticated via cookie, verify influencer exists and accountId is valid
-    if (!isAuth) {
-      const influencer = await getInfluencerByUsername(username);
-      if (!influencer) {
-        return NextResponse.json({ error: 'Influencer not found' }, { status: 404 });
+    // Session required: admin, or the account's own influencer/support-agent
+    // session. username↔accountId matching alone proves nothing — both are public.
+    const isAdmin = (await requireAdminAuth()) === null;
+    if (!isAdmin) {
+      if (!(await checkInfluencerAuth(username))) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
-
-      // Verify accountId matches
-      if (influencer.id !== accountId) {
+      const influencer = await getInfluencerByUsername(username);
+      if (!influencer || influencer.id !== accountId) {
         return NextResponse.json({ error: 'Account mismatch' }, { status: 403 });
       }
+    }
+
+    // parse later downloads storage_path with the service role and indexes it
+    // into this account's RAG, so a path into another tenant's folder would be
+    // a cross-account read. Every client writes under `${accountId}/`.
+    if (typeof storagePath !== 'string' || !storagePath.startsWith(`${accountId}/`) || storagePath.includes('..')) {
+      return NextResponse.json({ error: 'Invalid storage path' }, { status: 403 });
     }
 
     // Save document metadata to database
@@ -102,17 +99,10 @@ export async function POST(req: NextRequest) {
 
     console.log('[Metadata API] ✅ Document saved:', document.id);
 
-    // Trigger AI parsing asynchronously (optional)
-    if (process.env.NEXT_PUBLIC_APP_URL) {
-      fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/influencer/documents/parse`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documentId: document.id,
-          documentType: documentType || 'other',
-        }),
-      }).catch(err => console.error('Failed to trigger parsing:', err));
-    }
+    // No parse trigger here. Every caller of this route calls
+    // /api/influencer/documents/parse itself once the upload is registered
+    // (and some need the parse result synchronously), so triggering it here
+    // too parsed — and billed — every file twice.
 
     return NextResponse.json({
       success: true,

@@ -262,6 +262,7 @@ export default function NewPartnershipPage() {
       if (uploadedFiles.length > 0) {
         const accountId = result.partnership.account_id;
 
+        const registeredIds: string[] = [];
         for (const file of uploadedFiles) {
           try {
             // Check file size (max 10MB)
@@ -289,7 +290,7 @@ export default function NewPartnershipPage() {
             }
 
             // 2. Save metadata to DB via lightweight API (only JSON, no file payload)
-            await fetch('/api/influencer/documents/metadata', {
+            const metaRes = await fetch('/api/influencer/documents/metadata', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -303,11 +304,25 @@ export default function NewPartnershipPage() {
                 documentType: 'contract',
               }),
             });
+            if (metaRes.ok) {
+              const { document: doc } = await metaRes.json();
+              if (doc?.id) registeredIds.push(doc.id);
+            }
 
             console.log(`✓ Uploaded ${file.name}`);
           } catch (err) {
             console.error(`Error uploading ${file.name}:`, err);
           }
+        }
+
+        // 3. One parse for the batch. The metadata route no longer triggers
+        //    parse itself (it used to, on top of the UI's own call).
+        if (registeredIds.length > 0) {
+          fetch(`/api/influencer/documents/parse?username=${encodeURIComponent(username)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ documentIds: registeredIds, documentType: 'contract' }),
+          }).catch(() => {});
         }
       }
 
