@@ -5,12 +5,25 @@ import { supabase } from '@/lib/supabase';
 import { parseDocument, mergeDocuments } from '@/lib/ai-parser';
 import type { MultiLayerResult } from '@/lib/ai-parser';
 import type { DocumentType, ParseResult } from '@/lib/ai-parser/types';
+import { requireAdminAuth } from '@/lib/auth/admin-auth';
+import { requireInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 // Multi-layer analysis takes longer — allow 10 minutes
 export const maxDuration = 600; // 10 minutes
 
 export async function POST(request: NextRequest) {
   try {
+    // Paid AI parsing: an admin may parse any document; otherwise the caller
+    // must hold the account's own session (?username=), and every requested
+    // document must belong to that account (checked after the fetch below).
+    let ownerAccountId: string | null = null;
+    const adminDenied = await requireAdminAuth();
+    if (adminDenied) {
+      const auth = await requireInfluencerAuth(request);
+      if (!auth.authorized) return auth.response!;
+      ownerAccountId = auth.accountId;
+    }
+
     const body = await request.json();
     const { documentId, documentIds, documentType } = body;
 
@@ -44,6 +57,11 @@ export async function POST(request: NextRequest) {
         { error: 'המסמכים לא נמצאו' },
         { status: 404 }
       );
+    }
+
+    if (ownerAccountId !== null && documents.some((d) => d.account_id !== ownerAccountId)) {
+      console.warn(`[Parse API] Refused: document(s) outside account ${ownerAccountId}`);
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const parseResults: MultiLayerResult[] = [];

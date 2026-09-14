@@ -102,7 +102,7 @@ export default function NewPartnershipPage() {
       setIsParsing(true);
       console.log('[Partnership Creation] 🔄 Calling parse API for document:', document.id);
 
-      const parseResponse = await fetch('/api/influencer/documents/parse', {
+      const parseResponse = await fetch(`/api/influencer/documents/parse?username=${encodeURIComponent(username)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

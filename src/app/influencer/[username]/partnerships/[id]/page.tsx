@@ -201,7 +201,7 @@ export default function PartnershipDetailPage() {
       }
 
       if (uploadedIds.length > 0) {
-        fetch('/api/influencer/documents/parse', {
+        fetch(`/api/influencer/documents/parse?username=${encodeURIComponent(username)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ documentIds: uploadedIds, documentType: selectedDocType }),

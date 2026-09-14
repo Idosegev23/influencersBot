@@ -100,7 +100,7 @@ export default function DocumentsPage() {
     setParseSuccess(false);
 
     try {
-      const response = await fetch('/api/influencer/documents/parse', {
+      const response = await fetch(`/api/influencer/documents/parse?username=${encodeURIComponent(username)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
