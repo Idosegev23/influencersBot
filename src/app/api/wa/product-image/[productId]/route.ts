@@ -11,7 +11,6 @@
  * for that product.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import sharp from 'sharp';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
@@ -20,13 +19,44 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const MAX_WIDTH = 1024;   // well under WhatsApp's 5 MB at q80
 const FETCH_TIMEOUT_MS = 8000;
 
+// sharp is loaded LAZILY, inside the handler. It used to be a top-level `import sharp from 'sharp'`,
+// and in production (2026-09-14) sharp could not dlopen libvips-cpp.so — which threw while the
+// MODULE was being evaluated, so every request (even an invalid id) became a bare HTML 500 and no
+// line of this file ever ran or logged. Loaded here, the same failure is one caught error with a
+// JSON answer and a log line that names the cause. Only a successful load is cached; a failure is
+// retried on the next request.
+let sharpModule: Promise<any> | null = null;
+function loadSharp(): Promise<any> {
+  if (!sharpModule) {
+    sharpModule = import('sharp')
+      .then((m: any) => m.default ?? m)
+      .catch((e) => { sharpModule = null; throw e; });
+  }
+  return sharpModule;
+}
+
+// Errors must never be cached: the success path is `immutable` for a year, and a CDN holding a
+// transient 502/503 at this URL would pin a broken card image the same way.
+function jsonError(error: string, status: number) {
+  return NextResponse.json({ error }, { status, headers: { 'Cache-Control': 'no-store' } });
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ productId: string }> },
 ) {
   const { productId } = await params;
   if (!UUID_RE.test(productId || '')) {
-    return NextResponse.json({ error: 'invalid product id' }, { status: 400 });
+    return jsonError('invalid product id', 400);
+  }
+
+  // Before the DB read and the upstream fetch: without a transcoder neither can produce a card image.
+  let sharp: any;
+  try {
+    sharp = await loadSharp();
+  } catch (e: any) {
+    console.error('[wa/product-image] sharp failed to load', e?.message);
+    return jsonError('image transcoder unavailable', 503);
   }
 
   const { data } = await supabaseAdmin
@@ -36,7 +66,7 @@ export async function GET(
     .single();
   const src = (data as any)?.image_url;
   if (!src || typeof src !== 'string' || !src.startsWith('https://')) {
-    return NextResponse.json({ error: 'not found' }, { status: 404 });
+    return jsonError('not found', 404);
   }
 
   let input: ArrayBuffer;
@@ -46,7 +76,7 @@ export async function GET(
     input = await res.arrayBuffer();
   } catch (e: any) {
     console.warn('[wa/product-image] fetch failed', productId, e?.message);
-    return NextResponse.json({ error: 'upstream fetch failed' }, { status: 502 });
+    return jsonError('upstream fetch failed', 502);
   }
 
   try {
@@ -67,6 +97,6 @@ export async function GET(
     });
   } catch (e: any) {
     console.warn('[wa/product-image] transcode failed', productId, e?.message);
-    return NextResponse.json({ error: 'transcode failed' }, { status: 502 });
+    return jsonError('transcode failed', 502);
   }
 }

@@ -56,6 +56,12 @@ const securityHeaders = [
   },
 ];
 
+// sharp's native addon and the libvips shared library it links against (see outputFileTracingIncludes).
+const SHARP_NATIVE_TRACE = [
+  './node_modules/@img/sharp-libvips-{linux,linuxmusl,darwin}-*/**/*',
+  './node_modules/@img/sharp-{linux,linuxmusl,darwin}-*/**/*',
+];
+
 const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
@@ -63,6 +69,21 @@ const nextConfig: NextConfig = {
   // sharp loads platform-specific native binaries; bundling it breaks that resolution.
   // Used by /api/wa/product-image to transcode product photos to JPEG for WhatsApp.
   serverExternalPackages: ['sharp'],
+  // sharp 0.35 requires `@img/sharp-<platform>/sharp.node` by name (traceable), but that addon
+  // links libvips-cpp.so from the SIBLING package `@img/sharp-libvips-<platform>/lib` through the
+  // dynamic loader — no JS require ever names it, so file tracing leaves it out of the function.
+  // Production symptom (2026-09-14): every /api/wa/product-image request 500'd with
+  // "ERR_DLOPEN_FAILED: libvips-cpp.so.8.18.3: cannot open shared object file", so no WhatsApp
+  // product card has ever shown an image. Globbed by platform so the same entry traces the linux
+  // binaries on Vercel and the darwin ones in a local build (where inclusion can be checked in
+  // .next/server/app/api/wa/product-image/[productId]/route.js.nft.json). Uninstalled platforms
+  // match nothing. Keys are route globs: the exact key is escaped the way the Next docs show for a
+  // dynamic segment, and the `/**` form is kept beside it so a difference in how Turbopack and the
+  // webpack tracer match `[productId]` cannot silently drop the include again.
+  outputFileTracingIncludes: {
+    '/api/wa/product-image/\\[productId\\]': SHARP_NATIVE_TRACE,
+    '/api/wa/product-image/**': SHARP_NATIVE_TRACE,
+  },
   images: {
     // Skip Vercel image optimization: our /api/image-proxy already caches
     // Instagram URLs (max-age=86400), and Vercel's optimizer rejects

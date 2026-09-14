@@ -35,22 +35,26 @@ vi.mock('next/headers', () => ({
 // Mock fetch globally
 global.fetch = vi.fn();
 
-// Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
-Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+// Browser-only mocks. Guarded so a test that opts into `// @vitest-environment node` (e.g. one that
+// needs real native modules like sharp, which reject jsdom's cross-realm Uint8Array) can load setup.
+if (typeof window !== 'undefined') {
+  // Mock localStorage
+  const localStorageMock = {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  };
+  Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
-// Mock clipboard
-Object.defineProperty(navigator, 'clipboard', {
-  value: {
-    writeText: vi.fn(),
-    readText: vi.fn(),
-  },
-});
+  // Mock clipboard
+  Object.defineProperty(navigator, 'clipboard', {
+    value: {
+      writeText: vi.fn(),
+      readText: vi.fn(),
+    },
+  });
+}
 
 
 

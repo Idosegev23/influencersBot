@@ -44,29 +44,56 @@ export function formatCardBody(card: CsProductCard): string {
   return lines.join('\n').slice(0, 1024);
 }
 
+// Generous: a cold function plus a first-time transcode. Meta's own fetch will hit the CDN copy
+// this request leaves behind (the route's success response is `immutable`).
+const IMAGE_PREFLIGHT_TIMEOUT_MS = 9000;
+
 /**
- * Send one card. Falls back to a plain text message carrying the same link if the interactive
- * send fails for any reason (a rejected image, a transcode timeout, a Meta hiccup) — the shopper
- * was just told about this product, so they must end up with a way to reach it.
+ * Can Meta actually fetch this card's header image? Asked BEFORE the card is sent, because Meta
+ * will not tell us synchronously: a cta_url with an image link is accepted (200 + message id) and
+ * the image is fetched only at delivery — a failure arrives later as a `failed` status webhook.
+ * CS sends are never written to whatsapp_messages, so that status matches no row and nobody sees
+ * it. This is how every card image 500'd in production without a single fallback firing.
+ */
+async function imageIsServable(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(IMAGE_PREFLIGHT_TIMEOUT_MS) });
+    const type = res.headers.get('content-type') || '';
+    try { await res.arrayBuffer(); } catch { /* body drained only to free the socket */ }
+    if (res.ok && /^image\/(jpeg|png)\b/i.test(type)) return true;
+    console.warn('[cs-cards] image preflight rejected', url, res.status, type);
+    return false;
+  } catch (e: any) {
+    console.warn('[cs-cards] image preflight threw', url, e?.message);
+    return false;
+  }
+}
+
+/**
+ * Send one card. Falls back to a plain text message carrying the same link if the image can't be
+ * served (checked up front, see imageIsServable) or the interactive send fails for any reason —
+ * the shopper was just told about this product, so they must end up with a way to reach it.
  *
  * The channel is passed in, never resolved here: the reply text is already sent on the channel
  * the message ARRIVED on, and a brand running WhatsApp on its own number would otherwise get its
  * prose from one number and its cards from the shared Bestie number — two separate chat threads.
  */
-async function sendOneCard(channel: WaChannel, to: string, card: CsProductCard): Promise<boolean> {
+async function sendOneCard(channel: WaChannel, to: string, card: CsProductCard, imageOk: boolean): Promise<boolean> {
   const body = formatCardBody(card);
-  try {
-    const res = await sendInteractiveCtaUrl({
-      channel,
-      to,
-      body,
-      displayText: BUTTON_LABEL,
-      url: card.productUrl,
-      imageUrl: productImageUrl(card.productId),
-    });
-    if (res.success) return true;
-  } catch (e) {
-    console.warn('[cs-cards] cta_url send threw', card.productId, e);
+  if (imageOk) {
+    try {
+      const res = await sendInteractiveCtaUrl({
+        channel,
+        to,
+        body,
+        displayText: BUTTON_LABEL,
+        url: card.productUrl,
+        imageUrl: productImageUrl(card.productId),
+      });
+      if (res.success) return true;
+    } catch (e) {
+      console.warn('[cs-cards] cta_url send threw', card.productId, e);
+    }
   }
   try {
     const res = await sendText({ channel, to, body: `${body}\n${card.productUrl}` });
@@ -88,9 +115,11 @@ export async function sendProductCards(
   params: { channel: WaChannel; to: string; cards: CsProductCard[] },
 ): Promise<number> {
   const { channel, to, cards } = params;
+  // Preflights run together (up to 3 cold transcodes would otherwise stack up); sends stay in order.
+  const imageOk = await Promise.all(cards.map((c) => imageIsServable(productImageUrl(c.productId))));
   let sent = 0;
-  for (const card of cards) {
-    if (await sendOneCard(channel, to, card)) sent++;
+  for (let i = 0; i < cards.length; i++) {
+    if (await sendOneCard(channel, to, cards[i], imageOk[i])) sent++;
   }
   return sent;
 }
