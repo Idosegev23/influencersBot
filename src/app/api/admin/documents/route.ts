@@ -40,6 +40,9 @@ export async function GET(request: NextRequest) {
  * DELETE /api/admin/documents?documentId=xxx - Delete a document
  */
 export async function DELETE(request: NextRequest) {
+  const denied = await requireAdminAuth();
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
     const documentId = searchParams.get('documentId');
