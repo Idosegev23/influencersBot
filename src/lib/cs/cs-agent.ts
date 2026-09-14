@@ -374,18 +374,20 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   // On an order-status turn the answer comes from the orders provider, never from the brand's
   // content. Measured live: RAG cost 638ms and returned 43-50 items at 0.02 average relevance for
   // exactly these queries — paid for, and irrelevant.
-  const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest, config: accountMeta?.config ?? null, skipRag: orderIntent.isOrderStatus });
-
-  // 5) Tool-calling loop.
-  // ctx was built (and possibly bound) right after session load — see the auto-bind block above.
   // Archetype-aware toolset (spec §4): pre-bind (account null) = the full set, today's behavior;
-  // post-bind the account's archetype + config decide what the model is even OFFERED.
+  // post-bind the account's archetype + config decide what the model is even OFFERED. Built BEFORE
+  // the prompt so the prompt's brand-switching block is cut by the very same decision.
   const toolset = buildCsToolset({
     channel: ctx.identity.channel,
     account: accountMeta ? { archetype: accountMeta.config?.archetype, config: accountMeta.config } : null,
     // Address-decided tenant (customer's own number / web channel) — NOT a mid-conversation bind.
     preBoundAccountId: input.boundAccountId ?? null,
   });
+  const canSwitchBrand = toolset.tools.some((t) => t.def.function.name === 'bind_brand');
+  const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest, config: accountMeta?.config ?? null, skipRag: orderIntent.isOrderStatus, canSwitchBrand });
+
+  // 5) Tool-calling loop.
+  // ctx was built (and possibly bound) right after session load — see the auto-bind block above.
   const toolMap = new Map(toolset.tools.map((t) => [t.def.function.name, t]));
   const history = await historyPromise;
   // Image turn → multimodal content (text + image_url) so the brain sees the photo; text turn → string.

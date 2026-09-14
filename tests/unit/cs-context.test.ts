@@ -234,6 +234,90 @@ describe('cs-context', () => {
     expect(p).not.toMatch(/לא ניתן לבדוק הזמנות/);
   });
 
+  // Live, 2026-09-14: a shopper bound to ARGANIA since August wrote "היי אני לקוח של בסטי טסט"
+  // and was answered as ARGANIA. Once bound, the prompt carried no roster and no switching rule —
+  // bind_brand was still OFFERED on the shared number, but the brain had no accountId to pass it
+  // and no instruction that a different brand is a reason to.
+  describe('switching brands while bound on the shared WhatsApp number', () => {
+    beforeEach(() => { BOUND_CONFIG = { display_name: 'Argania', integrations: { quickshop: { api_key: 'k' } } }; });
+    const bound = (over: any = {}) => ({ accountId: 'acc-argania', userMessage: 'היי אני לקוח של בסטי טסט', digest: digest({ boundBrand: 'Argania', ...over }) });
+
+    it('bound + switchable: carries a switching block with the OTHER brands and their accountIds', async () => {
+      const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+      const p = await buildCsSystemPrompt({ ...bound(), canSwitchBrand: true });
+      expect(p).toContain('מותג פעיל: Argania');
+      expect(p).toMatch(/מעבר בין מותגים/);
+      expect(p).toMatch(/רק לוודא/);                        // confirm in prose before switching
+      expect(p).toMatch(/bind_brand/);
+      const line = (name: string) => p.split('\n').find((l) => l.startsWith(name));
+      expect(line('LA BEAUTÉ')).toContain('accountId: acc-labeaute');
+      // The brand already bound is not a switch target.
+      expect(p).not.toContain('accountId: acc-argania');
+    });
+
+    it('bound + switchable keeps the anti-enumeration rule', async () => {
+      const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+      const p = await buildCsSystemPrompt({ ...bound(), canSwitchBrand: true });
+      expect(p).toMatch(/לעולם אל תקריא\/י אותה/);
+    });
+
+    it('pre-bound web (not switchable): no roster, no switching block — but still the bound brand', async () => {
+      const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+      const p = await buildCsSystemPrompt({ ...bound(), canSwitchBrand: false });
+      expect(p).toContain('מותג פעיל: Argania');           // presence companion: a real bound prompt
+      expect(p).toContain('קול המותג');
+      expect(p).not.toMatch(/מעבר בין מותגים/);
+      expect(p).not.toContain('accountId:');
+      expect(p).not.toContain('LA BEAUTÉ');
+    });
+
+    it('omitting canSwitchBrand behaves like a pre-bound surface (no roster leaks by default)', async () => {
+      const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+      const p = await buildCsSystemPrompt(bound());
+      expect(p).toContain('מותג פעיל: Argania');
+      expect(p).not.toContain('accountId:');
+    });
+
+    // The bot calls itself בסטי. "אני לקוח של בסטי" must not be read as a request to switch to a
+    // roster brand whose name merely contains the word.
+    it('tells the brain that "בסטי" alone is not a brand — in the switching block and pre-bind', async () => {
+      const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+      const boundP = await buildCsSystemPrompt({ ...bound(), canSwitchBrand: true });
+      expect(boundP).toMatch(/המילה "בסטי" לבדה אינה מותג/);
+      const unboundP = await buildCsSystemPrompt({ accountId: null, userMessage: 'היי בסטי', digest: digest() });
+      expect(unboundP).toMatch(/המילה "בסטי" לבדה אינה מותג/);
+      expect(unboundP).toContain('accountId: acc-argania'); // presence companion: the roster is there
+      const webP = await buildCsSystemPrompt({ ...bound(), canSwitchBrand: false });
+      expect(webP).not.toMatch(/המילה "בסטי" לבדה אינה מותג/);
+    });
+
+    it('a shopper returning after a long silence is asked what brand they need today, not assumed', async () => {
+      const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+      const stale = await buildCsSystemPrompt({ ...bound({ idleDays: 20 }), canSwitchBrand: true });
+      expect(stale).toMatch(/חוזר\/ת אחרי 20 ימים/);
+      expect(stale).toMatch(/עם איזה מותג אפשר לעזור היום/);
+
+      const fresh = await buildCsSystemPrompt({ ...bound({ idleDays: 1 }), canSwitchBrand: true });
+      expect(fresh).toMatch(/מעבר בין מותגים/);            // presence companion
+      expect(fresh).not.toMatch(/ימים ללא פעילות/);
+
+      const web = await buildCsSystemPrompt({ ...bound({ idleDays: 20 }), canSwitchBrand: false });
+      expect(web).not.toMatch(/ימים ללא פעילות/);          // a brand's own surface has nothing to switch to
+      expect(web).toContain('מותג פעיל: Argania');
+    });
+  });
+
+  describe('buildContextDigest idleDays', () => {
+    const row = (last: string | null): any => ({ customer_name: null, active_account_id: null, context: {}, last_activity_at: last });
+    it('counts whole days since the session was last active, before this turn', async () => {
+      const { buildContextDigest } = await import('@/lib/cs/cs-context');
+      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 3600 * 1000 - 60_000).toISOString();
+      expect((await buildContextDigest(row(tenDaysAgo), [])).idleDays).toBe(10);
+      expect((await buildContextDigest(row(new Date().toISOString()), [])).idleDays).toBe(0);
+      expect((await buildContextDigest(row(null), [])).idleDays).toBeNull();
+    });
+  });
+
 });
 
 describe('buildCsSystemPrompt skipRag', () => {

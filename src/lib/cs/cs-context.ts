@@ -42,6 +42,38 @@ export interface CsContextDigest {
   // number) and once a web shopper has given a phone; false for an anonymous widget / chat visitor,
   // where a hand-off without asking first reaches nobody.
   hasContactRoute: boolean;
+  // Whole days since the session's last activity, measured on the row as loaded — i.e. BEFORE this
+  // turn touches it. null for a session with no recorded activity. Optional so older callers and
+  // fixtures keep compiling; absent is treated as "not stale".
+  idleDays?: number | null;
+}
+
+// A shopper bound to a brand who comes back after this long is not assumed to be continuing it.
+export const STALE_BRAND_DAYS = 7;
+
+// The bot introduces itself as בסטי, and a roster brand may contain the word. Without this the
+// greeting "אני לקוח של בסטי" reads as a brand name.
+const BESTIE_WORD_RULE = 'המילה "בסטי" לבדה אינה מותג — זה השם שלך (Bestie, שירות הלקוחות עצמו). "היי בסטי" או "אני לקוח/ה של בסטי" אינם בחירת מותג; רק שם מלא של מותג מהרשימה (גם אם הוא מכיל את המילה) מתייחס למותג.';
+
+// Roster lines shared by the unbound prompt and the bound switching block: identical format and the
+// same anti-enumeration rule, so the two can never drift into different disclosure behaviour.
+function pushRoster(lines: string[], header: string, brands: Array<{ accountId: string; displayName: string; domain: string | null; username: string }>): void {
+  lines.push(header);
+  lines.push('כל שורה: שם — אתר — accountId. ל-bind_brand מעבירים את ה-accountId בדיוק כפי שהוא כתוב כאן, לעולם לא את השם או את כתובת האתר.');
+  // The roster is MATCHING MATERIAL, not a catalogue. Measured on the live model: asked
+  // "איזה מותגים יש לכם?" it recited every client by name — one brand's shopper being handed
+  // the list of everyone else we serve, and (once a QA account existed) told about that too.
+  // The confirm/disambiguate flows stay allowed; only enumerating is forbidden.
+  lines.push(
+    'הרשימה הזו היא לשימושך הפנימי בלבד — כדי לזהות למי הלקוח/ה מתכוון/ת. לעולם אל תקריא/י אותה ואל תמנה/י מותגים שהלקוח/ה לא הזכיר/ה, ' +
+    'גם לא כשנשאלת ישירות ("איזה מותגים יש לכם?" / "עם מי אתם עובדים?") — אלה פרטים של לקוחותינו ולא מידע שאנחנו חולקים. ' +
+    'במקרה כזה ענה/י בקצרה שתשמח/י לעזור, ובקש/י את שם המותג או כתובת האתר שממנו הזמינו. ' +
+    'מותר ואף רצוי לאשר בפרוזה מותג יחיד שהלקוח/ה עצמו/ה הזכיר/ה, או לשאול בין 2-3 מועמדים קרובים כשמה שנאמר מתאים לכמה מהם.'
+  );
+  lines.push(BESTIE_WORD_RULE);
+  for (const b of brands.slice(0, MAX_INLINE)) {
+    lines.push(`${b.displayName} — ${b.domain || b.username || '—'} — accountId: ${b.accountId}`);
+  }
 }
 
 export async function buildContextDigest(
@@ -72,7 +104,9 @@ export async function buildContextDigest(
   const hasContactRoute = identity
     ? contactRoute({ phone: identityPhone(identity), email: (session.context as any)?.contactEmail })
     : true;
-  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), mode, language, openThreads, recentTurns, policy, hasContactRoute };
+  const lastMs = session.last_activity_at ? Date.parse(session.last_activity_at) : NaN;
+  const idleDays = Number.isFinite(lastMs) ? Math.max(0, Math.floor((Date.now() - lastMs) / 86_400_000)) : null;
+  return { knownName: session.customer_name, boundBrand, warm: isWarm(session), mode, language, openThreads, recentTurns, policy, hasContactRoute, idleDays };
 }
 
 /**
@@ -91,6 +125,11 @@ export async function buildCsSystemPrompt(input: {
   // Grounding still comes from the persona and the policy block; only the content retrieval is
   // dropped. Absent/false keeps the original behaviour for every other turn and every other caller.
   skipRag?: boolean;
+  // True only where the brand-switching tools are actually offered — the shared WhatsApp number,
+  // NOT a surface whose address already names the tenant. The caller derives it from the toolset
+  // it built, so the prompt can never describe a switch there is no bind_brand for. Absent = false:
+  // a caller that does not know must not be handed the roster.
+  canSwitchBrand?: boolean;
 }): Promise<string> {
   const { accountId, userMessage, digest } = input;
   // The account's config is read ONCE and reused: the orders/products guidance below and the
@@ -143,6 +182,28 @@ export async function buildCsSystemPrompt(input: {
         'כללי המדיניות מנחים אותך ישירות וגוברים על הרגלים כלליים — אך לעולם אינם עוקפים אימות טלפון (lookup_order) או האיסור לכתוב לחנות (read-only). אם מקרה אינו מכוסה במדיניות — הפעל/י שיקול דעת או הסלמה לאדם.'
       );
     }
+    // Live, 2026-09-14: bound to ARGANIA since August, the shopper wrote "היי אני לקוח של בסטי טסט"
+    // and kept being served as ARGANIA. bind_brand was offered, but this branch carried no roster
+    // (no accountId to pass) and no rule saying a different brand is a reason to switch.
+    if (input.canSwitchBrand) {
+      const b = digest.boundBrand;
+      lines.push(
+        '\n--- מעבר בין מותגים (המספר הזה משרת כמה מותגים) ---\n' +
+        `השיחה משויכת כרגע ל-${b}. אם הלקוח/ה מזכיר/ה בשם מותג אחר מהרשימה למטה, או מתכוון/ת אליו בבירור (שם, אתר, מוצר שרק הוא מוכר) — אל תמשיכ/י לענות בשם ${b}. ` +
+        'אשר/י קודם בפרוזה (למשל: "רק לוודא — עוברים ל-Y?"), ורק אחרי שהלקוח/ה מאשר/ת קרא/י ל-bind_brand עם ה-accountId של Y מהרשימה. ' +
+        'מותג שלא מופיע ברשימה — קרא/י ל-resolve_brand עם מה שנאמר.'
+      );
+      if (typeof digest.idleDays === 'number' && digest.idleDays >= STALE_BRAND_DAYS) {
+        lines.push(
+          `הלקוח/ה חוזר/ת אחרי ${digest.idleDays} ימים ללא פעילות. אל תניח/י שהפנייה החדשה היא שוב על ${b}: ` +
+          `אם ההודעה לא ממשיכה בבירור נושא של ${b} ולא מזכירה מותג — שאל/י בקצרה ובחום עם איזה מותג אפשר לעזור היום, לפני שעונים בשם ${b}. אם היא מזכירה מותג — פעל/י לפי כללי המעבר.`
+        );
+      }
+      try {
+        const others = (await listCsEnabledBrands()).filter((x) => x.accountId !== accountId);
+        if (others.length) pushRoster(lines, '--- מותגים נוספים שאפשר לעבור אליהם ---', others);
+      } catch { /* roster optional — resolve_brand still covers a switch if the fetch fails */ }
+    }
   } else {
     lines.push(
       'טרם נבחר מותג — שאל/י בשיחה טבעית לאיזה מותג/עסק הלקוח/ה צריך/ה עזרה (למשל: "לאיזה מותג / עם איזה עסק אתה צריך עזרה?"). ' +
@@ -161,21 +222,7 @@ export async function buildCsSystemPrompt(input: {
     try {
       const brands = await listCsEnabledBrands();
       if (brands.length) {
-        lines.push('\n--- מותגים זמינים שאת/ה משרת/ת (בחר/י את זה שהלקוח/ה מתכוון/ת אליו, אשר/י בפרוזה, ואז קרא/י ל-bind_brand; אם הרשימה גדולה מדי / הלקוח/ה מזכיר/ה משהו שלא כאן — הישענ/י על resolve_brand) ---');
-        lines.push('כל שורה: שם — אתר — accountId. ל-bind_brand מעבירים את ה-accountId בדיוק כפי שהוא כתוב כאן, לעולם לא את השם או את כתובת האתר.');
-        // The roster is MATCHING MATERIAL, not a catalogue. Measured on the live model: asked
-        // "איזה מותגים יש לכם?" it recited every client by name — one brand's shopper being handed
-        // the list of everyone else we serve, and (once a QA account existed) told about that too.
-        // The confirm/disambiguate flows below stay allowed; only enumerating is forbidden.
-        lines.push(
-          'הרשימה הזו היא לשימושך הפנימי בלבד — כדי לזהות למי הלקוח/ה מתכוון/ת. לעולם אל תקריא/י אותה ואל תמנה/י מותגים שהלקוח/ה לא הזכיר/ה, ' +
-          'גם לא כשנשאלת ישירות ("איזה מותגים יש לכם?" / "עם מי אתם עובדים?") — אלה פרטים של לקוחותינו ולא מידע שאנחנו חולקים. ' +
-          'במקרה כזה ענה/י בקצרה שתשמח/י לעזור, ובקש/י את שם המותג או כתובת האתר שממנו הזמינו. ' +
-          'מותר ואף רצוי לאשר בפרוזה מותג יחיד שהלקוח/ה עצמו/ה הזכיר/ה, או לשאול בין 2-3 מועמדים קרובים כשמה שנאמר מתאים לכמה מהם.'
-        );
-        for (const b of brands.slice(0, MAX_INLINE)) {
-          lines.push(`${b.displayName} — ${b.domain || b.username || '—'} — accountId: ${b.accountId}`);
-        }
+        pushRoster(lines, '\n--- מותגים זמינים שאת/ה משרת/ת (בחר/י את זה שהלקוח/ה מתכוון/ת אליו, אשר/י בפרוזה, ואז קרא/י ל-bind_brand; אם הרשימה גדולה מדי / הלקוח/ה מזכיר/ה משהו שלא כאן — הישענ/י על resolve_brand) ---', brands);
       }
     } catch { /* brand roster optional — resolve_brand tool still covers this if the fetch fails */ }
   }
