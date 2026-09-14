@@ -6,7 +6,6 @@ import { getProgress } from '@/lib/scraping-progress';
 import { verifySessionToken, ADMIN_SUBJECT, influencerSubject } from '@/lib/auth/session-token';
 
 const COOKIE_PREFIX = 'influencer_session_';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // Increase timeout to 8 minutes (Vercel Pro max: 900s)
 export const maxDuration = 480; // 8 minutes

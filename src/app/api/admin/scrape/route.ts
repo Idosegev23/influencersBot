@@ -4,8 +4,7 @@ import { getInfluencerByUsername } from '@/lib/supabase';
 import { runBackgroundScrape } from '@/lib/background-scraper';
 import { getProgress } from '@/lib/scraping-progress';
 import { verifySessionToken, ADMIN_SUBJECT } from '@/lib/auth/session-token';
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
+import { isAdminPassword as matchesAdminPassword } from '@/lib/auth/admin-auth';
 
 // Increase timeout to 8 minutes (Vercel Pro max: 900s)
 export const maxDuration = 480; // 8 minutes
@@ -26,7 +25,7 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies();
     const adminCookie = cookieStore.get('bestieai_admin_session');
     const isAdminCookie = verifySessionToken(adminCookie?.value, ADMIN_SUBJECT);
-    const isAdminPassword = adminPassword === ADMIN_PASSWORD;
+    const isAdminPassword = matchesAdminPassword(adminPassword);
     
     if (!isAdminCookie && !isAdminPassword) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

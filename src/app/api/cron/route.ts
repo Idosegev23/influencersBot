@@ -11,7 +11,7 @@ export const maxDuration = 300; // 5 minutes
 // Verify cron secret
 function verifyCronSecret(req: NextRequest): boolean {
   const authHeader = req.headers.get('authorization');
-  if (!authHeader) return false;
+  if (!authHeader || !process.env.CRON_SECRET) return false;
   return authHeader === `Bearer ${process.env.CRON_SECRET}`;
 }
 
@@ -138,7 +138,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.ADMIN_PASSWORD}`) {
+    // Unset ADMIN_PASSWORD used to make the expected header "Bearer undefined".
+    if (!process.env.ADMIN_PASSWORD || authHeader !== `Bearer ${process.env.ADMIN_PASSWORD}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

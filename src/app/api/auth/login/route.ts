@@ -12,8 +12,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 import { signSessionToken, ADMIN_SUBJECT } from '@/lib/auth/session-token';
+import { isAdminPassword } from '@/lib/auth/admin-auth';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
 const ADMIN_COOKIE = 'bestieai_admin_session';
 const SEVEN_DAYS = 60 * 60 * 24 * 7;
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
   // ---- Admin path (reserved username) ----
   if (uname === 'admin') {
-    if (password !== ADMIN_PASSWORD) {
+    if (!isAdminPassword(password)) {
       return NextResponse.json({ error: 'שם משתמש או סיסמה שגויים' }, { status: 401 });
     }
     const res = NextResponse.json({

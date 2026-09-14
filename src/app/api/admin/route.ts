@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { hashPassword, verifyPassword } from '@/lib/utils';
 import { signSessionToken, verifySessionToken, ADMIN_SUBJECT } from '@/lib/auth/session-token';
+import { isAdminPassword } from '@/lib/auth/admin-auth';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
 const COOKIE_NAME = 'bestieai_admin_session';
 
 // Check if authenticated
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (password === ADMIN_PASSWORD) {
+    if (isAdminPassword(password)) {
       const response = NextResponse.json({ success: true });
       response.cookies.set(COOKIE_NAME, signSessionToken(ADMIN_SUBJECT), {
         httpOnly: true,
