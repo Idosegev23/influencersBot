@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getInfluencerByUsername } from '@/lib/supabase';
 import { sanitizeInfluencerForClient } from '@/lib/influencer/sanitize';
+import { checkInfluencerAuth } from '@/lib/auth/influencer-auth';
 
 /**
  * GET /api/influencer/profile?username=...
@@ -11,8 +12,8 @@ import { sanitizeInfluencerForClient } from '@/lib/influencer/sanitize';
  * server-side with the service role and returns a sanitized projection.
  *
  * Unauthenticated on purpose: the public chat page renders for anonymous
- * visitors. sanitizeInfluencerForClient is therefore the only thing standing
- * between accounts.* and the open internet — keep it that way.
+ * visitors, and gets only the allow-listed public config. The account's own
+ * session (dashboard pages, widget editor) gets its config minus credentials.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +30,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    const safe = sanitizeInfluencerForClient(influencer as any)!;
+    const isOwner = await checkInfluencerAuth(username);
+    const safe = sanitizeInfluencerForClient(influencer as any, { isOwner })!;
 
     // `account` mirrors what chatbot-settings and the instagram page already read.
     return NextResponse.json({
