@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isSafeReturnTo } from '@/lib/meta-review/util';
 import { subscribeMessagesWebhook } from '@/lib/instagram-graph/subscribe';
+import { verifyOAuthState } from '@/lib/instagram-graph/connect-token';
 
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || '';
 const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET || '';
@@ -36,18 +37,18 @@ export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const code = searchParams.get('code');
   const error = searchParams.get('error');
-  const state = searchParams.get('state'); // Contains accountId if we passed it
+  const state = searchParams.get('state');
 
-  // Parse state to get accountId + optional returnTo for redirect
-  let accountId = '';
-  let returnTo = '';
-  if (state) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(state));
-      accountId = parsed.accountId || '';
-      returnTo = parsed.returnTo || '';
-    } catch {}
+  // `state` comes back through the browser, so it is attacker-controlled. Only
+  // a state signed by /api/auth/instagram/connect (after it verified the signed
+  // connect token) may name the account to link. Anything else — including the
+  // old unsigned JSON — still saves the connection, but attaches it to nothing.
+  const verifiedState = verifyOAuthState(state);
+  if (state && !verifiedState) {
+    console.warn('[IG OAuth] Ignoring unsigned/invalid/expired OAuth state — connection will not be linked to an account');
   }
+  const accountId = verifiedState?.accountId || '';
+  const returnTo = verifiedState?.returnTo || '';
   const redirectBase = accountId ? `/admin/influencers/${accountId}` : '/admin/influencers';
 
   // Handle user declining permissions
@@ -118,30 +119,23 @@ export async function GET(req: NextRequest) {
       throw new Error(`Database error: ${dbError.message}`);
     }
 
-    // 5. If state contains an account_id, link the connection
-    if (state) {
-      try {
-        const stateData = JSON.parse(decodeURIComponent(state));
-        if (stateData.accountId) {
-          await supabase
-            .from('ig_graph_connections')
-            .update({ account_id: stateData.accountId })
-            .eq('ig_business_account_id', igbaId);
+    // 5. If the signed state names an account, link the connection
+    if (accountId) {
+      await supabase
+        .from('ig_graph_connections')
+        .update({ account_id: accountId })
+        .eq('ig_business_account_id', igbaId);
 
-          // Enforce one active connection per account. A reconnect can produce a
-          // different ig_business_account_id (e.g. Instagram Login vs. older flow),
-          // leaving two `is_active=true` rows — which breaks every account-scoped
-          // `.single()` read (the connection indicator, admin panel, DM token lookup).
-          await supabase
-            .from('ig_graph_connections')
-            .update({ is_active: false })
-            .eq('account_id', stateData.accountId)
-            .eq('is_active', true)
-            .neq('ig_business_account_id', igbaId);
-        }
-      } catch {
-        // State parsing failed — not critical
-      }
+      // Enforce one active connection per account. A reconnect can produce a
+      // different ig_business_account_id (e.g. Instagram Login vs. older flow),
+      // leaving two `is_active=true` rows — which breaks every account-scoped
+      // `.single()` read (the connection indicator, admin panel, DM token lookup).
+      await supabase
+        .from('ig_graph_connections')
+        .update({ is_active: false })
+        .eq('account_id', accountId)
+        .eq('is_active', true)
+        .neq('ig_business_account_id', igbaId);
     }
 
     // 6. Subscribe the account to the `messages` webhook.

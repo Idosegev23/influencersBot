@@ -80,6 +80,61 @@ export function verifyConnectToken(token: string | null | undefined): { accountI
     return null;
   }
   if (payload.v !== 1 || !payload.a || !payload.e) return null;
+  if ((payload as { p?: string }).p !== undefined) return null; // an OAuth state is not a connect link
   if (Date.now() > payload.e) return null;
   return { accountId: payload.a };
+}
+
+// ─── OAuth `state` ──────────────────────────────────────────────────────────
+//
+// /connect verified the signed connect token, but the accountId then rode to
+// /callback inside plain-JSON `state` — which the browser carries and anyone can
+// write by hand when starting Instagram OAuth themselves. The callback linked
+// whatever accountId that JSON named (and deactivated that account's existing
+// connection). The state is now signed the same way, tagged so it can never be
+// replayed as a connect link (or vice versa), and short-lived: it only has to
+// survive one consent screen.
+
+export const OAUTH_STATE_TTL_MS = 30 * 60 * 1000;
+const OAUTH_STATE_PURPOSE = 'ig_oauth_state';
+
+function signPayload(obj: Record<string, unknown>): string {
+  const payload = b64url(JSON.stringify(obj));
+  return `${payload}.${b64url(createHmac('sha256', getSecret()).update(payload).digest())}`;
+}
+
+export function signOAuthState(
+  s: { accountId: string; returnTo?: string },
+  ttlMs: number = OAUTH_STATE_TTL_MS,
+): string {
+  return signPayload({ v: 1, p: OAUTH_STATE_PURPOSE, a: s.accountId, r: s.returnTo || '', e: Date.now() + ttlMs });
+}
+
+/** The account + returnTo a state was minted for, or null if unsigned/forged/tampered/expired. */
+export function verifyOAuthState(
+  state: string | null | undefined,
+): { accountId: string; returnTo: string } | null {
+  if (typeof state !== 'string' || !state.includes('.')) return null;
+  const [payloadB64, sigB64] = state.split('.', 2);
+  if (!payloadB64 || !sigB64) return null;
+
+  const expected = createHmac('sha256', getSecret()).update(payloadB64).digest();
+  let provided: Buffer;
+  try {
+    provided = b64urlDecode(sigB64);
+  } catch {
+    return null;
+  }
+  if (provided.length !== expected.length) return null;
+  if (!timingSafeEqual(provided, expected)) return null;
+
+  let payload: { v?: number; p?: string; a?: string; r?: string; e?: number };
+  try {
+    payload = JSON.parse(b64urlDecode(payloadB64).toString('utf8'));
+  } catch {
+    return null;
+  }
+  if (payload.v !== 1 || payload.p !== OAUTH_STATE_PURPOSE || !payload.a || !payload.e) return null;
+  if (Date.now() > payload.e) return null;
+  return { accountId: payload.a, returnTo: typeof payload.r === 'string' ? payload.r : '' };
 }

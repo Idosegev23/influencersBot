@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { IG_OAUTH_SCOPE_PARAM } from '@/lib/instagram-graph/scopes';
-import { verifyConnectToken } from '@/lib/instagram-graph/connect-token';
+import { verifyConnectToken, signOAuthState } from '@/lib/instagram-graph/connect-token';
 
 const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || '';
 
@@ -52,7 +52,9 @@ export async function GET(req: NextRequest) {
   // State parameter — passed through OAuth flow and returned in callback.
   // Carries the accountId (to link the connection) and an optional returnTo
   // (so the admin console can send the user back to itself after reconnect).
-  const state = encodeURIComponent(JSON.stringify({ accountId, returnTo }));
+  // Signed: the callback links ONLY the account named by a valid signature,
+  // otherwise anyone could start OAuth with a hand-written state.
+  const state = signOAuthState({ accountId, returnTo });
 
   // Build Instagram OAuth URL
   const authUrl = new URL('https://www.instagram.com/oauth/authorize');
