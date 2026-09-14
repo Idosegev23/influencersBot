@@ -251,6 +251,9 @@ export async function getAgentSession(accountUsername: string): Promise<AgentSes
   if (!c?.value) return null;
   const p = decodeSession(c.value);
   if (!p) return null;
+  // The cookie NAME is client-controlled; only the signed payload is ours. A
+  // session issued for account A renamed to agent_session_B must not open B.
+  if (p.un !== accountUsername) return null;
   return liveSession(p);
 }
 
