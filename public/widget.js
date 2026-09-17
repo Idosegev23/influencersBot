@@ -1247,23 +1247,33 @@
   function showComplementPopup(products) {
     if (document.getElementById('ibot-comp')) return;
     var pc = safeColor(config.primaryColor);
+    // This popup mounts on document.body, OUTSIDE #ibot-widget-container, and
+    // the --ibot-* custom properties are declared on that container only. A
+    // var() that resolves to nothing makes the whole declaration invalid at
+    // computed-value time: `background` fell back to transparent, so the card
+    // showed the product page straight through it and the site's own text ran
+    // under the product names; `color` became inherit, so the text took
+    // whatever the host page was using. Colors are read from theme() here
+    // instead — the same source every in-container render function uses, so
+    // the card also follows darkMode, which a hardcoded fallback would not.
+    var t = theme();
     lastCompProducts = products.slice(0, 3);   // index in the button below maps into this array
     var cards = lastCompProducts.map(function (p, i) {
       var price = p.price != null
         ? ((p.isOnSale && p.originalPrice != null)
-            ? '<span style="text-decoration:line-through;color:var(--ibot-text-muted);font-size:11px;margin-inline-end:4px;">' + locale.currencyPrefix + p.originalPrice + '</span>' + locale.currencyPrefix + p.price
+            ? '<span style="text-decoration:line-through;color:' + t.textMuted + ';font-size:11px;margin-inline-end:4px;">' + locale.currencyPrefix + p.originalPrice + '</span>' + locale.currencyPrefix + p.price
             : locale.currencyPrefix + p.price)
         : '';
       var img = p.image ? '<img src="' + escapeHtml(p.image) + '" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;" onerror="this.style.display=\'none\'"/>' : '';
-      return '<button onclick="window.__ibotComplementClick(' + i + ')" style="display:flex;align-items:center;gap:8px;width:100%;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';background:var(--ibot-surface);border:1px solid var(--ibot-border);border-radius:10px;padding:7px 9px;cursor:pointer;font-family:inherit;margin-bottom:6px;">' +
-        img + '<span style="flex:1;min-width:0;"><span style="display:block;font-size:12.5px;font-weight:600;color:var(--ibot-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(p.name || '') + '</span><span style="font-size:12px;color:' + pc + ';font-weight:700;">' + price + '</span></span></button>';
+      return '<button onclick="window.__ibotComplementClick(' + i + ')" style="display:flex;align-items:center;gap:8px;width:100%;text-align:' + (locale.dir === 'rtl' ? 'right' : 'left') + ';background:' + t.surface + ';border:1px solid ' + t.border + ';border-radius:10px;padding:7px 9px;cursor:pointer;font-family:inherit;margin-bottom:6px;">' +
+        img + '<span style="flex:1;min-width:0;"><span style="display:block;font-size:12.5px;font-weight:600;color:' + t.textPrimary + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(p.name || '') + '</span><span style="font-size:12px;color:' + pc + ';font-weight:700;">' + price + '</span></span></button>';
     }).join('');
     var el = document.createElement('div');
     el.id = 'ibot-comp';
-    el.style.cssText = 'position:fixed;z-index:2147483646;bottom:calc(96px + env(safe-area-inset-bottom));' + (config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;') + 'width:260px;max-width:calc(100vw - 40px);background:var(--ibot-panel-bg);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,0.18);padding:12px;animation:ibot-slide-up 0.3s ease-out;direction:' + locale.dir + ';';
+    el.style.cssText = 'position:fixed;z-index:2147483646;bottom:calc(96px + env(safe-area-inset-bottom));' + (config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;') + 'width:260px;max-width:calc(100vw - 40px);background:' + t.panelBg + ';border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,0.18);padding:12px;animation:ibot-slide-up 0.3s ease-out;direction:' + locale.dir + ';font-family:"' + locale.font + '",system-ui,-apple-system,sans-serif;';
     el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-      '<span style="font-size:13px;font-weight:700;color:var(--ibot-text-primary);">' + escapeHtml(wlbl('משלים מצוין 👇', 'Goes great with it 👇')) + '</span>' +
-      '<button onclick="window.__ibotComplementDismiss()" style="background:transparent;border:none;color:var(--ibot-text-muted);cursor:pointer;font-size:18px;line-height:1;">&times;</button></div>' + cards;
+      '<span style="font-size:13px;font-weight:700;color:' + t.textPrimary + ';">' + escapeHtml(wlbl('משלים מצוין 👇', 'Goes great with it 👇')) + '</span>' +
+      '<button onclick="window.__ibotComplementDismiss()" style="background:transparent;border:none;color:' + t.textMuted + ';cursor:pointer;font-size:18px;line-height:1;">&times;</button></div>' + cards;
     document.body.appendChild(el);
     widgetTrack('widget_action_proposed', { type: 'complementary', count: products.length });
   }
