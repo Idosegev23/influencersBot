@@ -9,8 +9,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  */
 
 const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+// The account row the alert reads its display name from.
+let accountRow: any = null;
+const from = vi.fn(() => ({
+  select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: accountRow, error: null }) }) }),
+}));
 vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => ({ rpc })),
+  createClient: vi.fn(async () => ({ rpc, from })),
 }));
 
 const sendAdminAlert = vi.fn().mockResolvedValue(undefined);
@@ -39,6 +44,7 @@ const TURN = {
 beforeEach(() => {
   vi.clearAllMocks();
   redisStore = {};
+  accountRow = null;
 });
 
 describe('recordTurnCost — accounting', () => {
@@ -105,6 +111,32 @@ describe('recordTurnCost — account alert (>$20/day)', () => {
     const acc = sendAdminAlert.mock.calls.find(c => `${c[0].subject}`.includes('חשבון'));
     expect(acc).toBeTruthy();
     expect(acc![0].level).toBe('warning');
+  });
+
+  it('names the account by its display name, not its id', async () => {
+    const { recordTurnCost } = await import('@/lib/costs/recorder');
+    accountRow = { config: { display_name: '𝐋𝐀 𝐁𝐄𝐀𝐔𝐓𝐄', username: 'labeaute.israel' } };
+    rpc.mockResolvedValue({ data: [{ new_tokens: 1, new_cost: '23.59', budget_limit: null, over_budget: false }], error: null });
+    await recordTurnCost(TURN);
+    const acc = sendAdminAlert.mock.calls.find(c => `${c[0].subject}`.includes('חשבון'));
+    const text = `${acc![0].subject} ${acc![0].message}`;
+    expect(text).toContain('LA BEAUTE'); // math-bold letters folded to plain ones
+    expect(text).toContain('$23.59');
+    expect(text).not.toContain('acc-1');
+  });
+
+  it('falls back to the username, then the id, when there is no display name', async () => {
+    const { recordTurnCost } = await import('@/lib/costs/recorder');
+    accountRow = { config: { username: 'argania' } };
+    rpc.mockResolvedValue({ data: [{ new_tokens: 1, new_cost: '21', budget_limit: null, over_budget: false }], error: null });
+    await recordTurnCost(TURN);
+    expect(sendAdminAlert.mock.calls[0][0].message).toContain('argania');
+
+    sendAdminAlert.mockClear();
+    redisStore = {};
+    accountRow = null;
+    await recordTurnCost(TURN);
+    expect(sendAdminAlert.mock.calls[0][0].message).toContain('acc-1');
   });
 
   it('stays quiet below the threshold', async () => {

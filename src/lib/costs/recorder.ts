@@ -54,11 +54,38 @@ async function markAlerted(key: string): Promise<void> {
   }
 }
 
-async function alert(key: string, level: 'warning' | 'critical', subject: string, message: string): Promise<void> {
+/**
+ * A human name for the account, for alert text. Display names are often styled in
+ * math-bold Unicode (𝐋𝐀 𝐁𝐄𝐀𝐔𝐓𝐄), which NFKC folds back to plain letters. Falls back to the
+ * username, then to the id, so an alert is never lost to a failed lookup.
+ */
+async function accountLabel(accountId: string): Promise<string> {
+  try {
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = await createClient();
+    const { data } = await supabase.from('accounts').select('config').eq('id', accountId).maybeSingle();
+    const name = String(data?.config?.display_name || data?.config?.username || '').normalize('NFKC').trim();
+    return name || accountId;
+  } catch {
+    return accountId;
+  }
+}
+
+/**
+ * `message` may be a thunk so work it needs (the account-name lookup) runs only when the
+ * alert actually sends — past a threshold every turn reaches here, but the cooldown drops most.
+ */
+async function alert(
+  key: string,
+  level: 'warning' | 'critical',
+  subject: string,
+  message: string | (() => Promise<string>)
+): Promise<void> {
   try {
     if (!(await shouldAlert(key))) return;
+    const text = typeof message === 'string' ? message : await message();
     const { sendAdminAlert } = await import('@/lib/email');
-    await sendAdminAlert({ level, subject, message });
+    await sendAdminAlert({ level, subject, message: text });
     await markAlerted(key);
   } catch (err) {
     console.error('[cost] alert failed:', err);
@@ -148,7 +175,8 @@ export async function recordTurnCost(params: {
         `cost-session:${sessionId}`,
         'warning',
         `שיחה יחידה חצתה $${SESSION_ALERT_USD}`,
-        `שיחה ${sessionId} (חשבון ${accountId}) הגיעה ל-$${sessionUsd.toFixed(2)}.\n\n` +
+        async () =>
+          `שיחה ${sessionId} (חשבון ${await accountLabel(accountId)}) הגיעה ל-$${sessionUsd.toFixed(2)}.\n\n` +
           `שיחה בעלות כזו היא כמעט תמיד שרשור הקשר שרץ בלי בלם — כל תור מחויב מחדש על כל ההיסטוריה. ` +
           `כדאי לבדוק את מספר התורים בשיחה ואת גודל הקלט בכל תור.`
       );
@@ -159,7 +187,7 @@ export async function recordTurnCost(params: {
         `cost-account:${accountId}:${todayKey()}`,
         'warning',
         `חשבון חצה $${ACCOUNT_DAILY_ALERT_USD} ביום`,
-        `חשבון ${accountId} הגיע ל-$${accountDailyUsd.toFixed(2)} מתחילת היום.`
+        async () => `חשבון ${await accountLabel(accountId)} הגיע ל-$${accountDailyUsd.toFixed(2)} מתחילת היום.`
       );
     }
 
