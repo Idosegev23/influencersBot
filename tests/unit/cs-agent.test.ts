@@ -317,6 +317,30 @@ beforeEach(() => {
     expect(inserted['chat_messages']).toContainEqual(expect.objectContaining({ role: 'assistant', metadata: { product_ids: ['p-1'] } }));
   });
 
+  // Measured 2026-09-27 on gpt-5.6-sol: the prompt says to write the recommendation and call
+  // show_products in the SAME turn. The model did, then returned empty text on the next call, and
+  // the shopper got "סליחה, אפשר לנסח שוב?" under three product cards. The prose it already wrote
+  // must be the reply.
+  it('prose written alongside show_products is the reply when the closing call comes back empty', async () => {
+    handlers['show_products'] = vi.fn().mockResolvedValue({ ok: true, cards, data: { sent: [{ name: 'מרכך קיק' }] } });
+    callModel
+      .mockResolvedValueOnce({ toolCalls: [{ id: 'tc1', name: 'show_products', args: { refs: ['p1'] } }], text: 'לשיער יבש אני ממליצה על המרכך הזה 👇' })
+      .mockResolvedValueOnce({ toolCalls: [], text: '' });
+    store['972501112222'] = bound();
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('מה מתאים לשיער יבש?'), { callModel });
+    expect(res.reply).toEqual({ kind: 'text', body: 'לשיער יבש אני ממליצה על המרכך הזה 👇' });
+    expect(res.cards).toEqual(cards);
+  });
+
+  it('with no prose anywhere in the turn, the rephrase fallback still applies', async () => {
+    callModel.mockResolvedValueOnce({ toolCalls: [], text: '' });
+    store['972501112222'] = bound();
+    const { runCsTurn } = await import('@/lib/cs/cs-agent');
+    const res = await runCsTurn(job('מה?'), { callModel });
+    expect(res.reply).toEqual({ kind: 'text', body: 'סליחה, אפשר לנסח שוב? 🙏' });
+  });
+
   it('a turn with no cards carries none — and writes no product metadata', async () => {
     callModel.mockResolvedValue({ toolCalls: [], text: 'ההזמנה שלך בדרך 📦' });
     store['972501112222'] = bound();

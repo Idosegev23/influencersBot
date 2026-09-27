@@ -41,9 +41,22 @@ export interface ModelPricing {
   longContextInputPerM: number;
   /** USD per 1M output tokens on a long-context request. */
   longContextOutputPerM: number;
+  /** Prompt size where this model's long-context rates start. Defaults to LONG_CONTEXT_THRESHOLD_TOKENS. */
+  longContextThresholdTokens?: number;
 }
 
 const PRICES: Record<string, ModelPricing> = {
+  // GPT-6 family (released 2026-09-22). PUBLISHED list prices, not yet derived from our own
+  // billing: re-derive once gpt-6 line items appear in /v1/organization/costs. Long context
+  // starts at 272K here, not 128K.
+  'gpt-6-sol': {
+    inputPerM: 2, cachedInputPerM: 0.2, outputPerM: 10,
+    longContextInputPerM: 4, longContextOutputPerM: 15, longContextThresholdTokens: 272_000,
+  },
+  'gpt-6-luna': {
+    inputPerM: 0.1, cachedInputPerM: 0.01, outputPerM: 0.5,
+    longContextInputPerM: 0.2, longContextOutputPerM: 0.75, longContextThresholdTokens: 272_000,
+  },
   // GPT-5.6 family (launch pricing 2026-07-09, cut 2026-07-30; cached assumed 10% of input,
   // long-context assumed 2x like 5.4/5.5 — NOT yet confirmed from our own billing, re-derive
   // once real 5.6 line items appear in /v1/organization/costs).
@@ -86,9 +99,17 @@ const PRICES: Record<string, ModelPricing> = {
   // reporting $0 for a real cost, and they must be re-derived the moment a Google invoice is
   // available. Gemini has no long-context tier on these models, so those fields mirror the
   // base rate rather than doubling it.
+  // Corrected 2026-09-27: this row carried $0.30/$2.50, about a fifth of the real rate, so
+  // scan cost was under-reported ~5x.
   'gemini-3.5-flash': {
-    inputPerM: 0.3, cachedInputPerM: 0.03, outputPerM: 2.5,
-    longContextInputPerM: 0.3, longContextOutputPerM: 2.5,
+    inputPerM: 1.5, cachedInputPerM: 0.15, outputPerM: 9,
+    longContextInputPerM: 1.5, longContextOutputPerM: 9,
+  },
+  // Launch pricing, valid through 2026-12-31. Google doubles it on 2027-01-01
+  // ($1.50 / $0.15 / $7.50): update this row then.
+  'gemini-3.8-flash': {
+    inputPerM: 0.75, cachedInputPerM: 0.075, outputPerM: 3.75,
+    longContextInputPerM: 0.75, longContextOutputPerM: 3.75,
   },
   'gemini-2.5-flash': {
     inputPerM: 0.3, cachedInputPerM: 0.03, outputPerM: 2.5,
@@ -103,8 +124,8 @@ const PRICES: Record<string, ModelPricing> = {
     longContextInputPerM: 0.1, longContextOutputPerM: 0.4,
   },
   'gemini-3.1-pro-preview': {
-    inputPerM: 1.25, cachedInputPerM: 0.125, outputPerM: 10,
-    longContextInputPerM: 1.25, longContextOutputPerM: 10,
+    inputPerM: 2, cachedInputPerM: 0.2, outputPerM: 12,
+    longContextInputPerM: 4, longContextOutputPerM: 18, longContextThresholdTokens: 200_000,
   },
   'gemini-3-pro-preview': {
     inputPerM: 1.25, cachedInputPerM: 0.125, outputPerM: 10,
@@ -158,7 +179,7 @@ export function estimateCostUsd(params: {
   const output = Math.max(0, params.outputTokens ?? 0);
   const uncached = input - cached;
 
-  const long = input >= LONG_CONTEXT_THRESHOLD_TOKENS;
+  const long = input >= (p.longContextThresholdTokens ?? LONG_CONTEXT_THRESHOLD_TOKENS);
   const inRate = long ? p.longContextInputPerM : p.inputPerM;
   const outRate = long ? p.longContextOutputPerM : p.outputPerM;
 

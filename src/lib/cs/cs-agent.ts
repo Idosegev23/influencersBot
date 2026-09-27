@@ -64,15 +64,35 @@ function phoneVariants(waId: string): string[] {
 }
 
 // Default LLM caller — native OpenAI function-calling (mirrors src/lib/chatbot/sandwich-bot-hybrid.ts).
+// Runs when the CS model is refused outright (access not yet granted, or flapping, as gpt-5.6 and
+// gpt-6 both did for hours after being enabled). A refused model must not leave a shopper unanswered.
+const CS_FALLBACK_MODEL = 'gpt-5.6-terra';
+
+function isAccessError(e: any): boolean {
+  const status = e?.status ?? e?.response?.status;
+  return status === 403 || status === 404;
+}
+
 async function defaultCallModel(params: { system: string; messages: CsChatMessage[]; tools: OpenAIFunctionDef[] }): Promise<CsModelTurn> {
+  const primary = laneModel('cs');
+  try {
+    return await callCsModel(primary, params);
+  } catch (e) {
+    if (primary === CS_FALLBACK_MODEL || !isAccessError(e)) throw e;
+    console.warn('[cs-agent] model refused, falling back', { primary, fallback: CS_FALLBACK_MODEL, status: (e as any)?.status });
+    return callCsModel(CS_FALLBACK_MODEL, params);
+  }
+}
+
+async function callCsModel(model: string, params: { system: string; messages: CsChatMessage[]; tools: OpenAIFunctionDef[] }): Promise<CsModelTurn> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const res = await openai.chat.completions.create({
-    model: laneModel('money'),
+    model,
     messages: [{ role: 'system', content: params.system }, ...(params.messages as any)],
     tools: params.tools as any,
     tool_choice: 'auto',
-    // OpenAI (observed live 2026-08-13): gpt-5.6-sol rejects function tools on
-    // /v1/chat/completions unless reasoning_effort is explicitly 'none'.
+    // OpenAI (observed live 2026-08-13, again for gpt-6 on 2026-09-28): function tools on
+    // /v1/chat/completions are rejected unless reasoning_effort is explicitly 'none'.
     reasoning_effort: 'none',
   } as any);
   const msg: any = res.choices?.[0]?.message;
@@ -80,7 +100,7 @@ async function defaultCallModel(params: { system: string; messages: CsChatMessag
   const u: any = (res as any).usage;
   const usage: TokenUsage | null = u
     ? {
-        model: laneModel('money'),
+        model,
         inputTokens: u.prompt_tokens ?? 0,
         cachedInputTokens: u.prompt_tokens_details?.cached_tokens ?? 0,
         outputTokens: u.completion_tokens ?? 0,
@@ -447,10 +467,15 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   // Every call the loop makes is separately billed, so all of them are collected and priced as
   // ONE turn below — see recordTurnCost's contract for why the tokens must not simply be summed.
   const turnUsage: TokenUsage[] = [];
+  // Prose the model wrote alongside a tool call. The prompt asks for the recommendation and
+  // show_products in the SAME call; a closing call that then comes back empty must not replace
+  // that prose with the rephrase fallback (measured 2026-09-27: "סליחה, אפשר לנסח שוב?" under cards).
+  let toolTurnProse: string | null = null;
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const turn = await deps.callModel({ system, messages, tools: toolset.defs });
     if (turn.usage) turnUsage.push(turn.usage);
     if (!turn.toolCalls?.length) { finalText = turn.text; break; }
+    if (turn.text?.trim()) toolTurnProse = turn.text;
     messages.push({ role: 'assistant', content: turn.text, tool_calls: turn.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.args) } })) });
     for (const tc of turn.toolCalls) await dispatchTool(tc);
     // Do NOT short-circuit on a hand-off. escalate_to_human pauses the bot for FUTURE turns, but the
@@ -473,7 +498,7 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
   // header), so the reply is always text. On a hand-off, if the model produced no closing text we fall
   // back to an empathetic ack — NEVER the rephrase fallback, which reads as nonsense after an escalation.
   const HANDOFF_ACK = 'אני מעבירה את זה לנציג/ה אנושי/ת שיחזרו אליך בהקדם 🙏';
-  const rawReply = finalText || (handedOff ? HANDOFF_ACK : 'סליחה, אפשר לנסח שוב? 🙏');
+  const rawReply = finalText || toolTurnProse || (handedOff ? HANDOFF_ACK : 'סליחה, אפשר לנסח שוב? 🙏');
   const suggestions = parseSuggestions(rawReply);
   const replyBody = stripSuggestions(rawReply);
   if (replyBody) recentTurns.push({ role: 'assistant', text: replyBody });

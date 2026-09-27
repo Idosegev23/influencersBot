@@ -158,6 +158,14 @@ async function callGeminiWithRetry(
   throw lastError || new Error('Max retries exceeded');
 }
 
+/**
+ * Model for reel transcription and IG image OCR. Benched 2026-09-27 against gemini-3.5-flash on
+ * real Hebrew reels and images: same or better quality, clearly better on-screen text (8.06 vs
+ * 6.94), ~40% faster, 60-69% cheaper at launch pricing. Do NOT swap in a flash-lite model: weak
+ * Hebrew OCR, invented text, and it rejects this file's settings.
+ */
+export const TRANSCRIBE_MODEL = 'gemini-3.8-flash';
+
 export async function transcribeVideo(
   input: TranscriptionInput
 ): Promise<TranscriptionOutput> {
@@ -220,13 +228,13 @@ export async function transcribeVideo(
 
 חשוב: החזר רק JSON תקין, ללא טקסט נוסף.`;
 
-    console.log(`[Transcriber] Calling Gemini 3 Flash with HIGH media resolution for OCR...`);
+    console.log(`[Transcriber] Calling ${TRANSCRIBE_MODEL} with HIGH media resolution for OCR...`);
     
     // Call Gemini with video (with automatic retry on 429)
     // ⚡ CRITICAL: Use media_resolution_high for TEXT-HEAVY videos (OCR)
     const response = await callGeminiWithRetry(
       genAI,
-      'gemini-3.5-flash', // ⚡ Gemini 3 Flash Preview (1M context, cheap!)
+      TRANSCRIBE_MODEL,
       [
         {
           parts: [
@@ -394,11 +402,11 @@ export async function transcribeImage(
 
 חשוב: החזר רק JSON תקין, ללא טקסט נוסף.`;
 
-    console.log(`[Vision] Calling Gemini 3 Flash for image OCR...`);
+    console.log(`[Vision] Calling ${TRANSCRIBE_MODEL} for image OCR...`);
 
     const response = await callGeminiWithRetry(
       genAI,
-      'gemini-3.5-flash',
+      TRANSCRIBE_MODEL,
       [
         {
           parts: [
@@ -484,7 +492,7 @@ export async function saveTranscription(
         video_duration: input.video_duration,
         processing_status: 'failed',
         error_message: output.error,
-        gemini_model_used: 'gemini-3.5-flash',
+        gemini_model_used: TRANSCRIBE_MODEL,
       }, {
         onConflict: 'source_type,source_id',
       })
@@ -512,7 +520,7 @@ export async function saveTranscription(
       language: output.transcription.language,
       on_screen_text: output.transcription.on_screen_text,
       speakers: output.transcription.speakers,
-      gemini_model_used: 'gemini-3.5-flash',
+      gemini_model_used: TRANSCRIBE_MODEL,
       processing_status: 'completed',
       tokens_used: output.tokens_used,
       processing_cost: output.processing_cost,

@@ -8,9 +8,11 @@ import { getVertical, type VerticalId } from '@/lib/catalog/verticals';
 
 // Use dynamic import for Gemini to avoid build issues
 async function getGeminiModel() {
-  const { getGeminiClient, MODELS } = await import('@/lib/ai/google-client');
+  const { getGeminiClient } = await import('@/lib/ai/google-client');
   const client = getGeminiClient();
-  return { client, model: MODELS.CHAT_FAST };
+  // Benched 2026-09-27: output identical to gemini-3.5-flash (29/29 page decisions, 24/24 names),
+  // about half the price. Local on purpose: MODELS.CHAT_FAST feeds calls that were not benched.
+  return { client, model: 'gemini-3.8-flash' };
 }
 
 // ============================================

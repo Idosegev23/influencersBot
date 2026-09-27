@@ -24,16 +24,20 @@ const openai = new OpenAI({
 });
 
 // Model Configuration
-const CHAT_MODEL = 'gpt-5.6-terra'; // benched 2026-08-08: same 10/10 quality as gpt-5.4, ~37% cheaper per reply, faster TTFT
-const FALLBACK_MODEL = 'gpt-5.4-mini-2026-03-17'; // kept on 5.4 family — 5.6 access still propagating, this catches denials
-const NANO_MODEL = 'gpt-5.6-luna'; // ⚡ ~130 tok/s, judged 10/10; weak at long-context recall — short queries only
+// Benched 2026-09-27 on 40 real turns (LA BEAUTÉ + ARGANIA), two blind judges: gpt-6-luna 7.26 vs
+// terra 7.40 (within judge noise), 40/40 clean format, no invented prices or codes, p50 1.8s vs 3.7s,
+// ~1/20 of the cost. Its weak side is tone (cautious, less sales-driven), not facts. Run it at
+// effort 'low': 'none' duplicated <<INTENT>> in 3/40 replies.
+const CHAT_MODEL = 'gpt-6-luna';
+const FALLBACK_MODEL = 'gpt-5.6-terra'; // the previous primary: catches gpt-6 access flapping at full quality
+const NANO_MODEL = 'gpt-6-luna';
 const MAX_TOKENS = 2048; // Enough for full Hebrew recipes, routines, and detailed content
 
 // Map decision engine model tiers to actual OpenAI model names
 function resolveModel(tier?: 'nano' | 'standard' | 'full'): { primary: string; fallback: string } {
   switch (tier) {
     case 'nano':
-      return { primary: NANO_MODEL, fallback: CHAT_MODEL };
+      return { primary: NANO_MODEL, fallback: FALLBACK_MODEL };
     case 'full':
     case 'standard':
     default:

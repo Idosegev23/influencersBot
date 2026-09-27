@@ -140,3 +140,38 @@ describe('estimateCostUsd — Gemini', () => {
     expect(GEMINI_RATES_ARE_LIST_PRICE).toBe(true);
   });
 });
+
+// 2026-09-27 model switch. A model missing from this table prices at $0, and recordTurnCost
+// then skips the turn entirely, so switching production to an unpriced model would blind the
+// cost tracking and the budget alerts at the exact moment traffic moves to it.
+describe('pricing — models switched to on 2026-09-27', () => {
+  it('prices every model production now calls', () => {
+    for (const m of ['gpt-6-sol', 'gpt-6-luna', 'gemini-3.8-flash']) {
+      expect(priceFor(m), m).not.toBeNull();
+      expect(estimateCostUsd({ model: m, inputTokens: 1_000_000, outputTokens: 0 }), m).toBeGreaterThan(0);
+    }
+  });
+
+  it('GPT-6 list prices: sol $2/$0.20/$10, luna $0.10/$0.01/$0.50', () => {
+    // 100K keeps every call below the long-context threshold.
+    expect(estimateCostUsd({ model: 'gpt-6-sol', inputTokens: 100_000, outputTokens: 100_000 })).toBeCloseTo(0.2 + 1.0, 6);
+    expect(estimateCostUsd({ model: 'gpt-6-luna', inputTokens: 100_000, outputTokens: 100_000 })).toBeCloseTo(0.01 + 0.05, 6);
+    expect(estimateCostUsd({ model: 'gpt-6-sol', inputTokens: 100_000, cachedInputTokens: 100_000 })).toBeCloseTo(0.02, 6);
+  });
+
+  it('GPT-6 switches to long-context rates at 272K, not 128K', () => {
+    // 200K prompt: long-context for gpt-5.x, still standard for gpt-6.
+    expect(estimateCostUsd({ model: 'gpt-6-sol', inputTokens: 200_000 })).toBeCloseTo(0.4, 6);
+    expect(estimateCostUsd({ model: 'gpt-5.6-terra', inputTokens: 200_000 })).toBeCloseTo(0.8, 6);
+    // 300K prompt: long-context for gpt-6 too ($4 in / $15 out).
+    expect(estimateCostUsd({ model: 'gpt-6-sol', inputTokens: 300_000, outputTokens: 100_000 })).toBeCloseTo(1.2 + 1.5, 6);
+  });
+
+  it('Gemini list prices from ai.google.dev (2026-09-27)', () => {
+    expect(estimateCostUsd({ model: 'gemini-3.5-flash', inputTokens: 100_000, outputTokens: 100_000 })).toBeCloseTo(0.15 + 0.9, 6);
+    expect(estimateCostUsd({ model: 'gemini-3.8-flash', inputTokens: 100_000, outputTokens: 100_000 })).toBeCloseTo(0.075 + 0.375, 6);
+    expect(estimateCostUsd({ model: 'gemini-3.1-pro-preview', inputTokens: 100_000, outputTokens: 100_000 })).toBeCloseTo(0.2 + 1.2, 6);
+    // pro's long-context tier starts at 200K ($4 in).
+    expect(estimateCostUsd({ model: 'gemini-3.1-pro-preview', inputTokens: 250_000 })).toBeCloseTo(1.0, 6);
+  });
+});

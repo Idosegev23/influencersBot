@@ -896,6 +896,11 @@ ${chunks.map((c, i) => `[${i}] (${c.entityType}) ${c.text.substring(0, 250)}`).j
   try {
     const parsed = JSON.parse(raw);
     const topics = Array.isArray(parsed) ? parsed : parsed?.topics;
+    // The caller writes topics[j] onto chunk j, so a count mismatch would shift every label after
+    // the gap onto the wrong chunk. Measured 2026-09-27: 14 topics for 15 texts on 1 batch in 5.
+    if (Array.isArray(topics) && topics.length > 0 && topics.length !== chunks.length) {
+      throw new Error(`${topics.length} topics for ${chunks.length} texts`);
+    }
     if (Array.isArray(topics) && topics.length > 0) {
       return topics.map((t: unknown) => String(t));
     }
