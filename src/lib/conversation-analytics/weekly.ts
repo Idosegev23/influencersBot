@@ -12,6 +12,7 @@ import { generateInsights, ALLOWED_INSIGHT_TYPES, type GeneratedInsight } from '
 import { sendEmail } from '@/lib/email';
 import { fetchWatchKeywords } from './query';
 import OpenAI from 'openai';
+import { pageAll } from './paging';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -92,14 +93,23 @@ function defaultDeps(): WeeklyDeps {
   const openai = () => (client ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY }));
 
   const selectRows = async (accountId: string, fromIso: string, toIso: string) => {
-    const { data } = await supabase
-      .from('conversation_classifications')
-      .select('session_id, channel, started_at, inquiry_type, topic_raw, is_complaint, complaint_kind, sentiment, outcome, product_id, product_category, product_line, keywords, status, conversation_topics(label), widget_products(name_he, name)')
-      .eq('account_id', accountId)
-      .gte('started_at', fromIso)
-      .lt('started_at', toIso);
+    // Paged: a week above 1,000 conversations would otherwise be frozen into
+    // its snapshot as exactly 1,000.
+    const data = await pageAll<any>(async (from, to) => {
+      const { data: page, error } = await supabase
+        .from('conversation_classifications')
+        .select('session_id, channel, started_at, inquiry_type, topic_raw, is_complaint, complaint_kind, sentiment, outcome, product_id, product_category, product_line, keywords, status, conversation_topics(label), widget_products(name_he, name)')
+        .eq('account_id', accountId)
+        .gte('started_at', fromIso)
+        .lt('started_at', toIso)
+        .order('started_at', { ascending: true })
+        .order('session_id', { ascending: true })
+        .range(from, to);
+      if (error) throw new Error(`selectRows: ${error.message}`);
+      return page || [];
+    });
 
-    return (data || []).map((r: any) => ({
+    return data.map((r: any) => ({
       session_id: r.session_id,
       channel: r.channel,
       started_at: r.started_at,

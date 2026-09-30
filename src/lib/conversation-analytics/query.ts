@@ -12,6 +12,7 @@ import {
   watchTermsFromConfig,
   type WatchKeywordCount,
 } from './keyword-watch';
+import { pageAll } from './paging';
 
 /** Columns every surface needs, joined to the canonical topic and product name. */
 const SELECT =
@@ -77,19 +78,27 @@ export async function fetchClassificationRows(opts: {
   toIso: string;
   filters?: RowFilters;
 }): Promise<Array<ClassificationLite & { summary?: string | null }>> {
-  let q = supabase
-    .from('conversation_classifications')
-    .select(SELECT)
-    .eq('account_id', opts.accountId)
-    .gte('started_at', opts.fromIso)
-    .lt('started_at', opts.toIso);
+  // Paged: `.limit(MAX_ROWS)` alone is answered with the first 1,000 rows, so
+  // any range holding more conversations than that was charted from a slice.
+  const data = await pageAll<any>(async (from, to) => {
+    let q = supabase
+      .from('conversation_classifications')
+      .select(SELECT)
+      .eq('account_id', opts.accountId)
+      .gte('started_at', opts.fromIso)
+      .lt('started_at', opts.toIso);
 
-  q = applyFilters(q, opts.filters || {});
+    q = applyFilters(q, opts.filters || {});
 
-  const { data, error } = await q.limit(MAX_ROWS);
-  if (error) throw new Error(error.message);
+    const { data: page, error } = await q
+      .order('started_at', { ascending: true })
+      .order('session_id', { ascending: true })
+      .range(from, to);
+    if (error) throw new Error(error.message);
+    return page || [];
+  }, MAX_ROWS);
 
-  const rows = (data || []).map(toLite);
+  const rows = data.map(toLite);
   // `topic` filters on the resolved label, which only exists after the join.
   return opts.filters?.topic
     ? rows.filter((r) => r.topic_label === opts.filters!.topic)

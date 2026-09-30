@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { channelOf, runClassification } from '@/lib/conversation-analytics/run-classification';
+import { channelOf, runClassification, fetchAllMessages, MESSAGE_PAGE } from '@/lib/conversation-analytics/run-classification';
 
 describe('channelOf', () => {
   it('reads the channel off the anon id prefix', () => {
@@ -227,5 +227,59 @@ describe('runClassification', () => {
     expect(res.failed).toBe(2);
     expect(res.classified).toBe(0);
     expect(inserted).toHaveLength(2);
+  });
+});
+
+// Production, 2026-09-30: the transcript query was one `.in(session_id, ids)`
+// with no paging, and PostgREST caps a response at 1,000 rows. A 200-session
+// page carries more messages than that, so the sessions past the cap arrived
+// with no messages at all (the model call 400s on an empty input — 64 Argania
+// rows burned all three attempts) and the one on the boundary was classified
+// on half its conversation.
+describe('fetchAllMessages', () => {
+  const table = (perSession: number, ids: string[]) =>
+    ids.flatMap((id) => Array.from({ length: perSession }, (_, i) => ({ session_id: id, n: i })));
+
+  const pagedOver = (rows: any[]) =>
+    vi.fn(async (ids: string[], from: number, to: number) =>
+      rows.filter((r) => ids.includes(r.session_id)).slice(from, to + 1));
+
+  it('returns every message when the sessions hold more than one page', async () => {
+    const ids = Array.from({ length: 200 }, (_, i) => `s${i}`);
+    const rows = table(12, ids); // 2,400 messages
+    const got = await fetchAllMessages(ids, pagedOver(rows));
+
+    expect(got).toHaveLength(2400);
+    expect(got.filter((m) => m.session_id === 's199')).toHaveLength(12);
+  });
+
+  it('keeps paging inside a chunk whose messages exceed a page', async () => {
+    const rows = table(MESSAGE_PAGE + 250, ['long']);
+    const fetchPage = pagedOver(rows);
+    const got = await fetchAllMessages(['long'], fetchPage);
+
+    expect(got).toHaveLength(MESSAGE_PAGE + 250);
+    expect(fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it('issues no query for an empty id list', async () => {
+    const fetchPage = vi.fn(async () => []);
+    expect(await fetchAllMessages([], fetchPage)).toEqual([]);
+    expect(fetchPage).not.toHaveBeenCalled();
+  });
+});
+
+describe('runClassification with a session that has no transcript', () => {
+  it('skips it without a model call and without spending an attempt', async () => {
+    const empty = { ...session('empty'), messages: [] };
+    const { deps, inserted } = fakeDeps([session('s1'), empty, session('s2')]);
+
+    const res = await runClassification({ accountId: 'a1', deps });
+
+    expect(res.classified).toBe(2);
+    expect(res.failed).toBe(0);
+    expect(res.skipped).toBe(1);
+    expect(deps.classify).toHaveBeenCalledTimes(2);
+    expect(inserted.map((r) => r.session_id)).toEqual(['s1', 's2']);
   });
 });

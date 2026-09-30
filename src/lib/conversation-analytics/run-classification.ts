@@ -14,6 +14,7 @@ import { buildProductIndex, type CatalogProduct, type ProductIndex } from './pro
 import { buildSeriesIndex, type SeriesIndex } from './series-resolver';
 import { classifySession, type ClassificationRow, type SessionForClassification } from './classify';
 import { callClassifyModel } from './openai-call';
+import { pageAll, PAGE_SIZE } from './paging';
 
 export const DEFAULT_BUDGET_USD = 5;
 export const SETTLE_MINUTES = 30;
@@ -25,6 +26,26 @@ export const MAX_ATTEMPTS = 3;
  * later run dies the same way.
  */
 export const SAVE_EVERY = 10;
+
+export const MESSAGE_PAGE = PAGE_SIZE;
+const SESSION_CHUNK = 50;
+
+/**
+ * Every message of the given sessions, paged. One unpaged `.in()` silently
+ * returns the first 1,000 rows, which leaves the sessions past the cap with no
+ * transcript and cuts the one on the boundary in half.
+ */
+export async function fetchAllMessages<T>(
+  sessionIds: string[],
+  fetchPage: (ids: string[], from: number, to: number) => Promise<T[]>
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < sessionIds.length; i += SESSION_CHUNK) {
+    const chunk = sessionIds.slice(i, i + SESSION_CHUNK);
+    out.push(...(await pageAll((from, to) => fetchPage(chunk, from, to))));
+  }
+  return out;
+}
 
 export function channelOf(anonId: string | null | undefined): 'web' | 'whatsapp' | 'instagram' | 'unknown' {
   if (!anonId) return 'unknown';
@@ -60,9 +81,13 @@ export async function runClassification(opts: {
   const budget = opts.budgetUsd ?? DEFAULT_BUDGET_USD;
   const deps: RunDeps = { ...defaultDeps(), ...(opts.deps || {}) } as RunDeps;
 
-  const sessions = await deps.fetchPendingSessions(opts.accountId, opts.sinceIso, limit);
+  const pending = await deps.fetchPendingSessions(opts.accountId, opts.sinceIso, limit);
+  // A session with no customer message has nothing to classify. Sending it
+  // anyway 400s on the empty input and burns one of its three attempts.
+  const sessions = pending.filter((s) => s.messages.some((m) => m.role === 'user'));
+  const withoutTranscript = pending.length - sessions.length;
   if (!sessions.length) {
-    return { classified: 0, skipped: 0, failed: 0, spentUsd: 0, stoppedOnBudget: false, stoppedOnTime: false };
+    return { classified: 0, skipped: withoutTranscript, failed: 0, spentUsd: 0, stoppedOnBudget: false, stoppedOnTime: false };
   }
 
   const catalog = await deps.fetchCatalog(opts.accountId);
@@ -106,7 +131,7 @@ export async function runClassification(opts: {
 
   return {
     classified: done - failed,
-    skipped: sessions.length - done,
+    skipped: sessions.length - done + withoutTranscript,
     failed,
     spentUsd,
     stoppedOnBudget,
@@ -134,15 +159,21 @@ function defaultDeps(): RunDeps {
       if (!pending || pending.length === 0) return [];
 
       const ids = pending.map((s: any) => s.id);
-      const { data: msgs, error: msgErr } = await supabase
-        .from('chat_messages')
-        .select('session_id, role, content, intent, created_at')
-        .in('session_id', ids)
-        .order('created_at', { ascending: true });
-      if (msgErr) throw new Error(`fetchPendingSessions messages: ${msgErr.message}`);
+      const msgs = await fetchAllMessages<any>(ids, async (chunk, from, to) => {
+        const { data, error: msgErr } = await supabase
+          .from('chat_messages')
+          .select('session_id, role, content, intent, created_at')
+          .in('session_id', chunk)
+          // `id` breaks ties so consecutive pages neither repeat nor drop a row.
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to);
+        if (msgErr) throw new Error(`fetchPendingSessions messages: ${msgErr.message}`);
+        return data || [];
+      });
 
       const bySession = new Map<string, any[]>();
-      for (const m of msgs || []) {
+      for (const m of msgs) {
         const arr = bySession.get(m.session_id) || [];
         arr.push(m);
         bySession.set(m.session_id, arr);
