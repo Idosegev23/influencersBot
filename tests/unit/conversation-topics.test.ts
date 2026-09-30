@@ -187,6 +187,37 @@ describe('clusterTopics', () => {
     expect(res.remaining).toBe(0);
   });
 
+  // The weekly cron runs every enabled account inside one 300s function. One
+  // account's pass already takes most of that, so with three accounts the
+  // second and third were never reached: LA BEAUTÉ sat at 4,587 classified
+  // rows with no topic. A run now stops starting batches at its deadline.
+  it('stops starting batches at its deadline and reports what is left', async () => {
+    const many = Array.from({ length: 200 }, (_, i) => `נושא ${i}`);
+    let clock = 0;
+    const callModel = vi.fn(async ({ rawTopics }: any) => {
+      clock += 30_000;
+      return { assignments: rawTopics.map((r: string) => ({ raw: r, label: r })) };
+    });
+    const res = await clusterTopics({
+      accountId: 'a1',
+      deadlineAt: 60_000,
+      deps: {
+        fetchTopics: async () => [],
+        countUnassignedRows: async () => 120,
+        fetchUnassignedRaw: async () => many,
+        callModel,
+        upsertTopic: vi.fn(async () => 't'),
+        assignTopicToRaw: vi.fn(async () => {}),
+        now: () => clock,
+      },
+    });
+
+    expect(callModel).toHaveBeenCalledTimes(2);
+    expect(res.clustered).toBe(80);
+    expect(res.remaining).toBe(120);
+    expect(res.stoppedOnTime).toBe(true);
+  });
+
   it('does nothing when there is nothing unassigned', async () => {
     const callModel = vi.fn();
     const res = await clusterTopics({
@@ -201,6 +232,6 @@ describe('clusterTopics', () => {
       },
     });
     expect(callModel).not.toHaveBeenCalled();
-    expect(res).toEqual({ matchedByAlias: 0, clustered: 0, newTopics: 0, remaining: 0, rowsRemaining: 0 });
+    expect(res).toEqual({ matchedByAlias: 0, clustered: 0, newTopics: 0, remaining: 0, rowsRemaining: 0, stoppedOnTime: false });
   });
 });

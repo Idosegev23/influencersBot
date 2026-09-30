@@ -51,11 +51,15 @@ export interface ClusterDeps {
   }>;
   upsertTopic: (accountId: string, label: string, alias: string | null) => Promise<string>;
   assignTopicToRaw: (accountId: string, raw: string, topicId: string) => Promise<void>;
+  /** Injected so the deadline is testable without waiting on a real clock. */
+  now: () => number;
 }
 
 export async function clusterTopics(opts: {
   accountId: string;
   maxBatches?: number;
+  /** Epoch ms after which no new batch is started. Unset means no deadline. */
+  deadlineAt?: number;
   deps?: Partial<ClusterDeps>;
 }): Promise<{
   matchedByAlias: number;
@@ -65,6 +69,7 @@ export async function clusterTopics(opts: {
   remaining: number;
   /** Classification rows still without a topic, account-wide. This is the number to loop on. */
   rowsRemaining: number;
+  stoppedOnTime: boolean;
 }> {
   const deps: ClusterDeps = { ...defaultDeps(), ...(opts.deps || {}) } as ClusterDeps;
   const { accountId } = opts;
@@ -73,7 +78,7 @@ export async function clusterTopics(opts: {
 
   const raws = await deps.fetchUnassignedRaw(accountId);
   if (!raws.length) {
-    return { matchedByAlias: 0, clustered: 0, newTopics: 0, remaining: 0, rowsRemaining: 0 };
+    return { matchedByAlias: 0, clustered: 0, newTopics: 0, remaining: 0, rowsRemaining: 0, stoppedOnTime: false };
   }
 
   const topics = await deps.fetchTopics(accountId);
@@ -96,6 +101,7 @@ export async function clusterTopics(opts: {
     return {
       matchedByAlias, clustered: 0, newTopics: 0, remaining: 0,
       rowsRemaining: await deps.countUnassignedRows(accountId),
+      stoppedOnTime: false,
     };
   }
 
@@ -104,10 +110,13 @@ export async function clusterTopics(opts: {
 
   const budget = maxBatches * CLUSTER_BATCH;
   const thisRun = unseen.slice(0, budget);
-  const remaining = unseen.length - thisRun.length;
+  let attempted = 0;
+  let stoppedOnTime = false;
 
   for (let i = 0; i < thisRun.length; i += CLUSTER_BATCH) {
+    if (opts.deadlineAt !== undefined && deps.now() >= opts.deadlineAt) { stoppedOnTime = true; break; }
     const batch = thisRun.slice(i, i + CLUSTER_BATCH);
+    attempted += batch.length;
 
     let assignments: Array<{ raw: string; label: string }> = [];
     try {
@@ -133,8 +142,10 @@ export async function clusterTopics(opts: {
   }
 
   return {
-    matchedByAlias, clustered, newTopics, remaining,
+    matchedByAlias, clustered, newTopics,
+    remaining: unseen.length - attempted,
     rowsRemaining: await deps.countUnassignedRows(accountId),
+    stoppedOnTime,
   };
 }
 
@@ -143,6 +154,8 @@ function defaultDeps(): ClusterDeps {
   const openai = () => (client ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY }));
 
   return {
+    now: () => Date.now(),
+
     async fetchTopics(accountId) {
       const { data } = await supabase
         .from('conversation_topics')
