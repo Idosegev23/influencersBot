@@ -13,6 +13,15 @@ import { runClassification } from '@/lib/conversation-analytics/run-classificati
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
+/**
+ * Stop starting new sessions this long before the function is killed. The
+ * margin covers the sessions already in flight plus the final write.
+ */
+const TIME_BUDGET_MS = 240_000;
+/** Several sessions per model round-trip: one at a time is ~4.7s each, which
+ *  clears ~50 per run and cannot catch up with a backlog. */
+const CONCURRENCY = 4;
+
 function authorized(req: NextRequest): boolean {
   const expected = process.env.CRON_SECRET;
   if (!expected) return false;
@@ -20,6 +29,7 @@ function authorized(req: NextRequest): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  const startedAt = Date.now();
   if (!authorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -45,13 +55,20 @@ export async function GET(req: NextRequest) {
   });
 
   const results: any[] = [];
-  for (const a of targets) {
+  const deadline = startedAt + TIME_BUDGET_MS;
+  for (let i = 0; i < targets.length; i++) {
+    const a = targets[i];
+    // Each account gets an equal share of whatever time is left, so one
+    // account's backlog cannot starve the accounts queued behind it.
+    const share = Math.max(0, deadline - Date.now()) / (targets.length - i);
     try {
       const r = await runClassification({
         accountId: a.id,
         sinceIso: since,
         limit: Number.isFinite(limit) ? limit : 300,
         budgetUsd: Number.isFinite(budget) ? budget : 5,
+        deadlineAt: Date.now() + share,
+        concurrency: CONCURRENCY,
       });
       results.push({ accountId: a.id, ...r });
     } catch (e: any) {

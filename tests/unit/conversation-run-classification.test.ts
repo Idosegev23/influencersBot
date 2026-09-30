@@ -136,6 +136,74 @@ describe('runClassification', () => {
     expect(inserted[0].attempts).toBe(3);
   });
 
+  // Production, 2026-09-10 → 09-30: rows were saved once, after the whole page
+  // had been classified. At ~4.7s a session a 300-session page needs ~23 minutes
+  // and the function is killed at 5, so the hourly run paid for ~60 model calls
+  // and saved none of them. The backlog never shrank, so every later run died
+  // the same way: three weeks of nothing classified and two empty weekly reports.
+  it('saves as it goes, so a run killed midway keeps what it already classified', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => session(`s${i}`));
+    const { deps, inserted } = fakeDeps(many);
+    const savedWhenClassifying: number[] = [];
+    const base = deps.classify;
+    deps.classify = vi.fn(async (s: any) => {
+      savedWhenClassifying.push(inserted.length);
+      return base(s);
+    }) as any;
+
+    await runClassification({ accountId: 'a1', deps });
+
+    expect(inserted).toHaveLength(30);
+    // By the last session, the earlier ones are already in the database.
+    expect(savedWhenClassifying[29]).toBeGreaterThanOrEqual(20);
+  });
+
+  it('stops before its deadline and reports it, keeping what was classified', async () => {
+    const many = Array.from({ length: 50 }, (_, i) => session(`s${i}`));
+    const { deps, inserted } = fakeDeps(many);
+    let clock = 0;
+    const base = deps.classify;
+    deps.classify = vi.fn(async (s: any) => { clock += 5_000; return base(s); }) as any;
+
+    const res = await runClassification({
+      accountId: 'a1', deadlineAt: 60_000, deps: { ...deps, now: () => clock },
+    });
+
+    expect(res.stoppedOnTime).toBe(true);
+    expect(res.classified).toBe(12);
+    expect(inserted).toHaveLength(12);
+    expect(res.skipped).toBe(38);
+  });
+
+  it('reports no time stop when the page finishes inside the deadline', async () => {
+    const { deps } = fakeDeps([session('s1'), session('s2')]);
+    const res = await runClassification({
+      accountId: 'a1', deadlineAt: 60_000, deps: { ...deps, now: () => 0 },
+    });
+    expect(res.stoppedOnTime).toBe(false);
+    expect(res.classified).toBe(2);
+  });
+
+  it('classifies several sessions at once when asked to', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => session(`s${i}`));
+    const { deps, inserted } = fakeDeps(many);
+    let inFlight = 0;
+    let peak = 0;
+    const base = deps.classify;
+    deps.classify = vi.fn(async (s: any) => {
+      inFlight++; peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return base(s);
+    }) as any;
+
+    const res = await runClassification({ accountId: 'a1', concurrency: 4, deps });
+
+    expect(peak).toBe(4);
+    expect(res.classified).toBe(12);
+    expect(new Set(inserted.map((r) => r.session_id)).size).toBe(12);
+  });
+
   it('records a first attempt as attempt 1', async () => {
     const { deps, inserted } = fakeDeps([session('s1')]);
     await runClassification({ accountId: 'a1', deps });

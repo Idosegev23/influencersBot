@@ -18,6 +18,13 @@ import { callClassifyModel } from './openai-call';
 export const DEFAULT_BUDGET_USD = 5;
 export const SETTLE_MINUTES = 30;
 export const MAX_ATTEMPTS = 3;
+/**
+ * Rows are written every this-many sessions rather than once at the end. A run
+ * that is killed — and a 300s function working through a backlog will be —
+ * must keep what it already paid for, or the backlog never shrinks and every
+ * later run dies the same way.
+ */
+export const SAVE_EVERY = 10;
 
 export function channelOf(anonId: string | null | undefined): 'web' | 'whatsapp' | 'instagram' | 'unknown' {
   if (!anonId) return 'unknown';
@@ -31,6 +38,8 @@ export interface RunDeps {
   fetchCatalog: (accountId: string) => Promise<CatalogProduct[]>;
   classify: (s: SessionForClassification, index: ProductIndex, seriesIndex: SeriesIndex) => Promise<ClassificationRow>;
   saveRows: (rows: ClassificationRow[]) => Promise<number>;
+  /** Injected so the deadline is testable without waiting on a real clock. */
+  now: () => number;
 }
 
 export async function runClassification(opts: {
@@ -38,46 +47,77 @@ export async function runClassification(opts: {
   sinceIso?: string;
   limit?: number;
   budgetUsd?: number;
+  /** Epoch ms after which no new session is started. Unset means no deadline. */
+  deadlineAt?: number;
+  /** Sessions classified at once. The budget can overshoot by this many rows. */
+  concurrency?: number;
   deps?: Partial<RunDeps>;
-}): Promise<{ classified: number; skipped: number; failed: number; spentUsd: number; stoppedOnBudget: boolean }> {
+}): Promise<{
+  classified: number; skipped: number; failed: number; spentUsd: number;
+  stoppedOnBudget: boolean; stoppedOnTime: boolean;
+}> {
   const limit = opts.limit ?? 300;
   const budget = opts.budgetUsd ?? DEFAULT_BUDGET_USD;
   const deps: RunDeps = { ...defaultDeps(), ...(opts.deps || {}) } as RunDeps;
 
   const sessions = await deps.fetchPendingSessions(opts.accountId, opts.sinceIso, limit);
   if (!sessions.length) {
-    return { classified: 0, skipped: 0, failed: 0, spentUsd: 0, stoppedOnBudget: false };
+    return { classified: 0, skipped: 0, failed: 0, spentUsd: 0, stoppedOnBudget: false, stoppedOnTime: false };
   }
 
   const catalog = await deps.fetchCatalog(opts.accountId);
   const index = buildProductIndex(catalog);
   const seriesIndex = buildSeriesIndex(catalog);
 
-  const rows: ClassificationRow[] = [];
+  const concurrency = Math.max(1, opts.concurrency ?? 1);
+  let unsaved: ClassificationRow[] = [];
+  let done = 0;
+  let failed = 0;
   let spentUsd = 0;
   let stoppedOnBudget = false;
+  let stoppedOnTime = false;
 
-  for (const s of sessions) {
-    if (spentUsd >= budget) { stoppedOnBudget = true; break; }
-    const row = await deps.classify(s, index, seriesIndex);
-    spentUsd += row.cost_usd || 0;
-    rows.push(row);
+  const flush = async () => {
+    if (!unsaved.length) return;
+    const batch = unsaved;
+    unsaved = [];
+    await deps.saveRows(batch);
+  };
+
+  try {
+    for (let i = 0; i < sessions.length; i += concurrency) {
+      if (spentUsd >= budget) { stoppedOnBudget = true; break; }
+      if (opts.deadlineAt !== undefined && deps.now() >= opts.deadlineAt) { stoppedOnTime = true; break; }
+
+      const rows = await Promise.all(
+        sessions.slice(i, i + concurrency).map((s) => deps.classify(s, index, seriesIndex))
+      );
+      for (const row of rows) {
+        spentUsd += row.cost_usd || 0;
+        if (row.status === 'failed') failed++;
+      }
+      done += rows.length;
+      unsaved.push(...rows);
+      if (unsaved.length >= SAVE_EVERY) await flush();
+    }
+  } finally {
+    await flush();
   }
 
-  if (rows.length) await deps.saveRows(rows);
-
-  const failed = rows.filter((r) => r.status === 'failed').length;
   return {
-    classified: rows.length - failed,
-    skipped: sessions.length - rows.length,
+    classified: done - failed,
+    skipped: sessions.length - done,
     failed,
     spentUsd,
     stoppedOnBudget,
+    stoppedOnTime,
   };
 }
 
 function defaultDeps(): RunDeps {
   return {
+    now: () => Date.now(),
+
     async fetchPendingSessions(accountId, sinceIso, limit) {
       // The anti-join lives in SQL (migration 081). Filtering already-classified
       // sessions in JS after LIMIT is what stalled the first backfill at 100 of
