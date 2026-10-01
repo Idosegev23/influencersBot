@@ -1,6 +1,6 @@
 # Multiview Association Co-Pilot: white-label platform design
 
-Date: 2026-09-29. Status: design approved in conversation, awaiting spec review.
+Date: 2026-09-29, revised 2026-10-01 after Multiview's Intent Exchange document. Status: approved to build (Ido, 2026-10-01).
 
 ## 1. Why
 
@@ -59,13 +59,14 @@ New tables:
 - `tenant_domains`: `host` (unique, lowercase), `partner_id`, `account_id` (null = partner-level host), `kind` (`subdomain` | `custom`), `verified_at`.
 - `console_users`: `id`, `email` (unique per partner), `name`, `partner_id`, `account_id` (null = partner staff), `role` (`owner` | `admin` | `viewer`), `last_login_at`, `status`.
 - `console_login_codes`: `id`, `console_user_id`, `code_hash`, `expires_at`, `used_at`, `attempts`.
-- `visitors`: `id`, `partner_id`, `account_id`, `anon_id`, `member_ref` (AMS id), `email`, `name`, `company`, `membership jsonb` (minimal snapshot: status, type, renewal_date, fetched_at), `first_seen`, `last_seen`, `merged_into` (self FK). Unique (`account_id`, `anon_id`); unique (`account_id`, `member_ref`) where not null.
+- `visitors`: `id`, `partner_id`, `account_id`, `anon_id`, `member_ref` (AMS id), `email`, `name`, `company`, `company_domain`, `identity_source` (`ams_login` | `ams_email` | `email_domain` | `newsletter` | `external` | null), `identity_resolved_at`, `membership jsonb` (minimal snapshot: status, type, renewal_date, fetched_at), `first_seen`, `last_seen`, `merged_into` (self FK). Unique (`account_id`, `anon_id`); unique (`account_id`, `member_ref`) where not null. A stronger source never gets overwritten by a weaker one (order as listed).
 - `interaction_events`: `id`, `partner_id`, `account_id`, `visitor_id`, `session_id`, `message_id` (nullable), `type`, `payload jsonb`, `industry`, `occurred_at`. Append-only. Index (`account_id`, `occurred_at`), (`visitor_id`, `occurred_at`), (`partner_id`, `type`, `occurred_at`).
 
 Event `type` values at launch: `session_started`, `question`, `topic_classified`,
 `resource_shown`, `related_item_shown`, `event_suggested`, `membership_prompted`,
 `renewal_prompted`, `link_clicked`, `contact_requested`, `contact_captured`,
-`identified`, `escalated`, `recap_sent`, `ams_unavailable`.
+`identified`, `escalated`, `recap_sent`, `ams_unavailable`, `page_view`
+(sent by the widget loader on every page load, so browsing intent is kept from launch).
 `conversion` is reserved for the next release.
 
 Changes to existing tables:
@@ -89,6 +90,24 @@ only the service role (partner API) reads and writes them.
    row's `merged_into`.
 3. Otherwise set `member_ref` and `email` on the current visitor.
 4. Fetch the membership snapshot from the AMS (§5). Record `identified`.
+
+### Identity sources (Intent Exchange document, 2026-10-01)
+
+Multiview needs company identity on as many interactions as possible. We
+resolve it through identity the visitor gives us, not through an IP pixel
+(decision 2026-10-01: weak accuracy for this audience, privacy exposure, and
+outside contract scope):
+
+1. `ams_login`: the `identify` call above.
+2. `ams_email`: any email captured in chat (contact capture, recap request) is
+   looked up in the AMS; a member match runs the same merge as `identify`.
+3. `email_domain`: no AMS match and a non-free-mail domain: `company_domain`
+   set from the address, `company` from the domain (no third-party lookup).
+4. `newsletter`: a signed recipient token in links from the association's
+   member emails (`?cp_t=`), verified with the association secret, treated as
+   `identify`.
+5. `external`: `POST /visitors/:id/company` accepts a company identity from a
+   provider Multiview may run itself. Stored, never fetched by us.
 
 Cross-association unification is not built. `partner_id` on every row keeps it possible.
 
@@ -117,7 +136,8 @@ an association-scoped user is refused any other `account_id`.
 | | `GET/POST /users`, `DELETE /users/:id` | Invite staff (partner staff: any; association admin: own association). |
 | Reporting | `GET /reports/usage` | Conversations this month vs 2,000. |
 | | `GET /reports/topics`, `/reports/volume`, `/reports/gaps` | From existing conversation-analytics tables. |
-| | `GET /interactions` | Cursor-paginated export of `interaction_events`. This is the contracted reporting API. |
+| | `GET /interactions` | Cursor-paginated export of `interaction_events`, each joined with the visitor identity: company, company domain, contact name and email, industry, identity source, resolved timestamp, topic, association. This is the contracted reporting API and the Intent Exchange record. |
+| Identity | `POST /visitors/:id/company` | External company identity (source 5). Partner key only. |
 
 Rate limits: per `anon_id` and per association on `/chat`, max message length,
 per-key ceiling. Limits fail closed for `/chat` when Redis is down.
@@ -221,4 +241,5 @@ on buses.org (signed-in agent), Intent Exchange document (may add fields to
 
 Intent Exchange product, identity pixel, cross-association profiles, staff
 inbox and AI drafts, web-chat takeover, conversion reporting, outbound email
-tooling, self-serve association onboarding, SSO-in-chat.
+tooling, self-serve association onboarding, SSO-in-chat, IP-based visitor
+identification pixel or any third-party identity graph.
