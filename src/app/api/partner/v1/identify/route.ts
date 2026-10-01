@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
   const assoc = await loadAssociation(tenant);
   const ams = getAmsAdapter(assoc?.config);
-  const sessionId = typeof body.sessionId === 'string' ? body.sessionId : null;
+  const sessionId = typeof body.sessionId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.sessionId) ? body.sessionId : null;
   const events: InteractionEventInput[] = [];
   let member: MemberSnapshot | null = null;
   if (ams) {
@@ -74,8 +74,10 @@ export async function POST(req: Request) {
   const { visitor: v, merged } = applied;
 
   if (sessionId) {
-    await supabase.from('chat_sessions').update({ identified_at: new Date().toISOString(), visitor_id: v.id })
-      .eq('id', sessionId).eq('account_id', tenant.accountId);
+    const { error } = await supabase.from('chat_sessions').update({ identified_at: new Date().toISOString(), visitor_id: v.id })
+      .eq('id', sessionId).eq('account_id', tenant.accountId)
+      .or(`visitor_id.is.null,visitor_id.eq.${visitor.id},visitor_id.eq.${v.id}`);
+    if (error) console.error('[copilot/identify]', 'session link failed', error.message);
   }
   events.push({ type: 'identified', sessionId, payload: { source, merged } });
   await recordEvents({ partnerId: tenant.partnerId, accountId: tenant.accountId, visitorId: v.id, industry: assoc?.industry ?? null }, events);
