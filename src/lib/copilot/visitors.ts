@@ -66,23 +66,33 @@ export async function applyIdentity(
   let target = v;
   let merged = false;
 
-  if (upd.memberRef) {
-    const { data: owner } = await supabase.from('visitors').select(COLS)
-      .eq('account_id', t.accountId).eq('member_ref', upd.memberRef).is('merged_into', null)
-      .neq('id', v.id).maybeSingle();
-    if (owner) {
-      const { error } = await supabase.rpc('copilot_merge_visitor', { p_from: v.id, p_into: (owner as VisitorRow).id });
-      if (error) throw new Error(`merge failed: ${error.message}`);
-      target = owner as VisitorRow;
-      merged = true;
+  // Two devices can identify as the same member at once: our owner lookup finds nobody, the
+  // other device claims member_ref first, and our update hits visitors_member_uidx (23505).
+  // Then look the owner up once more and merge into it instead of failing.
+  for (let attempt = 0; ; attempt++) {
+    if (upd.memberRef && !merged) {
+      const { data: owner, error: ownerErr } = await supabase.from('visitors').select(COLS)
+        .eq('account_id', t.accountId).eq('member_ref', upd.memberRef).is('merged_into', null)
+        .neq('id', v.id).maybeSingle();
+      if (ownerErr) throw new Error(`owner lookup failed: ${ownerErr.message}`);
+      if (owner) {
+        const { error } = await supabase.rpc('copilot_merge_visitor', { p_from: v.id, p_into: (owner as VisitorRow).id });
+        if (error) throw new Error(`merge failed: ${error.message}`);
+        target = owner as VisitorRow;
+        merged = true;
+      }
     }
-  }
 
-  const patch = planIdentityPatch(target, upd, new Date().toISOString());
-  if (patch) {
+    const patch = planIdentityPatch(target, upd, new Date().toISOString());
+    if (!patch) break;
     const { error } = await supabase.from('visitors').update(patch).eq('id', target.id);
-    if (error) throw new Error(`identity update failed: ${error.message}`);
+    if (error) {
+      const retry = attempt === 0 && !merged && error.code === '23505' && 'member_ref' in patch;
+      if (retry) continue;
+      throw new Error(`identity update failed: ${error.message}`);
+    }
     target = { ...target, ...patch } as VisitorRow;
+    break;
   }
   return { visitor: target, merged };
 }

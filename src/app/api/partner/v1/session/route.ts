@@ -30,7 +30,10 @@ export async function POST(req: Request) {
     const { data: s, error } = await supabase.from('chat_sessions')
       .insert({ account_id: tenant.accountId, visitor_id: visitor.id, anon_id: body.anonId, ref_source: 'copilot' })
       .select('id').single();
-    if (error || !s) return Response.json({ error: 'session_unavailable' }, { status: 500 });
+    if (error || !s) {
+      console.error('[copilot/session]', 'session insert failed', error?.message ?? 'no row returned');
+      return Response.json({ error: 'session_unavailable' }, { status: 500 });
+    }
     sessionId = s.id;
     await recordEvents(
       { partnerId: tenant.partnerId, accountId: tenant.accountId, visitorId: visitor.id, industry: assoc.industry },

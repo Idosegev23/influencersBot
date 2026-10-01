@@ -12,11 +12,12 @@ vi.mock('@/lib/copilot/association', () => ({
 }));
 
 const sessions: any[] = [];
+let insertError: any = null;
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
       select: () => ({ eq: (_c: string, id: string) => ({ maybeSingle: async () => ({ data: sessions.find((s) => s.id === id) ?? null }) }) }),
-      insert: (row: any) => ({ select: () => ({ single: async () => { const s = { id: `s${sessions.length + 1}`, ...row }; sessions.push(s); return { data: s, error: null }; } }) }),
+      insert: (row: any) => ({ select: () => ({ single: async () => { if (insertError) return { data: null, error: insertError }; const s = { id: `s${sessions.length + 1}`, ...row }; sessions.push(s); return { data: s, error: null }; } }) }),
     }),
   },
 }));
@@ -29,12 +30,24 @@ function req(body: any) {
 
 beforeEach(() => {
   sessions.length = 0;
+  insertError = null;
   requireTenant.mockResolvedValue(T);
   getOrCreateVisitor.mockResolvedValue({ id: 'v1', identity_source: null });
   recordEvents.mockClear();
 });
 
 describe('POST /session', () => {
+  it('logs the insert failure and answers 500 session_unavailable', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    insertError = { message: 'fk violation', code: '23503' };
+    const res = await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa' }));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe('session_unavailable');
+    expect(err).toHaveBeenCalledWith('[copilot/session]', expect.anything(), expect.stringContaining('fk violation'));
+    expect(recordEvents).not.toHaveBeenCalled();
+    err.mockRestore();
+  });
+
   it('opens a new session and records session_started', async () => {
     const res = await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa' }));
     expect(res.status).toBe(200);

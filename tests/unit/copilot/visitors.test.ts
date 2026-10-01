@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const db: { visitors: any[]; rpc: any[]; inserts: any[]; selectError: boolean } = { visitors: [], rpc: [], inserts: [], selectError: false };
+const db: { visitors: any[]; rpc: any[]; inserts: any[]; selectError: boolean; onUpdate: ((id: string, patch: any) => any) | null } = { visitors: [], rpc: [], inserts: [], selectError: false, onUpdate: null };
 
 function q(table: string) {
   const filters: Record<string, unknown> = {};
@@ -12,7 +12,7 @@ function q(table: string) {
     maybeSingle: async () => db.selectError ? { data: null, error: { message: 'timeout' } } : ({ data: db.visitors.find((r) => Object.entries(filters).every(([k, v]) => k.startsWith('!') ? r[k.slice(1)] !== v : r[k] === v)) ?? null }),
     single: async () => api.maybeSingle(),
     upsert: (row: any) => { if (!db.visitors.find((r) => r.account_id === row.account_id && r.anon_id === row.anon_id)) db.visitors.push({ id: `v${db.visitors.length + 1}`, merged_into: null, identity_source: null, member_ref: null, email: null, name: null, company: null, company_domain: null, membership: null, identity_resolved_at: null, ...row }); return { then: (f: any) => f({ error: null }) }; },
-    update: (patch: any) => ({ eq: async (_c: string, id: string) => { Object.assign(db.visitors.find((r) => r.id === id), patch); return { error: null }; } }),
+    update: (patch: any) => ({ eq: async (_c: string, id: string) => { const err = db.onUpdate?.(id, patch); if (err) return { error: err }; Object.assign(db.visitors.find((r) => r.id === id), patch); return { error: null }; } }),
     insert: async (rows: any) => { db.inserts.push(...rows); return { error: null }; },
   };
   return api;
@@ -39,7 +39,7 @@ const T = { partnerId: 'pA', accountId: 'acc', host: 'aba.copilot.test' };
 const ANON1 = 'anon_aaaaaaaaaaaaaaaa';
 const ANON2 = 'anon_bbbbbbbbbbbbbbbb';
 
-beforeEach(() => { db.visitors = []; db.rpc = []; db.inserts = []; db.selectError = false; });
+beforeEach(() => { db.visitors = []; db.rpc = []; db.inserts = []; db.selectError = false; db.onUpdate = null; });
 
 describe('visitors', () => {
   it('validates anon ids', () => {
@@ -105,6 +105,32 @@ describe('visitors', () => {
   it('getOrCreateVisitor throws on a database error', async () => {
     db.selectError = true;
     await expect(getOrCreateVisitor(T, ANON1)).rejects.toThrow(/timeout/);
+  });
+
+  it('on a unique violation (another device claimed the member first) retries the owner lookup and merges', async () => {
+    const first = await getOrCreateVisitor(T, ANON1);
+    const second = await getOrCreateVisitor(T, ANON2);
+    let raced = false;
+    db.onUpdate = (id, patch) => {
+      if (!raced && id === second.id && patch.member_ref === 'M1') {
+        raced = true;
+        // The other device wins the race between our owner lookup and our update.
+        Object.assign(db.visitors.find((r) => r.id === first.id), { member_ref: 'M1', identity_source: 'ams_login' });
+        return { code: '23505', message: 'duplicate key value violates unique constraint "visitors_member_uidx"' };
+      }
+      return null;
+    };
+    const r = await applyIdentity(T, second, { source: 'ams_login', memberRef: 'M1', company: 'Acme' });
+    expect(r.merged).toBe(true);
+    expect(r.visitor.id).toBe(first.id);
+    expect(db.rpc).toEqual([{ name: 'copilot_merge_visitor', args: { p_from: second.id, p_into: first.id } }]);
+    expect(db.visitors.find((x) => x.id === first.id).company).toBe('Acme');
+  });
+
+  it('a unique violation with no owner on retry still fails', async () => {
+    const v = await getOrCreateVisitor(T, ANON1);
+    db.onUpdate = () => ({ code: '23505', message: 'duplicate key' });
+    await expect(applyIdentity(T, v, { source: 'ams_login', memberRef: 'M1' })).rejects.toThrow(/identity update failed/);
   });
 
   it('getVisitor refuses a visitor owned by another partner, even on the same account', async () => {
