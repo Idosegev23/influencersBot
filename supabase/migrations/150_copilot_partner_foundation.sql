@@ -139,30 +139,36 @@ begin
   end loop;
 end $$;
 
--- Vault wrappers (same pattern as 075 wa_channel_*)
+-- Vault wrappers (same pattern as 075 wa_channel_*). SECURITY DEFINER: search_path lists
+-- pg_temp last so a temp object can never shadow a name, and every reference is schema-qualified.
 create or replace function public.copilot_store_secret(p_secret text)
 returns uuid language plpgsql security definer
-set search_path = public, vault, extensions as $$
+set search_path = vault, extensions, public, pg_temp as $$
 declare v_id uuid;
 begin
-  select vault.create_secret(p_secret, 'copilot_' || gen_random_uuid()::text,
+  select vault.create_secret(p_secret, 'copilot_' || pg_catalog.gen_random_uuid()::text,
                              'Co-Pilot association secret') into v_id;
   return v_id;
 end; $$;
 
+-- Reads only Co-Pilot secrets (named copilot_*): the service role cannot use this to read
+-- any other secret in the vault by id.
 create or replace function public.copilot_read_secret(p_secret_id uuid)
 returns text language plpgsql security definer
-set search_path = public, vault, extensions as $$
+set search_path = vault, extensions, public, pg_temp as $$
 declare v_secret text;
 begin
-  select decrypted_secret into v_secret from vault.decrypted_secrets where id = p_secret_id;
+  select ds.decrypted_secret into v_secret from vault.decrypted_secrets ds
+   where ds.id = p_secret_id and ds.name like 'copilot\_%';
   return v_secret;
 end; $$;
 
--- Atomic merge: move everything owned by p_from to p_into, then mark p_from merged.
+-- Atomic merge of ownership only: re-point p_from's sessions, events and earlier merges to
+-- p_into, then mark p_from merged. Profile fields (email, company, membership...) are NOT
+-- copied here; reconciling them onto p_into is the caller's job.
 create or replace function public.copilot_merge_visitor(p_from uuid, p_into uuid)
 returns void language plpgsql security definer
-set search_path = public as $$
+set search_path = public, pg_temp as $$
 declare
   v_from public.visitors;
   v_into public.visitors;
