@@ -39,8 +39,8 @@ export async function recordEvents(
   }));
   try {
     const { error } = await supabase.from('interaction_events').insert(rows);
-    if (error) console.error('[copilot/events] insert failed', ctx.accountId, error.message);
+    if (error) console.error('[copilot/events]', 'insert failed', ctx.accountId, error.message);
   } catch (e) {
-    console.error('[copilot/events] insert threw', ctx.accountId, e);
+    console.error('[copilot/events]', 'insert threw', ctx.accountId, e);
   }
 }

@@ -32,7 +32,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { getOrCreateVisitor, getVisitor, applyIdentity, isValidAnonId } from '@/lib/copilot/visitors';
+import { getOrCreateVisitor, getVisitor, applyIdentity, isValidAnonId, IdentityConflictError } from '@/lib/copilot/visitors';
 import { recordEvents } from '@/lib/copilot/events';
 
 const T = { partnerId: 'pA', accountId: 'acc', host: 'aba.copilot.test' };
@@ -70,9 +70,30 @@ describe('visitors', () => {
   it('identifying an already merged visitor again does not merge into itself', async () => {
     const first = await getOrCreateVisitor(T, ANON1);
     await applyIdentity(T, first, { source: 'ams_login', memberRef: 'M1' });
-    const again = await applyIdentity(T, (await getVisitor(T, first.id))!, { source: 'ams_login', memberRef: 'M1' });
+    const second = await getOrCreateVisitor(T, ANON2);
+    await applyIdentity(T, second, { source: 'ams_login', memberRef: 'M1' });
+    const resolved = await getVisitor(T, second.id);
+    expect(resolved!.id).toBe(first.id);
+    const again = await applyIdentity(T, resolved!, { source: 'ams_login', memberRef: 'M1' });
     expect(again.merged).toBe(false);
-    expect(db.rpc.filter((r) => r.name === 'copilot_merge_visitor')).toHaveLength(0);
+    expect(again.visitor.id).toBe(first.id);
+    expect(db.rpc.filter((r) => r.name === 'copilot_merge_visitor')).toHaveLength(1);
+  });
+
+  it('refuses to re-identify a visitor as a different member', async () => {
+    const v = await getOrCreateVisitor(T, ANON1);
+    await applyIdentity(T, v, { source: 'ams_login', memberRef: 'M1' });
+    const cur = (await getVisitor(T, v.id))!;
+    await expect(applyIdentity(T, cur, { source: 'ams_login', memberRef: 'M2' })).rejects.toBeInstanceOf(IdentityConflictError);
+    expect(db.visitors.find((r) => r.id === v.id).member_ref).toBe('M1');
+    expect(db.rpc).toHaveLength(0);
+  });
+
+  it('identifies an anonymous visitor as a member', async () => {
+    const v = await getOrCreateVisitor(T, ANON1);
+    const r = await applyIdentity(T, v, { source: 'ams_login', memberRef: 'M2' });
+    expect(r.visitor.member_ref).toBe('M2');
+    expect(db.visitors.find((x) => x.id === v.id).member_ref).toBe('M2');
   });
 
   it('getVisitor refuses a visitor from another account', async () => {

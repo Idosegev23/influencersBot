@@ -19,6 +19,9 @@ export interface VisitorRow extends VisitorIdentity {
 const COLS = 'id, partner_id, account_id, anon_id, member_ref, email, name, company, company_domain, identity_source, identity_resolved_at, membership, merged_into';
 const MAX_HOPS = 5;
 
+/** The visitor is already a different member than the one being asserted (shared device). */
+export class IdentityConflictError extends Error {}
+
 export function isValidAnonId(v: unknown): v is string {
   return typeof v === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(v);
 }
@@ -55,6 +58,9 @@ export async function getOrCreateVisitor(t: AssociationTenant, anonId: string): 
 export async function applyIdentity(
   t: AssociationTenant, v: VisitorRow, upd: IdentityUpdate,
 ): Promise<{ visitor: VisitorRow; merged: boolean }> {
+  if (v.member_ref && upd.memberRef && v.member_ref !== upd.memberRef) {
+    throw new IdentityConflictError('visitor is already identified as a different member');
+  }
   let target = v;
   let merged = false;
 
