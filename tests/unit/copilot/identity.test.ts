@@ -38,6 +38,10 @@ describe('companyFromEmail', () => {
     expect(companyFromEmail('john@comcast.net')).toBeNull();
     expect(companyFromEmail('john@sbcglobal.net')).toBeNull();
     expect(companyFromEmail('not-an-email')).toBeNull();
+    for (const a of ['a@yahoo.co.uk', 'a@hotmail.co.uk', 'a@live.co.uk', 'a@btinternet.com', 'a@rogers.com', 'a@-.com']) {
+      expect(companyFromEmail(a), a).toBeNull();
+    }
+    expect(companyFromEmail('a@greyhound.com')?.company).toBe('Greyhound');
   });
 });
 

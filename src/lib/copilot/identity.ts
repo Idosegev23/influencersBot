@@ -52,9 +52,16 @@ export function planIdentityPatch(cur: VisitorIdentity, upd: IdentityUpdate, now
   return patch;
 }
 
-const US_ISP_DOMAINS = new Set([
+const CONSUMER_ISP_DOMAINS = new Set([
   'comcast.net', 'att.net', 'sbcglobal.net', 'verizon.net', 'bellsouth.net', 'cox.net',
   'charter.net', 'earthlink.net', 'optonline.net', 'frontier.com', 'windstream.net', 'rocketmail.com',
+  'btinternet.com', 'sky.com', 'virginmedia.com', 'ntlworld.com', 'talktalk.net', 'blueyonder.co.uk',
+  'rogers.com', 'shaw.ca', 'sympatico.ca', 'bigpond.com', 'optusnet.com.au',
+]);
+/** Consumer brand labels, matched on the name label so every country variant (yahoo.co.uk) is caught. */
+const CONSUMER_BRAND_LABELS = new Set([
+  'gmail', 'googlemail', 'yahoo', 'ymail', 'hotmail', 'outlook', 'live', 'msn', 'aol', 'icloud', 'me', 'mac',
+  'gmx', 'proton', 'protonmail', 'zoho', 'yandex', 'mail', 'email',
 ]);
 const TWO_PART_SUFFIXES = new Set(['co.uk', 'org.uk', 'ac.uk', 'com.au', 'co.il', 'com.br', 'co.nz', 'co.za', 'com.mx']);
 
@@ -62,13 +69,14 @@ export function companyFromEmail(email: string): { domain: string; company: stri
   const norm = normalizeEmail(email)?.toLowerCase();
   if (!norm) return null;
   const domain = domainOf(norm);
-  if (isConsumerMailDomain(domain) || US_ISP_DOMAINS.has(domain)) return null;
+  if (isConsumerMailDomain(domain) || CONSUMER_ISP_DOMAINS.has(domain)) return null;
   const labels = domain.split('.');
   if (labels.length < 2) return null;
   const lastTwo = labels.slice(-2).join('.');
   const nameLabel = TWO_PART_SUFFIXES.has(lastTwo) ? labels[labels.length - 3] : labels[labels.length - 2];
-  if (!nameLabel) return null;
+  if (!nameLabel || CONSUMER_BRAND_LABELS.has(nameLabel)) return null;
   const company = nameLabel.split('-').filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+  if (!company) return null;
   return { domain, company };
 }
 
