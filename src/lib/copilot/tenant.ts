@@ -9,15 +9,23 @@ export interface AssociationTenant extends Tenant { accountId: string }
 
 export type TenantResult =
   | { ok: true; tenant: Tenant }
-  | { ok: false; status: 401 | 403 | 404; error: string };
+  | { ok: false; status: 401 | 403 | 404 | 503; error: string };
+
+/** A database error is not a bad key or an unknown host: say so, so callers retry instead of giving up. */
+function unavailable(what: string, err: { message?: string }): TenantResult {
+  console.error('[copilot/tenant]', what, err?.message ?? err);
+  return { ok: false, status: 503, error: 'unavailable' };
+}
 
 export async function resolveTenant(keyHash: string, host: string): Promise<TenantResult> {
-  const { data: key } = await supabase
+  const { data: key, error: keyErr } = await supabase
     .from('partner_api_keys').select('id, partner_id, status').eq('key_hash', keyHash).maybeSingle();
+  if (keyErr) return unavailable('key lookup failed', keyErr);
   if (!key || key.status !== 'active') return { ok: false, status: 401, error: 'invalid_key' };
 
-  const { data: dom } = await supabase
+  const { data: dom, error: domErr } = await supabase
     .from('tenant_domains').select('host, partner_id, account_id').eq('host', host).maybeSingle();
+  if (domErr) return unavailable('host lookup failed', domErr);
   if (!dom) return { ok: false, status: 404, error: 'unknown_host' };
   if (dom.partner_id !== key.partner_id) return { ok: false, status: 403, error: 'host_not_owned' };
 

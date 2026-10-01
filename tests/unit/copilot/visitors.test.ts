@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const db: { visitors: any[]; rpc: any[]; inserts: any[] } = { visitors: [], rpc: [], inserts: [] };
+const db: { visitors: any[]; rpc: any[]; inserts: any[]; selectError: boolean } = { visitors: [], rpc: [], inserts: [], selectError: false };
 
 function q(table: string) {
   const filters: Record<string, unknown> = {};
@@ -9,7 +9,7 @@ function q(table: string) {
     eq: (c: string, v: unknown) => { filters[c] = v; return api; },
     is: (c: string, v: unknown) => { filters[c] = v; return api; },
     neq: (c: string, v: unknown) => { filters['!' + c] = v; return api; },
-    maybeSingle: async () => ({ data: db.visitors.find((r) => Object.entries(filters).every(([k, v]) => k.startsWith('!') ? r[k.slice(1)] !== v : r[k] === v)) ?? null }),
+    maybeSingle: async () => db.selectError ? { data: null, error: { message: 'timeout' } } : ({ data: db.visitors.find((r) => Object.entries(filters).every(([k, v]) => k.startsWith('!') ? r[k.slice(1)] !== v : r[k] === v)) ?? null }),
     single: async () => api.maybeSingle(),
     upsert: (row: any) => { if (!db.visitors.find((r) => r.account_id === row.account_id && r.anon_id === row.anon_id)) db.visitors.push({ id: `v${db.visitors.length + 1}`, merged_into: null, identity_source: null, member_ref: null, email: null, name: null, company: null, company_domain: null, membership: null, identity_resolved_at: null, ...row }); return { then: (f: any) => f({ error: null }) }; },
     update: (patch: any) => ({ eq: async (_c: string, id: string) => { Object.assign(db.visitors.find((r) => r.id === id), patch); return { error: null }; } }),
@@ -39,7 +39,7 @@ const T = { partnerId: 'pA', accountId: 'acc', host: 'aba.copilot.test' };
 const ANON1 = 'anon_aaaaaaaaaaaaaaaa';
 const ANON2 = 'anon_bbbbbbbbbbbbbbbb';
 
-beforeEach(() => { db.visitors = []; db.rpc = []; db.inserts = []; });
+beforeEach(() => { db.visitors = []; db.rpc = []; db.inserts = []; db.selectError = false; });
 
 describe('visitors', () => {
   it('validates anon ids', () => {
@@ -94,6 +94,17 @@ describe('visitors', () => {
     const r = await applyIdentity(T, v, { source: 'ams_login', memberRef: 'M2' });
     expect(r.visitor.member_ref).toBe('M2');
     expect(db.visitors.find((x) => x.id === v.id).member_ref).toBe('M2');
+  });
+
+  it('getVisitor throws on a database error instead of reporting an unknown visitor', async () => {
+    const v = await getOrCreateVisitor(T, ANON1);
+    db.selectError = true;
+    await expect(getVisitor(T, v.id)).rejects.toThrow(/timeout/);
+  });
+
+  it('getOrCreateVisitor throws on a database error', async () => {
+    db.selectError = true;
+    await expect(getOrCreateVisitor(T, ANON1)).rejects.toThrow(/timeout/);
   });
 
   it('getVisitor refuses a visitor from another account', async () => {

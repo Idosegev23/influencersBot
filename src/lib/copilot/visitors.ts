@@ -27,7 +27,8 @@ export function isValidAnonId(v: unknown): v is string {
 }
 
 async function byId(id: string): Promise<VisitorRow | null> {
-  const { data } = await supabase.from('visitors').select(COLS).eq('id', id).maybeSingle();
+  const { data, error } = await supabase.from('visitors').select(COLS).eq('id', id).maybeSingle();
+  if (error) throw new Error(`visitor read failed: ${error.message}`);
   return (data as VisitorRow) ?? null;
 }
 
@@ -47,8 +48,9 @@ export async function getOrCreateVisitor(t: AssociationTenant, anonId: string): 
     { partner_id: t.partnerId, account_id: t.accountId, anon_id: anonId },
     { onConflict: 'account_id,anon_id', ignoreDuplicates: true },
   );
-  const { data } = await supabase.from('visitors').select(COLS)
+  const { data, error } = await supabase.from('visitors').select(COLS)
     .eq('account_id', t.accountId).eq('anon_id', anonId).maybeSingle();
+  if (error) throw new Error(`visitor read failed: ${error.message}`);
   const v = await followMerges(data as VisitorRow);
   if (!v) throw new Error('visitor upsert returned nothing');
   await supabase.from('visitors').update({ last_seen: new Date().toISOString() }).eq('id', v.id);

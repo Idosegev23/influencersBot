@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const rows: Record<string, any> = {};
+const failing = new Set<string>();
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: (table: string) => ({
       select: () => ({
-        eq: (_c: string, v: string) => ({ maybeSingle: async () => ({ data: rows[table]?.[v] ?? null }) }),
+        eq: (_c: string, v: string) => ({ maybeSingle: async () => failing.has(table)
+          ? { data: null, error: { message: 'connection reset' } }
+          : { data: rows[table]?.[v] ?? null, error: null } }),
       }),
       update: () => ({ eq: () => ({ then: (fn: any) => fn() }) }),
     }),
@@ -18,6 +21,7 @@ import { hashPartnerKey } from '@/lib/copilot/keys';
 
 const KEY_A = 'cpk_partnerA';
 beforeEach(() => {
+  failing.clear();
   rows.partner_api_keys = {
     [hashPartnerKey(KEY_A)]: { id: 'k1', partner_id: 'pA', status: 'active' },
     [hashPartnerKey('cpk_revoked')]: { id: 'k2', partner_id: 'pA', status: 'revoked' },
@@ -46,6 +50,29 @@ describe('resolveTenant', () => {
     expect(await resolveTenant(hashPartnerKey('cpk_nope'), 'aba.copilot.test')).toMatchObject({ ok: false, status: 401 });
     expect(await resolveTenant(hashPartnerKey('cpk_revoked'), 'aba.copilot.test')).toMatchObject({ ok: false, status: 401 });
     expect(await resolveTenant(hashPartnerKey(KEY_A), 'missing.test')).toMatchObject({ ok: false, status: 404 });
+  });
+});
+
+describe('resolveTenant on database errors', () => {
+  it('returns 503 unavailable, not 401, when the key read fails', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    failing.add('partner_api_keys');
+    expect(await resolveTenant(hashPartnerKey(KEY_A), 'aba.copilot.test')).toEqual({ ok: false, status: 503, error: 'unavailable' });
+    expect(err).toHaveBeenCalledWith('[copilot/tenant]', expect.anything(), expect.anything());
+    err.mockRestore();
+  });
+  it('returns 503 unavailable, not 404, when the host read fails', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    failing.add('tenant_domains');
+    expect(await resolveTenant(hashPartnerKey(KEY_A), 'aba.copilot.test')).toEqual({ ok: false, status: 503, error: 'unavailable' });
+    err.mockRestore();
+  });
+  it('requireTenant answers 503 on a database error', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    failing.add('partner_api_keys');
+    const t = await requireTenant(req({ authorization: `Bearer ${KEY_A}`, 'x-tenant-host': 'aba.copilot.test' }), { association: true });
+    expect((t as Response).status).toBe(503);
+    err.mockRestore();
   });
 });
 
