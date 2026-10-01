@@ -31,6 +31,9 @@ const RATE_LIMITS = {
   // office NAT shares a single IP bucket — the 200/min widget bucket would 429
   // them mid-browse and put an error where the customer's site should be.
   widgetPreview: { windowMs: 60 * 1000, maxRequests: 1000 },
+  // Co-Pilot partner API: server-to-server and browser calls on behalf of a
+  // partner's visitors, keyed per partner key (not per IP) — see below.
+  partner: { windowMs: 60 * 1000, maxRequests: 600 },
 };
 
 /**
@@ -67,6 +70,11 @@ function getClientIP(request: NextRequest): string {
   
   // Fallback
   return 'unknown';
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 function checkRateLimit(
@@ -234,6 +242,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/api/')) {
     let config = RATE_LIMITS.admin;
     let prefix = 'api';
+    let subject = ip;
     
     // Different limits for different endpoints
     if (pathname.startsWith('/api/widget/diagnostics')) {
@@ -257,6 +266,13 @@ export async function middleware(request: NextRequest) {
       // silently arrive with no photo.
       config = RATE_LIMITS.widget;
       prefix = 'wa';
+    } else if (pathname.startsWith('/api/partner/')) {
+      // Keyed on a hash of the partner's bearer key, so one partner's traffic from many
+      // visitors does not share a single IP bucket. The raw key never lands in the store.
+      config = RATE_LIMITS.partner;
+      prefix = 'partner';
+      const bearer = request.headers.get('authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
+      if (bearer) subject = `key:${await sha256Hex(bearer)}`;
     } else if (pathname.startsWith('/api/chat')) {
       config = RATE_LIMITS.chat;
       prefix = 'chat';
@@ -268,7 +284,7 @@ export async function middleware(request: NextRequest) {
       prefix = 'influencer';
     }
     
-    const key = `${prefix}:${ip}`;
+    const key = `${prefix}:${subject}`;
     const result = checkRateLimit(key, config);
     
     if (!result.success) {
