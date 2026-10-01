@@ -11,7 +11,7 @@ export async function requireTenant(req: Request, opts: { association: boolean }
   const host = normalizeHost(req.headers.get('x-tenant-host'));
   if (!host) return refuse(400, 'missing_host');
   const r = await resolveTenant(hashPartnerKey(token), host);
-  if (!r.ok) return refuse(r.status, r.error);
+  if (r.ok === false) return refuse(r.status, r.error);
   if (opts.association && !r.tenant.accountId) return refuse(400, 'association_host_required');
   return r.tenant;
 }
