@@ -47,14 +47,14 @@ export async function POST(req: Request) {
 
   const assoc = await loadAssociation(tenant);
   const ams = getAmsAdapter(assoc?.config);
-  const sessionId = typeof body.sessionId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.sessionId) ? body.sessionId : null;
-  const events: InteractionEventInput[] = [];
+  const requestedSessionId = typeof body.sessionId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.sessionId) ? body.sessionId : null;
+  let amsUnavailable = false;
   let member: MemberSnapshot | null = null;
   if (ams) {
     try { member = await ams.getMember(memberRef); }
     catch (e) {
       if (!(e instanceof AmsUnavailableError)) throw e;
-      events.push({ type: 'ams_unavailable', sessionId, payload: { during: 'identify' } });
+      amsUnavailable = true;
     }
   }
 
@@ -73,12 +73,18 @@ export async function POST(req: Request) {
   }
   const { visitor: v, merged } = applied;
 
-  if (sessionId) {
-    const { error } = await supabase.from('chat_sessions').update({ identified_at: new Date().toISOString(), visitor_id: v.id })
-      .eq('id', sessionId).eq('account_id', tenant.accountId)
-      .or(`visitor_id.is.null,visitor_id.eq.${visitor.id},visitor_id.eq.${v.id}`);
+  // Link only a session this visitor (pre-merge or merged profile) already owns; events carry it only if it linked.
+  let sessionId: string | null = null;
+  if (requestedSessionId) {
+    const { data, error } = await supabase.from('chat_sessions').update({ identified_at: new Date().toISOString(), visitor_id: v.id })
+      .eq('id', requestedSessionId).eq('account_id', tenant.accountId)
+      .or(`visitor_id.eq.${visitor.id},visitor_id.eq.${v.id}`)
+      .select('id');
     if (error) console.error('[copilot/identify]', 'session link failed', error.message);
+    else if (Array.isArray(data) && data.length > 0) sessionId = requestedSessionId;
   }
+  const events: InteractionEventInput[] = [];
+  if (amsUnavailable) events.push({ type: 'ams_unavailable', sessionId, payload: { during: 'identify' } });
   events.push({ type: 'identified', sessionId, payload: { source, merged } });
   await recordEvents({ partnerId: tenant.partnerId, accountId: tenant.accountId, visitorId: v.id, industry: assoc?.industry ?? null }, events);
 
