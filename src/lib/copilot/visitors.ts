@@ -40,7 +40,7 @@ async function followMerges(v: VisitorRow | null): Promise<VisitorRow | null> {
 
 export async function getVisitor(t: AssociationTenant, visitorId: string): Promise<VisitorRow | null> {
   const v = await followMerges(await byId(visitorId));
-  return v && v.account_id === t.accountId ? v : null;
+  return v && v.account_id === t.accountId && v.partner_id === t.partnerId ? v : null;
 }
 
 export async function getOrCreateVisitor(t: AssociationTenant, anonId: string): Promise<VisitorRow> {

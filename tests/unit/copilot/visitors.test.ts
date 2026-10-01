@@ -107,6 +107,12 @@ describe('visitors', () => {
     await expect(getOrCreateVisitor(T, ANON1)).rejects.toThrow(/timeout/);
   });
 
+  it('getVisitor refuses a visitor owned by another partner, even on the same account', async () => {
+    const v = await getOrCreateVisitor(T, ANON1);
+    expect(await getVisitor({ ...T, partnerId: 'pB' }, v.id)).toBeNull();
+    expect((await getVisitor(T, v.id))!.id).toBe(v.id);
+  });
+
   it('getVisitor refuses a visitor from another account', async () => {
     const v = await getOrCreateVisitor(T, ANON1);
     expect(await getVisitor({ ...T, accountId: 'other' }, v.id)).toBeNull();
