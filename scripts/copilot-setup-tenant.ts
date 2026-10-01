@@ -18,6 +18,17 @@ const flag = (n: string) => { const i = args.indexOf(`--${n}`); return i >= 0 ? 
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)!, { auth: { persistSession: false } });
 
+async function ensureHost(host: string, partnerId: string, accountId: string | null, kind: string) {
+  const { data: row, error: sErr } = await sb.from('tenant_domains').select('host, partner_id, account_id').eq('host', host).maybeSingle();
+  if (sErr) throw new Error(`tenant_domains select: ${sErr.message}`);
+  if (row) {
+    if (row.partner_id !== partnerId || (row.account_id ?? null) !== accountId) throw new Error(`host ${host} already belongs to another tenant`);
+    return;
+  }
+  const { error: iErr } = await sb.from('tenant_domains').insert({ host, partner_id: partnerId, account_id: accountId, kind });
+  if (iErr) throw new Error(`tenant_domains insert: ${iErr.message}`);
+}
+
 async function main() {
   const slug = flag('partner');
   const name = flag('partner-name');
@@ -29,7 +40,7 @@ async function main() {
 
   const partnerHost = normalizeHost(flag('partner-host'));
   if (partnerHost) {
-    await sb.from('tenant_domains').upsert({ host: partnerHost, partner_id: partner.id, account_id: null, kind: 'subdomain' });
+    await ensureHost(partnerHost, partner.id, null, 'subdomain');
     console.log('partner host', partnerHost);
   }
 
@@ -57,7 +68,7 @@ async function main() {
     config.copilot = copilot;
     const { error: uErr } = await sb.from('accounts').update({ partner_id: partner.id, config }).eq('id', accountId);
     if (uErr) throw new Error(`account: ${uErr.message}`);
-    await sb.from('tenant_domains').upsert({ host, partner_id: partner.id, account_id: accountId, kind: 'subdomain' });
+    await ensureHost(host, partner.id, accountId, 'subdomain');
     console.log('association', accountId, 'on', host);
     if (newSecret) console.log('\nIDENTIFY SECRET (shown once, give to the association developer):\n' + newSecret + '\n');
   }
