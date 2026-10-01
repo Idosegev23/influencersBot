@@ -9,6 +9,9 @@
 -- Service role only: RLS on, no anon/authenticated grants.
 -- ==================================================
 
+-- accounts and chat_sessions are hot tables: fail fast instead of queueing behind locks.
+set lock_timeout = '3s';
+
 create table public.partners (
   id          uuid primary key default gen_random_uuid(),
   slug        text not null unique check (slug ~ '^[a-z0-9-]{2,40}$'),
@@ -38,6 +41,9 @@ create table public.tenant_domains (
   created_at   timestamptz not null default now()
 );
 create index tenant_domains_account_idx on public.tenant_domains(account_id);
+create index tenant_domains_partner_idx on public.tenant_domains(partner_id);
+
+create index partner_api_keys_partner_idx on public.partner_api_keys(partner_id);
 
 create table public.console_users (
   id             uuid primary key default gen_random_uuid(),
@@ -78,12 +84,13 @@ create table public.visitors (
   membership            jsonb,
   first_seen            timestamptz not null default now(),
   last_seen             timestamptz not null default now(),
-  merged_into           uuid references public.visitors(id),
+  merged_into           uuid references public.visitors(id) on delete set null,
   unique (account_id, anon_id)
 );
 create unique index visitors_member_uidx on public.visitors(account_id, member_ref)
   where member_ref is not null and merged_into is null;
 create index visitors_partner_idx on public.visitors(partner_id, last_seen desc);
+create index visitors_merged_into_idx on public.visitors(merged_into) where merged_into is not null;
 
 create table public.interaction_events (
   id           uuid primary key default gen_random_uuid(),
@@ -97,13 +104,29 @@ create table public.interaction_events (
   industry     text,
   occurred_at  timestamptz not null default now()
 );
+create index interaction_events_session_idx on public.interaction_events(session_id) where session_id is not null;
 create index interaction_events_account_idx on public.interaction_events(account_id, occurred_at desc);
 create index interaction_events_visitor_idx on public.interaction_events(visitor_id, occurred_at desc);
 create index interaction_events_partner_type_idx on public.interaction_events(partner_id, type, occurred_at desc);
 
-alter table public.accounts add column partner_id uuid references public.partners(id);
-alter table public.chat_sessions add column visitor_id uuid references public.visitors(id);
+-- Hot tables: add plain nullable columns (no inline REFERENCES), then the FK as
+-- NOT VALID + VALIDATE so the heavy lock is not held during a full scan.
+alter table public.accounts add column partner_id uuid;
+alter table public.chat_sessions add column visitor_id uuid;
 alter table public.chat_sessions add column identified_at timestamptz;
+
+-- On purpose restrict (default): a partner that still has associations cannot be deleted by accident.
+alter table public.accounts add constraint accounts_partner_id_fkey
+  foreign key (partner_id) references public.partners(id) not valid;
+alter table public.accounts validate constraint accounts_partner_id_fkey;
+
+alter table public.chat_sessions add constraint chat_sessions_visitor_id_fkey
+  foreign key (visitor_id) references public.visitors(id) on delete set null not valid;
+alter table public.chat_sessions validate constraint chat_sessions_visitor_id_fkey;
+
+create index accounts_partner_idx on public.accounts(partner_id) where partner_id is not null;
+-- Plain CREATE INDEX (CONCURRENTLY cannot run inside the migration transaction). Acceptable:
+-- the column is all NULL here, so the partial index (where visitor_id is not null) is near-empty.
 create index chat_sessions_visitor_idx on public.chat_sessions(visitor_id) where visitor_id is not null;
 
 -- RLS: service role only
@@ -141,11 +164,34 @@ end; $$;
 create or replace function public.copilot_merge_visitor(p_from uuid, p_into uuid)
 returns void language plpgsql security definer
 set search_path = public as $$
+declare
+  v_from public.visitors;
+  v_into public.visitors;
 begin
   if p_from = p_into then return; end if;
+
+  -- Lock both rows in id order (deadlock-safe against concurrent merges).
+  perform 1 from public.visitors where id in (p_from, p_into) order by id for update;
+  select * into v_from from public.visitors where id = p_from;
+  select * into v_into from public.visitors where id = p_into;
+
+  if v_from.id is null or v_into.id is null then
+    raise exception 'copilot_merge_visitor: visitor not found';
+  end if;
+  if v_from.account_id <> v_into.account_id or v_from.partner_id <> v_into.partner_id then
+    raise exception 'copilot_merge_visitor: visitors belong to different account or partner';
+  end if;
+  if v_into.merged_into is not null then
+    raise exception 'copilot_merge_visitor: target visitor is already merged';
+  end if;
+  if v_from.merged_into is not null then
+    raise exception 'copilot_merge_visitor: source visitor is already merged';
+  end if;
+
   update public.chat_sessions      set visitor_id = p_into where visitor_id = p_from;
   update public.interaction_events set visitor_id = p_into where visitor_id = p_from;
-  update public.visitors set merged_into = p_into where merged_into = p_from;            -- re-point earlier merges
+  -- re-point earlier merges (cannot self-cycle: p_into.merged_into is null, checked above)
+  update public.visitors set merged_into = p_into where merged_into = p_from and id <> p_into;
   update public.visitors
      set merged_into = p_into,
          member_ref  = null,
