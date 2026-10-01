@@ -73,6 +73,11 @@ const PROVIDERS = [
 ];
 const PROVIDER_SET = new Set(PROVIDERS);
 
+/** True for consumer mailbox providers (gmail.com, outlook.com, ...). */
+export function isConsumerMailDomain(domain: string): boolean {
+  return PROVIDER_SET.has(domain.toLowerCase());
+}
+
 /**
  * Domains observed in production that are dead, or are live lookalikes.
  *
