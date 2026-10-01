@@ -31,6 +31,9 @@ describe('identify signature', () => {
     expect(verifyIdentify(S, { ...c, memberId: '' }, 'ab', NOW)).toBe('malformed');
     expect(verifyIdentify(S, c, 'not-hex', NOW)).toBe('malformed');
     expect(verifyIdentify(S, { ...c, memberId: 'a|b' }, signIdentify(S, c), NOW)).toBe('malformed');
+    expect(verifyIdentify(S, { memberId: 'M-1', email: undefined as any, ts: NOW }, 'a'.repeat(64), NOW)).toBe('malformed');
+    expect(verifyIdentify(S, { memberId: 123 as any, email: null, ts: NOW }, 'a'.repeat(64), NOW)).toBe('malformed');
+    expect(verifyIdentify(S, { memberId: 'M-1', email: null, ts: '1' as any }, 'a'.repeat(64), NOW)).toBe('malformed');
   });
 });
 

@@ -20,7 +20,9 @@ function hmac(secret: string, msg: string): Buffer {
 }
 
 function claimsValid(memberId: string, email: string | null): boolean {
+  if (typeof memberId !== 'string') return false;
   if (!memberId || memberId.length > 128 || memberId.includes('|')) return false;
+  if (email !== null && typeof email !== 'string') return false;
   if (email !== null && (email.length > 254 || email.includes('|'))) return false;
   return true;
 }
@@ -36,7 +38,8 @@ export function signIdentify(secret: string, c: IdentifyClaims): string {
 export function verifyIdentify(
   secret: string, c: IdentifyClaims, signature: string, now: number = Date.now(),
 ): 'ok' | 'bad_signature' | 'expired' | 'malformed' {
-  if (!claimsValid(c.memberId, c.email) || !Number.isFinite(c.ts)) return 'malformed';
+  if (typeof c.ts !== 'number' || !Number.isFinite(c.ts)) return 'malformed';
+  if (!claimsValid(c.memberId, c.email)) return 'malformed';
   if (typeof signature !== 'string' || !/^[0-9a-f]{64}$/i.test(signature)) return 'malformed';
   if (Math.abs(now - c.ts) > IDENTIFY_MAX_AGE_MS) return 'expired';
   const expected = hmac(secret, identifyMessage(c));
