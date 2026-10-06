@@ -6,6 +6,22 @@ export const runtime = 'nodejs';
 
 const RESOLVED_STATUSES = ['resolved', 'closed', 'cancelled'] as const;
 
+// PostgREST returns at most 1,000 rows per request. LA BEAUTÉ writes ~10k
+// history rows a month, so a single query silently showed an agent who
+// worked ~1,000 tickets as having worked 16. Read every page.
+const PAGE = 1000;
+async function fetchAll<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<{ rows: T[]; error: unknown }> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) return { rows, error };
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE) return { rows, error: null };
+  }
+}
+
 /**
  * Admin-only: support analytics for the logged-in agent's account.
  *
@@ -39,14 +55,18 @@ export async function GET(req: NextRequest) {
   const toIso = url.searchParams.get('to') || now.toISOString();
 
   // 1) Per-status totals (windowed) + overall counts
-  const { data: ticketRows, error: tErr } = await supabase
-    .from('support_requests')
-    .select(
-      'id, status, assigned_agent_id, created_at, resolved_at, delivered_at, feedback_status, feedback_sent_at, feedback_responded_at',
-    )
-    .eq('account_id', session.account_id)
-    .gte('created_at', fromIso)
-    .lte('created_at', toIso);
+  const { rows: ticketRows, error: tErr } = await fetchAll((from, to) =>
+    supabase
+      .from('support_requests')
+      .select(
+        'id, status, assigned_agent_id, created_at, resolved_at, delivered_at, feedback_status, feedback_sent_at, feedback_responded_at',
+      )
+      .eq('account_id', session.account_id)
+      .gte('created_at', fromIso)
+      .lte('created_at', toIso)
+      .order('id')
+      .range(from, to),
+  );
 
   if (tErr) {
     console.error('[analytics] tickets fetch:', tErr);
@@ -62,9 +82,8 @@ export async function GET(req: NextRequest) {
   // 2) Per-agent breakdown — based on history rows (who touched what)
   const { data: agents } = await supabase
     .from('support_agents')
-    .select('id, first_name, last_name, is_admin, last_login_at')
-    .eq('account_id', session.account_id)
-    .eq('is_active', true);
+    .select('id, first_name, last_name, is_admin, is_active, last_login_at')
+    .eq('account_id', session.account_id);
 
   const agentMap = new Map<string, any>();
   for (const a of agents || []) {
@@ -72,6 +91,7 @@ export async function GET(req: NextRequest) {
       id: a.id,
       display_name: `${a.first_name} ${a.last_name}`,
       is_admin: a.is_admin,
+      is_active: a.is_active,
       last_login_at: a.last_login_at,
       tickets_touched: 0,
       tickets_resolved: 0,
@@ -79,27 +99,38 @@ export async function GET(req: NextRequest) {
       avg_resolution_minutes: null as number | null,
       _resolution_minutes: [] as number[],
       _touched_ticket_ids: new Set<string>(),
+      _resolved_ticket_ids: new Set<string>(),
     });
   }
 
   // History within window — for "tickets touched" + activity feed
-  const { data: histRows } = await supabase
-    .from('support_ticket_history')
-    .select('id, ticket_id, action, actor, actor_agent_id, from_status, to_status, note, created_at')
-    .eq('account_id', session.account_id)
-    .gte('created_at', fromIso)
-    .lte('created_at', toIso)
-    .order('created_at', { ascending: false });
-
-  const history = histRows || [];
+  const { rows: history, error: hErr } = await fetchAll((from, to) =>
+    supabase
+      .from('support_ticket_history')
+      .select('id, ticket_id, action, actor, actor_agent_id, from_status, to_status, note, created_at')
+      .eq('account_id', session.account_id)
+      .gte('created_at', fromIso)
+      .lte('created_at', toIso)
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to),
+  );
+  if (hErr) {
+    console.error('[analytics] history fetch:', hErr);
+    return NextResponse.json({ error: 'db_error' }, { status: 500 });
+  }
 
   for (const h of history) {
     if (!h.actor_agent_id) continue;
+    // Auto-assignment rows carry the *receiving* agent in actor_agent_id
+    // with actor='system'. They are not work the agent did: a brand-new
+    // agent who never logged in showed dozens of "handled" tickets.
+    if (!h.actor || h.actor === 'system') continue;
     const a = agentMap.get(h.actor_agent_id);
     if (!a) continue;
     a._touched_ticket_ids.add(h.ticket_id);
     if (h.action === 'status_change' && h.to_status && RESOLVED_STATUSES.includes(h.to_status as any)) {
-      a.tickets_resolved += 1;
+      a._resolved_ticket_ids.add(h.ticket_id);
     }
   }
 
@@ -126,10 +157,15 @@ export async function GET(req: NextRequest) {
         ? Math.round(arr.reduce((s: number, n: number) => s + n, 0) / arr.length)
         : null;
       a.tickets_touched = a._touched_ticket_ids.size;
+      a.tickets_resolved = a._resolved_ticket_ids.size;
       delete a._resolution_minutes;
       delete a._touched_ticket_ids;
+      delete a._resolved_ticket_ids;
       return a;
     })
+    // Deactivated agents stay in the table for the window they worked in,
+    // otherwise their tickets vanish from the team's totals.
+    .filter((a: any) => a.is_active || a.tickets_touched > 0 || a.tickets_assigned_open > 0)
     .sort((a: any, b: any) => b.tickets_touched - a.tickets_touched);
 
   // 3) Overall avg resolution time across the window

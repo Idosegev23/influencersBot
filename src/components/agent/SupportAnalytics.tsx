@@ -43,6 +43,7 @@ type AgentRow = {
   id: string;
   display_name: string;
   is_admin: boolean;
+  is_active?: boolean;
   last_login_at: string | null;
   tickets_touched: number;
   tickets_resolved: number;
@@ -323,7 +324,7 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
             label="זמן טיפול ממוצע"
             value={formatMinutes(data.overall.avg_resolution_minutes)}
           />
-          <KpiCard icon={<Users className="w-4 h-4" />} label="סוכנות פעילות" value={data.agents.length.toString()} />
+          <KpiCard icon={<Users className="w-4 h-4" />} label="סוכנות פעילות" value={data.agents.filter((a) => a.is_active !== false).length.toString()} />
         </div>
 
         {/* Feedback funnel */}
@@ -397,6 +398,11 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
                       {a.is_admin && (
                         <span className="mr-2 px-1.5 py-0.5 rounded text-[10px]" style={{ background: '#883fe2', color: '#fff' }}>
                           אדמין
+                        </span>
+                      )}
+                      {a.is_active === false && (
+                        <span className="mr-2 px-1.5 py-0.5 rounded text-[10px]" style={{ background: 'rgba(255,255,255,0.1)', color: '#9ca3af' }}>
+                          מושבת/ת
                         </span>
                       )}
                     </td>
