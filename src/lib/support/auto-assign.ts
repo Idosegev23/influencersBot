@@ -1,18 +1,18 @@
 /**
- * Auto-assignment for new support tickets — load-balanced.
+ * Auto-assignment for new support tickets.
  *
- * When a new support_requests row is created we:
- *   1. Assign the new ticket to the agent with the FEWEST open tickets
- *      (random tiebreak among equally-loaded agents).
- *   2. Run a bounded rebalance pass that moves still-untouched
- *      (status='new') tickets from the heaviest agents to the lightest,
- *      so workload stays approximately even across the team even when
- *      some agents close faster than others.
+ * Rule: a ticket is assigned once, at the moment it arrives, and the
+ * system never moves it afterwards. An earlier version also "rebalanced"
+ * the backlog by moving status='new' tickets from busy agents to idle
+ * ones. In practice agents often handle a ticket without touching its
+ * status, so adding one agent to LA BEAUTÉ (2026-10-06) moved ~130
+ * already-handled tickets onto her, ping-ponging ~1,200 times in 17
+ * minutes. Moving an existing ticket is now a human decision only.
  *
- * Only `status='new'` tickets are eligible for rebalancing — once an
- * agent has set the status to anything else (in_progress, awaiting_customer,
- * shipped) the ticket is theirs; reassigning mid-handling would surprise
- * both the customer and the agent.
+ * Load = tickets assigned to the agent that arrived in the last 24 hours.
+ * Counting the whole open backlog would send every new ticket to a newly
+ * added agent for weeks; a 24h window balances the incoming flow and a
+ * new agent catches up within a day.
  *
  * Best-effort throughout: any failure logs and returns; the user-facing
  * ticket-creation flow never blocks on assignment.
@@ -28,20 +28,10 @@ export type AssignableAgent = {
 
 type AgentLoad = {
   agent: AssignableAgent;
-  openCount: number;
+  recentCount: number;
 };
 
-const TERMINAL_STATUSES = ['resolved', 'closed', 'cancelled'] as const;
-
-// Cap moves per trigger so a one-time backlog can't stall a single
-// ticket-creation request. The trigger runs again on every new ticket,
-// so the system converges over a handful of creations even when the
-// starting imbalance is large.
-const MAX_REBALANCE_MOVES = 50;
-
-// Don't reassign once the gap is small — without a threshold the queue
-// would thrash on ties. 1 means we stop when max-min <= 1.
-const MIN_GAP_TO_REBALANCE = 1;
+const LOAD_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 async function fetchAgentLoads(accountId: string): Promise<AgentLoad[]> {
   // is_routable is independent of is_active — an agent can keep login access
@@ -57,14 +47,13 @@ async function fetchAgentLoads(accountId: string): Promise<AgentLoad[]> {
 
   if (aErr || !agents || agents.length === 0) return [];
 
-  const agentIds = agents.map((a) => a.id);
+  const since = new Date(Date.now() - LOAD_WINDOW_MS).toISOString();
   const { data: tickets, error: tErr } = await supabase
     .from('support_requests')
     .select('assigned_agent_id')
-    .in('assigned_agent_id', agentIds)
-    .neq('status', 'resolved')
-    .neq('status', 'closed')
-    .neq('status', 'cancelled');
+    .eq('account_id', accountId)
+    .in('assigned_agent_id', agents.map((a) => a.id))
+    .gte('created_at', since);
 
   if (tErr) {
     console.warn('[auto-assign] count query failed:', tErr.message);
@@ -83,104 +72,34 @@ async function fetchAgentLoads(accountId: string): Promise<AgentLoad[]> {
       display_name: `${a.first_name} ${a.last_name}`,
       is_admin: !!a.is_admin,
     },
-    openCount: counts.get(a.id) || 0,
+    recentCount: counts.get(a.id) || 0,
   }));
 }
 
 function pickLightest(loads: AgentLoad[]): AgentLoad | null {
   if (loads.length === 0) return null;
-  // Random tiebreak: shuffle equally-loaded agents before picking the
-  // minimum, so the same agent doesn't always win when counts are tied.
+  // Random tiebreak so the same agent doesn't always win when counts are tied.
   const sorted = [...loads].sort((a, b) => {
-    if (a.openCount !== b.openCount) return a.openCount - b.openCount;
+    if (a.recentCount !== b.recentCount) return a.recentCount - b.recentCount;
     return Math.random() - 0.5;
   });
   return sorted[0];
 }
 
-async function moveOneNewTicket(
-  accountId: string,
-  fromAgent: AssignableAgent,
-  toAgent: AssignableAgent,
-): Promise<boolean> {
-  const { data: ticket } = await supabase
-    .from('support_requests')
-    .select('id')
-    .eq('account_id', accountId)
-    .eq('assigned_agent_id', fromAgent.id)
-    .eq('status', 'new')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (!ticket) return false;
-
-  const { error: updErr, data: updated } = await supabase
-    .from('support_requests')
-    .update({
-      assigned_agent_id: toAgent.id,
-      assigned_to: toAgent.display_name,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', ticket.id)
-    .eq('status', 'new') // status changed under us → don't move
-    .select('id')
-    .maybeSingle();
-  if (updErr || !updated) {
-    if (updErr) console.warn('[auto-assign rebalance] update failed:', updErr.message);
-    return false;
-  }
-
-  await supabase.from('support_ticket_history').insert({
-    ticket_id: ticket.id,
-    account_id: accountId,
-    action: 'assigned',
-    actor: 'system',
-    actor_agent_id: toAgent.id,
-    note: `איזון עומס: הועברה מ-${fromAgent.display_name} ל-${toAgent.display_name}`,
-  });
-  return true;
-}
-
-async function rebalance(accountId: string, loads: AgentLoad[]): Promise<number> {
-  let moves = 0;
-  while (moves < MAX_REBALANCE_MOVES) {
-    const sorted = [...loads].sort((a, b) => b.openCount - a.openCount);
-    const heavy = sorted[0];
-    const light = sorted[sorted.length - 1];
-    if (heavy.openCount - light.openCount <= MIN_GAP_TO_REBALANCE) break;
-
-    const moved = await moveOneNewTicket(accountId, heavy.agent, light.agent);
-    if (!moved) {
-      // Heavy has no movable 'new' tickets — its load is locked. Drop
-      // it from the pool and retry with the next-heaviest. Without this
-      // we'd loop forever on an agent whose tickets are all in_progress.
-      heavy.openCount = -Infinity;
-      continue;
-    }
-    // Update in-memory counts so the next iteration's sort is correct
-    // without re-querying the DB.
-    heavy.openCount -= 1;
-    light.openCount += 1;
-    moves++;
-  }
-  return moves;
-}
-
 /**
- * Auto-assign a freshly-created ticket and rebalance the team's queue.
- * Returns the agent the new ticket was assigned to (or null if there
- * are no eligible agents on the account).
+ * Assign a freshly-created, still-unassigned ticket. Never touches any
+ * other ticket. Returns the agent it went to, or null if there are no
+ * eligible agents on the account.
  */
 export async function autoAssignNewTicket(
   ticketId: string,
   accountId: string,
 ): Promise<AssignableAgent | null> {
   try {
-    const loads = await fetchAgentLoads(accountId);
-    const target = pickLightest(loads);
+    const target = pickLightest(await fetchAgentLoads(accountId));
     if (!target) return null;
 
-    const { error: updErr } = await supabase
+    const { data: updated, error: updErr } = await supabase
       .from('support_requests')
       .update({
         assigned_agent_id: target.agent.id,
@@ -188,12 +107,15 @@ export async function autoAssignNewTicket(
         updated_at: new Date().toISOString(),
       })
       .eq('id', ticketId)
-      .is('assigned_agent_id', null);
+      .is('assigned_agent_id', null)
+      .select('id')
+      .maybeSingle();
 
     if (updErr) {
       console.warn('[auto-assign] update failed:', updErr.message);
       return null;
     }
+    if (!updated) return null; // someone assigned it first
 
     await supabase.from('support_ticket_history').insert({
       ticket_id: ticketId,
@@ -203,14 +125,6 @@ export async function autoAssignNewTicket(
       actor_agent_id: target.agent.id,
       note: target.agent.display_name,
     });
-
-    // Reflect the newly-assigned ticket in the in-memory count before
-    // rebalancing, then redistribute backlog from heavy agents.
-    target.openCount += 1;
-    const moves = await rebalance(accountId, loads);
-    if (moves > 0) {
-      console.log(`[auto-assign] rebalanced ${moves} ticket(s) for account ${accountId}`);
-    }
 
     return target.agent;
   } catch (e) {

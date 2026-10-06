@@ -79,12 +79,8 @@ export default function AgentManagement({ accountUsername }: { accountUsername: 
     setBusyId(agent.id);
     setMessage(null);
     try {
-      const body = await call('PATCH', { id: agent.id, ...patch });
-      let text = okText;
-      if (patch.is_active === false && body.freed > 0) {
-        text += `. ${body.freed} פניות פתוחות שוחררו, ${body.reassigned} מהן חולקו מחדש לנציגים אחרים`;
-      }
-      setMessage({ kind: 'ok', text });
+      await call('PATCH', { id: agent.id, ...patch });
+      setMessage({ kind: 'ok', text: okText });
       await load();
       return true;
     } catch (e) {
@@ -262,7 +258,10 @@ export default function AgentManagement({ accountUsername }: { accountUsername: 
                     danger
                     title={isSelf ? 'אי אפשר להשבית את עצמך' : undefined}
                     onClick={() => {
-                      const extra = a.open_tickets > 0 ? `\n${a.open_tickets} הפניות הפתוחות שלו/ה יחולקו מחדש.` : '';
+                      const extra =
+                        a.open_tickets > 0
+                          ? `\n${a.open_tickets} הפניות שלו/ה יישארו משויכות אליו/ה. אפשר להעביר אותן ידנית מתוך הפנייה.`
+                          : '';
                       if (window.confirm(`להשבית את ${name}? הכניסה שלו/ה תיחסם מיד.${extra}`)) {
                         update(a, { is_active: false }, `${name} הושבת/ה`);
                       }

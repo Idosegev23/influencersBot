@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getAgentSession, hashPassword, type AgentSession } from '@/lib/auth/agent-auth';
-import { autoAssignNewTicket } from '@/lib/support/auto-assign';
 
 export const runtime = 'nodejs';
 
@@ -17,6 +16,9 @@ const OPEN_EXCLUDED = '("resolved","closed","cancelled")';
  *
  * Agents are deactivated, never deleted: their name stays on the tickets
  * and history they touched, so the analytics numbers don't shift.
+ * Deactivating never moves tickets. Agents often handle a ticket without
+ * changing its status, so "open" ones may well be done; reassigning is
+ * left to a human.
  */
 async function requireAdmin(
   accountUsername: string | null,
@@ -140,31 +142,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'db_error' }, { status: 500 });
   }
   if (!updated) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-
-  // A deactivated agent's open tickets would sit with nobody working them.
-  // Hand them back to the auto-assign pool (it only takes unassigned rows).
-  let reassigned = 0;
-  if (body.is_active === false) {
-    const { data: freed } = await supabase
-      .from('support_requests')
-      .update({ assigned_agent_id: null, assigned_to: null, updated_at: new Date().toISOString() })
-      .eq('account_id', session.account_id)
-      .eq('assigned_agent_id', id)
-      .not('status', 'in', OPEN_EXCLUDED)
-      .select('id');
-    for (const t of freed || []) {
-      await supabase.from('support_ticket_history').insert({
-        ticket_id: t.id,
-        account_id: session.account_id,
-        action: 'assigned',
-        actor: session.display_name,
-        actor_agent_id: session.agent_id,
-        note: `${updated.first_name} ${updated.last_name} הושבת/ה, הפנייה שוחררה לחלוקה מחדש`,
-      });
-      if (await autoAssignNewTicket(t.id, session.account_id)) reassigned++;
-    }
-    return NextResponse.json({ ok: true, freed: (freed || []).length, reassigned });
-  }
 
   return NextResponse.json({ ok: true });
 }
