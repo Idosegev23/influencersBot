@@ -110,7 +110,13 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
   const [days, setDays] = useState<number>(30);
   const [agentDisplayName, setAgentDisplayName] = useState<string>('');
 
+  // days === 0 means "today": from local midnight, not the last 24 hours.
   const fromIso = useMemo(() => {
+    if (days === 0) {
+      const midnight = new Date();
+      midnight.setHours(0, 0, 0, 0);
+      return midnight.toISOString();
+    }
     const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     return from.toISOString();
   }, [days]);
@@ -245,12 +251,21 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
               className="text-sm p-2 rounded-lg outline-none"
-              style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)' }}
+              style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', colorScheme: 'dark' }}
             >
-              <option value={7}>7 ימים אחרונים</option>
-              <option value={30}>30 ימים אחרונים</option>
-              <option value={90}>90 ימים אחרונים</option>
-              <option value={365}>שנה אחרונה</option>
+              {/* The open list is drawn by the OS: without an explicit option
+                  background it renders white text on a white menu. */}
+              {[
+                [0, 'היום'],
+                [7, '7 ימים אחרונים'],
+                [30, '30 ימים אחרונים'],
+                [90, '90 ימים אחרונים'],
+                [365, 'שנה אחרונה'],
+              ].map(([value, label]) => (
+                <option key={value} value={value} style={{ background: '#1a1a22', color: '#fff' }}>
+                  {label}
+                </option>
+              ))}
             </select>
             <button
               onClick={() => { setRefreshing(true); fetchData(); }}
