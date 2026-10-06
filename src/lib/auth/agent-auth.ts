@@ -209,13 +209,15 @@ export async function logoutAgent(accountUsername: string): Promise<void> {
 
 // ─── Session readers ────────────────────────────────────────────────────────
 
-export async function getAgentSession(accountUsername: string): Promise<AgentSession | null> {
-  const cookieStore = await cookies();
-  const c = cookieStore.get(cookieNameFor(accountUsername));
-  if (!c?.value) return null;
-  const p = decodeSession(c.value);
-  if (!p) return null;
-  return {
+/**
+ * The cookie only proves who logged in. Admins can deactivate an agent or
+ * change their admin flag at any time, so the row is re-read on every
+ * request: a deactivated agent is out immediately, not when the 30-day
+ * cookie expires. On a DB error we fall back to the cookie rather than
+ * logging the whole team out over a transient blip.
+ */
+async function liveSession(p: SessionPayload): Promise<AgentSession | null> {
+  const fromCookie: AgentSession = {
     agent_id: p.aid,
     account_id: p.acc,
     first_name: p.fn,
@@ -224,6 +226,32 @@ export async function getAgentSession(accountUsername: string): Promise<AgentSes
     is_admin: p.adm,
     account_username: p.un,
   };
+  const { data: row, error } = await supabase
+    .from('support_agents')
+    .select('account_id, first_name, last_name, is_admin, is_active')
+    .eq('id', p.aid)
+    .maybeSingle();
+  if (error) {
+    console.warn('[agent-auth] live session check failed, using cookie:', error.message);
+    return fromCookie;
+  }
+  if (!row || !row.is_active || row.account_id !== p.acc) return null;
+  return {
+    ...fromCookie,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    display_name: `${row.first_name} ${row.last_name}`,
+    is_admin: !!row.is_admin,
+  };
+}
+
+export async function getAgentSession(accountUsername: string): Promise<AgentSession | null> {
+  const cookieStore = await cookies();
+  const c = cookieStore.get(cookieNameFor(accountUsername));
+  if (!c?.value) return null;
+  const p = decodeSession(c.value);
+  if (!p) return null;
+  return liveSession(p);
 }
 
 /** Read any agent session present on the request (for routes that can match
@@ -235,15 +263,8 @@ export async function getAnyAgentSession(): Promise<AgentSession | null> {
     if (!c.name.startsWith(COOKIE_PREFIX)) continue;
     const p = decodeSession(c.value);
     if (!p) continue;
-    return {
-      agent_id: p.aid,
-      account_id: p.acc,
-      first_name: p.fn,
-      last_name: p.ln,
-      display_name: `${p.fn} ${p.ln}`,
-      is_admin: p.adm,
-      account_username: p.un,
-    };
+    const s = await liveSession(p);
+    if (s) return s;
   }
   return null;
 }

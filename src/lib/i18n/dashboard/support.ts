@@ -53,7 +53,7 @@ export const support = {
     // Agent header bar
     agentLoggedInAs: 'מחובר/ת כ:',
     adminBadge: 'אדמין',
-    analyticsBtn: 'אנליטיקה',
+    analyticsBtn: 'ממשק אדמין',
     logout: 'התנתק',
 
     // Header actions
@@ -334,7 +334,7 @@ export const support = {
     // Agent header bar
     agentLoggedInAs: 'Signed in as:',
     adminBadge: 'Admin',
-    analyticsBtn: 'Analytics',
+    analyticsBtn: 'Admin',
     logout: 'Log out',
 
     // Header actions

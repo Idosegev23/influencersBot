@@ -15,9 +15,11 @@ import {
   Heart,
   AlertTriangle,
   Truck,
+  UserCog,
 } from 'lucide-react';
 
 import { agentLoginPath } from '@/lib/auth/agent-login-path';
+import AgentManagement from '@/components/agent/AgentManagement';
 
 const STATUS_LABEL: Record<string, string> = {
   new: 'חדשה',
@@ -108,6 +110,7 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
   const [data, setData] = useState<AnalyticsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [days, setDays] = useState<number>(30);
+  const [tab, setTab] = useState<'analytics' | 'agents'>('analytics');
   const [agentDisplayName, setAgentDisplayName] = useState<string>('');
 
   // days === 0 means "today": from local midnight, not the last 24 hours.
@@ -241,12 +244,13 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
               <ArrowRight className="w-4 h-4" />
             </button>
             <BarChart3 className="w-5 h-5" style={{ color: '#883fe2' }} />
-            <h1 className="text-xl font-bold">אנליטיקת תמיכה</h1>
+            <h1 className="text-xl font-bold">ממשק אדמין</h1>
             <span className="text-xs px-2 py-0.5 rounded" style={{ background: '#883fe2', color: '#fff' }}>
               אדמין
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {tab === 'analytics' && (<>
             <select
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
@@ -274,6 +278,7 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
+            </>)}
             <span className="text-xs hidden md:inline" style={{ color: '#9ca3af' }}>
               {agentDisplayName}
             </span>
@@ -288,6 +293,27 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'rgba(255,255,255,0.04)' }}>
+          {([
+            ['analytics', 'אנליטיקה', <BarChart3 key="a" className="w-4 h-4" />],
+            ['agents', 'ניהול נציגים', <UserCog key="u" className="w-4 h-4" />],
+          ] as const).map(([key, label, icon]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5"
+              style={tab === key ? { background: '#883fe2', color: '#fff' } : { color: '#9ca3af' }}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'agents' ? (
+          <AgentManagement accountUsername={ACCOUNT_USERNAME} />
+        ) : (<>
         {/* KPI cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiCard icon={<BarChart3 className="w-4 h-4" />} label="סה״כ פניות" value={data.overall.total.toString()} />
@@ -429,6 +455,7 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
             )}
           </ol>
         </Section>
+        </>)}
       </div>
     </div>
   );
