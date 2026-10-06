@@ -37,6 +37,7 @@ import type { Influencer } from '@/types';
 import { useDashboardLang } from '@/hooks/useDashboardLang';
 import { getDashboardStrings } from '@/lib/i18n/dashboard';
 import { isRealPhone, realEmailOrNull, waMeNumber } from '@/lib/support/contact';
+import { agentLoginPath } from '@/lib/auth/agent-login-path';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -251,11 +252,6 @@ export default function SupportPage({
         // Accounts that enforce per-agent login: the agent session is the *only*
         // accepted auth — the legacy influencer cookie can't bypass attribution.
         // Each has a dedicated branded login page.
-        const brandedLogin: Record<string, string> = {
-          'labeaute.israel': '/labeaute/login',
-          argania_group: '/argania/login',
-          studiopasha_fashion: '/studiopasha/login',
-        };
         const enforceAgentLogin = username === 'labeaute.israel' || username === 'argania_group';
 
         const agentRes = await fetch(`/api/agent/me?accountUsername=${username}`, { cache: 'no-store' });
@@ -280,14 +276,14 @@ export default function SupportPage({
             }
           }
         } else if (enforceAgentLogin) {
-          router.push(brandedLogin[username] || '/labeaute/login');
+          router.push(agentLoginPath(username));
           return;
         } else {
           // Other accounts: allow legacy influencer cookie.
           const authRes = await fetch(`/api/influencer/auth?username=${username}`);
           const authData = await authRes.json();
           if (!authData.authenticated) {
-            router.push(brandedLogin[username] || `/influencer/${username}`);
+            router.push(agentLoginPath(username));
             return;
           }
         }
@@ -319,11 +315,7 @@ export default function SupportPage({
         body: JSON.stringify({ accountUsername: username }),
       });
     } catch {}
-    if (username === 'labeaute.israel') {
-      router.push('/labeaute/login');
-    } else {
-      router.push(`/influencer/${username}`);
-    }
+    router.push(agentLoginPath(username));
   }, [username, router]);
 
   // Refetch on filter change
@@ -471,7 +463,7 @@ export default function SupportPage({
             <div className="flex items-center gap-2">
               {agent.is_admin && (
                 <button
-                  onClick={() => router.push('/labeaute/admin/analytics')}
+                  onClick={() => router.push(`/influencer/${username}/support/analytics`)}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5"
                   style={{ background: '#883fe2', color: '#fff' }}
                 >
