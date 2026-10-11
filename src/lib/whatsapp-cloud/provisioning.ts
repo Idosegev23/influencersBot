@@ -231,15 +231,22 @@ export async function runProvisioningChain(args: {
     }),
   ]);
   state.coexistence_sync = syncs.every((s) => s.ok);
+  // Kept on the row, not only in the log: the first live failure (2026-08-26) left nothing
+  // behind once the function logs aged out, so its cause is still unknown.
+  const syncErrors = state.coexistence_sync ? undefined : syncs.map((s, i) => ({
+    sync_type: i === 0 ? 'smb_app_state_sync' : 'history',
+    status: s.status,
+    error: (s.data as any)?.error ?? null,
+  }));
   if (!state.coexistence_sync) {
-    console.error('[wa-connect] coexistence sync REJECTED — 24h deadline is running', {
-      phoneNumberId,
-      responses: syncs.map((s) => ({ ok: s.ok, error: (s.data as any)?.error ?? null })),
-    });
+    console.error('[wa-connect] coexistence sync REJECTED — 24h deadline is running', { phoneNumberId, syncErrors });
   }
   await supabase.from('whatsapp_channels')
     // Only stamp the clock when it actually started. A false stamp would hide a missed deadline.
-    .update({ sync_initiated_at: state.coexistence_sync ? new Date().toISOString() : null, provision_state: { ...state } })
+    .update({
+      sync_initiated_at: state.coexistence_sync ? new Date().toISOString() : null,
+      provision_state: syncErrors ? { ...state, sync_errors: syncErrors } : { ...state },
+    })
     .eq('id', channelId);
 
   if (!state.coexistence_sync) {
@@ -264,7 +271,9 @@ export async function runProvisioningChain(args: {
   // 5. Templates — best effort. Reply-only still works, so a rejection must not fail the connect.
   state.templates = await createCsTemplates(accessToken, wabaId, accountId).catch(() => false);
 
-  await supabase.from('whatsapp_channels').update({ provision_state: { ...state } }).eq('id', channelId);
+  await supabase.from('whatsapp_channels')
+    .update({ provision_state: syncErrors ? { ...state, sync_errors: syncErrors } : { ...state } })
+    .eq('id', channelId);
   return { ok: true, channelId, state };
 }
 

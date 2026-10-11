@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getAgentSession, hashPassword, type AgentSession } from '@/lib/auth/agent-auth';
+import { hashPassword } from '@/lib/auth/agent-auth';
+import { requireAgentAdmin as requireAdmin } from '@/lib/auth/require-agent-admin';
 
 export const runtime = 'nodejs';
 
@@ -20,18 +21,6 @@ const OPEN_EXCLUDED = '("resolved","closed","cancelled")';
  * changing its status, so "open" ones may well be done; reassigning is
  * left to a human.
  */
-async function requireAdmin(
-  accountUsername: string | null,
-): Promise<{ session: AgentSession } | { res: NextResponse }> {
-  if (!accountUsername) {
-    return { res: NextResponse.json({ error: 'accountUsername required' }, { status: 400 }) };
-  }
-  const session = await getAgentSession(accountUsername);
-  if (!session) return { res: NextResponse.json({ error: 'unauthorized' }, { status: 401 }) };
-  if (!session.is_admin) return { res: NextResponse.json({ error: 'forbidden' }, { status: 403 }) };
-  return { session };
-}
-
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(new URL(req.url).searchParams.get('accountUsername'));
   if ('res' in auth) return auth.res;

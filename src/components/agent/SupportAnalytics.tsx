@@ -16,10 +16,12 @@ import {
   AlertTriangle,
   Truck,
   UserCog,
+  MessageCircle,
 } from 'lucide-react';
 
 import { agentLoginPath } from '@/lib/auth/agent-login-path';
 import AgentManagement from '@/components/agent/AgentManagement';
+import { WhatsAppConnectCard } from '@/components/onboard/WhatsAppConnectCard';
 
 const STATUS_LABEL: Record<string, string> = {
   new: 'חדשה',
@@ -111,7 +113,7 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
   const [data, setData] = useState<AnalyticsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [days, setDays] = useState<number>(30);
-  const [tab, setTab] = useState<'analytics' | 'agents'>('analytics');
+  const [tab, setTab] = useState<'analytics' | 'agents' | 'whatsapp'>('analytics');
   const [agentDisplayName, setAgentDisplayName] = useState<string>('');
 
   // days === 0 means "today": from local midnight, not the last 24 hours.
@@ -299,6 +301,7 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
           {([
             ['analytics', 'אנליטיקה', <BarChart3 key="a" className="w-4 h-4" />],
             ['agents', 'ניהול נציגים', <UserCog key="u" className="w-4 h-4" />],
+            ['whatsapp', 'וואטסאפ', <MessageCircle key="w" className="w-4 h-4" />],
           ] as const).map(([key, label, icon]) => (
             <button
               key={key}
@@ -314,6 +317,11 @@ export default function SupportAnalytics({ accountUsername }: { accountUsername:
 
         {tab === 'agents' ? (
           <AgentManagement accountUsername={ACCOUNT_USERNAME} />
+        ) : tab === 'whatsapp' ? (
+          // The card is drawn for the light dashboard, so it sits on its own light panel here.
+          <div className="max-w-2xl rounded-2xl bg-white text-gray-900 p-2">
+            <WhatsAppConnectCard apiBase={`/api/agent/account/${encodeURIComponent(ACCOUNT_USERNAME)}`} />
+          </div>
         ) : (<>
         {/* KPI cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

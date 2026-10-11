@@ -34,6 +34,7 @@ export const whatsapp = {
     addPaymentNow: "חברו אמצעי תשלום עכשיו ←",
     onThePage: "בעמוד שנפתח:",
     awaitingTemplate: "ממתין גם לאישור תבנית אצל מטא (עד 24 שעות). נבדוק אוטומטית ברגע שתאושר.",
+    syncMissing: "⚠️ הסנכרון עם אפליקציית WhatsApp Business לא התחיל. למטא יש 24 שעות מרגע החיבור, ואחריהן היא מנתקת את המספר. צוות Bestie קיבל התראה — פנו אלינו אם לא חזרו אליכם.",
   },
   en: {
     numberConnected: "✅ Number connected",
@@ -67,5 +68,6 @@ export const whatsapp = {
     addPaymentNow: "Add a payment method now →",
     onThePage: "On the page that opens:",
     awaitingTemplate: "Also waiting on Meta to approve a template (up to 24 hours). We'll check automatically the moment it is.",
+    syncMissing: "⚠️ Syncing with the WhatsApp Business app didn't start. Meta allows 24 hours from connecting, then disconnects the number. The Bestie team has been alerted — get in touch if you haven't heard from us.",
   },
 } as const;

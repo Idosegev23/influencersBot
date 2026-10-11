@@ -45,6 +45,8 @@ interface Billing {
   displayPhoneNumber?: string | null;
   paymentReady: boolean;
   templateApproved: boolean;
+  /** Coexistence sync never started — Meta offboards the number 24h after connecting. */
+  syncMissing?: boolean;
 }
 
 // Meta returns machine codes; the customer sees prose, in their own language.
@@ -108,7 +110,7 @@ export function WhatsAppConnectCard({
 
     (window as any).fbAsyncInit = function () {
       (window as any).FB.init({ appId, autoLogAppEvents: true, xfbml: false, version: 'v23.0' });
-      setStatus({ kind: 'idle' });
+      setStatus((cur) => (cur.kind === 'loading' ? { kind: 'idle' } : cur));
     };
     if (!document.getElementById(SDK_ID)) {
       const js = document.createElement('script');
@@ -121,7 +123,7 @@ export function WhatsAppConnectCard({
       };
       document.body.appendChild(js);
     } else if ((window as any).FB) {
-      setStatus({ kind: 'idle' });
+      setStatus((cur) => (cur.kind === 'loading' ? { kind: 'idle' } : cur));
     }
 
     // A silently-blocked SDK is the worst failure mode: the button renders and does
@@ -129,7 +131,7 @@ export function WhatsAppConnectCard({
     const t = setTimeout(() => {
       if (!(window as any).FB) {
         console.error('[wa-connect] FB SDK never initialised — likely CSP frame-src/script-src');
-        setStatus({ kind: 'error', message: T.sdkNotLoaded });
+        setStatus((cur) => (cur.kind === 'connected' ? cur : { kind: 'error', message: T.sdkNotLoaded }));
       }
     }, 8000);
     return () => clearTimeout(t);
@@ -137,6 +139,22 @@ export function WhatsAppConnectCard({
 
   const [billing, setBilling] = useState<Billing | null>(null);
   const [probing, setProbing] = useState(false);
+
+  // An account that already has a number opens on its status, not on a connect button that
+  // would run the whole signup again. 404 = nothing connected yet, which is the normal case.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${apiBase}/whatsapp/billing`, { cache: 'no-store' });
+        if (!cancelled && res.ok) {
+          setBilling(await res.json());
+          setStatus({ kind: 'connected' });
+        }
+      } catch { /* fall through to the connect button */ }
+    })();
+    return () => { cancelled = true; };
+  }, [apiBase]);
 
   const refreshBilling = useCallback(async () => {
     try {
@@ -287,6 +305,10 @@ export function WhatsAppConnectCard({
           <p className="text-sm font-medium text-green-600">
             {T.numberConnected}{billing?.displayPhoneNumber ? ` — ${billing.displayPhoneNumber}` : ''}.
           </p>
+
+          {billing?.syncMissing && (
+            <p className="text-xs font-medium text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{T.syncMissing}</p>
+          )}
 
           {billing?.paymentReady ? (
             <p className="text-sm font-medium text-green-600">{T.paymentActive}</p>

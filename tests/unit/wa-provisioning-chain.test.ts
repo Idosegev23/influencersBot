@@ -78,4 +78,23 @@ describe('provisioning chain', () => {
     const stamped = updated.find((u) => 'sync_initiated_at' in u);
     expect(stamped?.sync_initiated_at).toBeNull();
   });
+
+  it("keeps Meta's sync rejection on the row through the final write", async () => {
+    mockFetch(['sync']);
+    const { runProvisioningChain } = await import('@/lib/whatsapp-cloud/provisioning');
+    await runProvisioningChain(ARGS);
+    const last = updated.at(-1).provision_state;
+    expect(last.coexistence_sync).toBe(false);
+    expect(last.sync_errors.map((e: any) => e.sync_type)).toEqual(['smb_app_state_sync', 'history']);
+    expect(last.sync_errors[0].status).toBe(400);
+  });
+
+  it('records no sync_errors when the sync starts', async () => {
+    mockFetch();
+    const { runProvisioningChain } = await import('@/lib/whatsapp-cloud/provisioning');
+    await runProvisioningChain(ARGS);
+    const last = updated.at(-1).provision_state;
+    expect(last.coexistence_sync).toBe(true);
+    expect(last).not.toHaveProperty('sync_errors');
+  });
 });
