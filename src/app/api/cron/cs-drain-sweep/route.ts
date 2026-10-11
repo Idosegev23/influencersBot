@@ -20,12 +20,13 @@ export async function GET() {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { data: sessions } = await supabaseAdmin
     .from('whatsapp_cs_sessions')
-    .select('wa_id, wa_channel_id')
+    .select('channel_user_id, wa_channel_id')
     .gte('last_activity_at', since);
 
   const swept: { waId: string; queued: number }[] = [];
   for (const s of sessions || []) {
-    const waId = (s as any).wa_id as string;
+    // channel_user_id, not wa_id: on a second business number wa_id is `<phone>@<channel>`.
+    const waId = (s as any).channel_user_id as string;
     // Queues, locks and drains are all channel-scoped (migration 075). A session with no
     // channel predates the backfill and has no queue under the new keys — skip it.
     const waChannelId = (s as any).wa_channel_id as string | null;

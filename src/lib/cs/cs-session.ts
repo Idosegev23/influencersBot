@@ -60,13 +60,13 @@ export async function createCsSession(
   channel: CsChannel = 'whatsapp',
   waChannelId: string | null = null,
 ): Promise<CsSessionRow> {
-  const { data } = await supabaseAdmin
+  const insert = (key: string) => supabaseAdmin
     .from('whatsapp_cs_sessions')
     .insert({
       // Migration 074 step 1: wa_id is still the PK and keeps being populated; the channel
       // pair is what code reads. For web channels wa_id carries the channel user id too —
       // ids are namespaced by generation scheme (waId digits / aw_* / a_*), so they can't collide.
-      wa_id: waId,
+      wa_id: key,
       channel,
       channel_user_id: waId,
       wa_channel_id: waChannelId,
@@ -78,6 +78,18 @@ export async function createCsSession(
     })
     .select('*')
     .single();
+
+  let { data, error } = await insert(waId);
+  // wa_id is still the PK, so one phone could hold ONE session across every business number.
+  // The first BYO number (LA BEAUTÉ, 2026-10-11) made that real: any shopper who had ever
+  // written to Bestie's shared number got a null session and the turn crashed. The pair is
+  // what identifies a session, so key the second one by it. Nothing reads wa_id as a phone.
+  if (error?.code === '23505' && waChannelId) {
+    ({ data, error } = await insert(`${waId}@${waChannelId}`));
+  }
+  if (error || !data) {
+    throw new Error(`createCsSession failed for ${channel}/${waChannelId ?? 'no-channel'}: ${error?.message ?? 'no row'}`);
+  }
   return data as CsSessionRow;
 }
 

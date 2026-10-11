@@ -142,7 +142,7 @@ async function applyBind(session: CsSessionRow, ctx: CsToolCtx, bind: { accountI
   let chatSessionId = session.active_chat_session_id;
   if (!chatSessionId || brandChanged) {
     chatSessionId = randomUUID();
-    await supabaseAdmin.from('chat_sessions').insert({ id: chatSessionId, account_id: bind.accountId, message_count: 0, anon_id: `wa_${session.wa_id}_${bind.accountId}` });
+    await supabaseAdmin.from('chat_sessions').insert({ id: chatSessionId, account_id: bind.accountId, message_count: 0, anon_id: `wa_${session.channel_user_id || session.wa_id}_${bind.accountId}` });
   }
   // A ticket belongs to exactly one brand. Carrying the old one across a switch would file this
   // brand's messages onto the other brand's ticket — appendCsTicketHistory takes ticket_id and
