@@ -264,8 +264,15 @@ async function processWebhook(payload: any): Promise<void> {
         // Agency-CRM: if the sender is a registered agent, treat the inbound as
         // a forwarded price-quote (AI parse → quote → tailored reply) and SKIP
         // support routing — an agent's WhatsApp is not a customer thread.
+        // Spec §6: agents, phone-matched tickets and Bestie leads are branches of BESTIE'S OWN
+        // number. On a customer's number every inbound is that customer's shopper and goes
+        // straight to their CS brain. Running these here hijacked messages (an agent's phone
+        // never reached the bot) and — worse — routeInboundToTicket matches by phone across
+        // EVERY account, so a shopper with an open ticket at another brand would land in it.
+        const onBestieNumber = inbound.kind === 'bestie';
+
         let handledAsAgent = false;
-        try {
+        if (onBestieNumber) try {
           handledAsAgent = await maybeEnqueueAgentJob({ waId, msg, textBody });
         } catch (err) {
           console.error('[whatsapp webhook] agent enqueue failed', err);
@@ -276,7 +283,7 @@ async function processWebhook(payload: any): Promise<void> {
         // above. Best-effort: errors are swallowed because the raw
         // message is already persisted.
         let ticketMatch: string | null = null;
-        if (!handledAsAgent) {
+        if (onBestieNumber && !handledAsAgent) {
           try {
             const res = await routeInboundToTicket({
               waId,
@@ -296,7 +303,7 @@ async function processWebhook(payload: any): Promise<void> {
         // about a brand. Best-effort like the others; the raw message is already
         // persisted, so a failure here just leaves it for the CS branch.
         let claimedAsLead = false;
-        try {
+        if (onBestieNumber) try {
           claimedAsLead = (await maybeRouteBestieLead({
             handledAsAgent,
             ticketId: ticketMatch,
