@@ -160,6 +160,13 @@ async function processWebhook(payload: any): Promise<void> {
         continue;
       }
 
+      // Template review results. The billing probe waits on cs_followup being APPROVED here.
+      if (change.field === 'message_template_status_update') {
+        const { recordTemplateStatus } = await import('@/lib/whatsapp-cloud/template-status');
+        await recordTemplateStatus(entry?.id, change.value);
+        continue;
+      }
+
       if (change.field !== 'messages') continue;
 
       const value = change.value ?? {};
