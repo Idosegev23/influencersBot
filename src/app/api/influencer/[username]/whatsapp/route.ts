@@ -12,8 +12,8 @@ export const runtime = 'nodejs';
  * Same flow as the onboarding wizard, different door. The account comes from the session,
  * never from the request body — a logged-in customer can only ever connect their own.
  */
-export async function POST(req: NextRequest) {
-  const auth = await requireInfluencerAuth(req);
+export async function POST(req: NextRequest, { params }: { params: Promise<{ username: string }> }) {
+  const auth = await requireInfluencerAuth(req, decodeURIComponent((await params).username));
   if (!auth.authorized) return auth.response;
 
   let body: any;

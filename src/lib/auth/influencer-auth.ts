@@ -49,8 +49,11 @@ export function extractUsername(req: NextRequest): string | null {
  * // עכשיו אפשר להשתמש ב-auth.username ו-auth.influencer
  * ```
  */
-export async function requireInfluencerAuth(req: NextRequest) {
-  const username = extractUsername(req);
+export async function requireInfluencerAuth(req: NextRequest, pathUsername?: string) {
+  // Routes under /api/influencer/[username]/ carry the username in the path, not the query.
+  // Without this they answered 400 "Username required" to every call — the dashboard
+  // WhatsApp connect never worked, and the customer only saw a generic failure.
+  const username = pathUsername || extractUsername(req);
 
   if (!username) {
     return {
