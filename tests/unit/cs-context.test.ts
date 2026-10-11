@@ -342,4 +342,22 @@ describe('buildCsSystemPrompt skipRag', () => {
     // The rest of the grounding must survive: dropping RAG must not drop the brand's voice.
     expect(without).toContain('קול המותג');
   });
+
+  // LA BEAUTÉ, 2026-10-11 — first shopper on their own number got "היי! אני בסטי מ־LA BEAUTÉ".
+  // On the brand's own number the brand is the only voice.
+  it("on the brand's own number: speaks as the brand and never introduces itself as Bestie", async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: 'acc-lb', userMessage: 'היי', digest: digest({ boundBrand: 'LA BEAUTÉ' }), config: {}, ownNumber: true });
+    expect(p).toContain('את/ה שירות הלקוחות של LA BEAUTÉ');
+    expect(p).toContain('לעולם אל תציג/י את עצמך כ-Bestie');
+    expect(p).not.toContain('את/ה Bestie');
+    expect(p).not.toContain('אני בסטי');
+  });
+
+  it("on Bestie's shared number the Bestie identity stays", async () => {
+    const { buildCsSystemPrompt } = await import('@/lib/cs/cs-context');
+    const p = await buildCsSystemPrompt({ accountId: 'acc-lb', userMessage: 'היי', digest: digest({ boundBrand: 'LA BEAUTÉ' }), config: {} });
+    expect(p).toContain('את/ה Bestie');
+    expect(p).not.toContain('לעולם אל תציג/י את עצמך כ-Bestie');
+  });
 });

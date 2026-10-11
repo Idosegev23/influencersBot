@@ -130,6 +130,10 @@ export async function buildCsSystemPrompt(input: {
   // it built, so the prompt can never describe a switch there is no bind_brand for. Absent = false:
   // a caller that does not know must not be handed the roster.
   canSwitchBrand?: boolean;
+  // True when the shopper wrote to the BRAND'S OWN number (Coexistence / BYO), not Bestie's
+  // shared one. There the brand is the only voice: the shopper messaged La Beauté, not a
+  // platform, and "היי! אני בסטי" reads as a stranger answering their phone. Absent = false.
+  ownNumber?: boolean;
 }): Promise<string> {
   const { accountId, userMessage, digest } = input;
   // The account's config is read ONCE and reused: the orders/products guidance below and the
@@ -145,7 +149,14 @@ export async function buildCsSystemPrompt(input: {
   const canCheckOrders = Boolean(boundConfig) && hasOrdersProvider(boundConfig);
 
   const lines: string[] = [];
-  lines.push('את/ה Bestie — שירות הלקוחות של המותגים בוואטסאפ. דבר/י בעברית, בגובה העיניים, קצר וברור, בקול המותג.');
+  const ownNumber = Boolean(input.ownNumber);
+  if (ownNumber) {
+    const brand = digest.boundBrand || 'המותג';
+    lines.push(`את/ה שירות הלקוחות של ${brand} בוואטסאפ — הלקוח/ה כתב/ה למספר של ${brand} עצמו. דבר/י בשם ${brand} בלבד, בעברית, בגובה העיניים, קצר וברור, בקול המותג.`);
+    lines.push('לעולם אל תציג/י את עצמך כ-Bestie או "בסטי", ואל תזכיר/י את Bestie, פלטפורמה, בוט או מערכת חיצונית. אם שואלים מי עונה — זה שירות הלקוחות של המותג.');
+  } else {
+    lines.push('את/ה Bestie — שירות הלקוחות של המותגים בוואטסאפ. דבר/י בעברית, בגובה העיניים, קצר וברור, בקול המותג.');
+  }
   // Pre-bind the brand is unknown, so the order rules stay general. Once bound they must match the
   // toolset buildCsToolset() actually handed over.
   if (!accountId || canCheckOrders) {
@@ -172,6 +183,7 @@ export async function buildCsSystemPrompt(input: {
   if (digest.language === 'en') lines.push("Reply in English — this brand's audience is English-speaking. Keep the same warm, concise tone.");
 
   if (digest.knownName) lines.push(`שם הלקוח/ה: ${digest.knownName}. פנה/י אליו/ה בשם, ואל תשאל/י שוב לשם.`);
+  else if (ownNumber) lines.push(`שם הלקוח/ה עדיין לא ידוע — פתח/י בברכה קצרה וחמה בשם ${digest.boundBrand || 'המותג'} ושאל/י בטבעיות איך קוראים ללקוח/ה (למשל: "היי! כאן ${digest.boundBrand || 'שירות הלקוחות'} 🙂 איך קוראים לך ואיך אפשר לעזור?"). ברגע שקיבלת שם — קרא/י ל-remember_name פעם אחת כדי לזכור אותו, ומאותו רגע פנה/י אליו/ה בשם.`);
   else lines.push('שם הלקוח/ה עדיין לא ידוע — פתח/י בברכה קצרה וחמה ושאל/י בטבעיות איך קוראים ללקוח/ה (אפשר באותה נשימה עם שאלת המותג, למשל: "היי! אני בסטי 🙂 איך קוראים לך? ולאיזה מותג / עסק את/ה צריך/ה עזרה?"). ברגע שקיבלת שם — קרא/י ל-remember_name פעם אחת כדי לזכור אותו, ומאותו רגע פנה/י אליו/ה בשם.');
 
   if (digest.boundBrand) {

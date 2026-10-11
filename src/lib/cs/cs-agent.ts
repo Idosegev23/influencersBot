@@ -404,7 +404,7 @@ export async function runCsTurnCore(input: CsTurnInput, depsOverride?: Partial<C
     preBoundAccountId: input.boundAccountId ?? null,
   });
   const canSwitchBrand = toolset.tools.some((t) => t.def.function.name === 'bind_brand');
-  const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest, config: accountMeta?.config ?? null, skipRag: orderIntent.isOrderStatus, canSwitchBrand });
+  const system = await buildCsSystemPrompt({ accountId: session.active_account_id, userMessage, digest, config: accountMeta?.config ?? null, skipRag: orderIntent.isOrderStatus, canSwitchBrand, ownNumber: Boolean(input.boundAccountId) });
 
   // 5) Tool-calling loop.
   // ctx was built (and possibly bound) right after session load — see the auto-bind block above.
