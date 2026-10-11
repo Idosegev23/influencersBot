@@ -269,10 +269,11 @@ export async function buildCsSystemPrompt(input: {
         if (rag.trim()) lines.push(`\n--- ידע רלוונטי מהמותג (RAG) ---\n${rag}`);
       } catch { /* RAG optional */ }
     }
-    // Product cards are per-brand opt-in, and so is the guidance: a brand with cards switched off
-    // must not get a prompt telling Bestie to reach for tools that will only refuse.
+    // The guidance follows the same gate as the tools: a brand with cards switched off must not
+    // get a prompt telling the bot to reach for tools that will only refuse.
     try {
-      if (boundConfig?.whatsapp_cs?.products_enabled === true) {   // reuses the single config read above
+      const { productCardsEnabled } = await import('@/lib/cs/tools/registry');
+      if (boundConfig && productCardsEnabled(boundConfig)) {   // reuses the single config read above
         lines.push(
           '\n--- כרטיסי מוצר ---\n' +
           'כשהלקוח/ה מתעניין/ת במוצר, שואל/ת מה מתאים לו/ה, או מבקש/ת לראות מה יש — קרא/י ל-search_products עם מה שהוא/היא תיאר/ה במילים שלו/ה. ' +

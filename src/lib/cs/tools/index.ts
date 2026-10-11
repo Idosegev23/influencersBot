@@ -339,11 +339,11 @@ const escalateTool: CsTool = {
 // ---------------------------------------------------------------------------
 const MAX_CARDS = 3;
 
-// Per-brand opt-in. OFF unless explicitly enabled, so switching a brand's cards off is one
-// config edit and never a deploy (mirrors config.support.auto_ticket_enabled).
+// On by default for every brand; `products_enabled: false` is the per-brand off switch.
 async function productsEnabled(accountId: string): Promise<boolean> {
   const { data } = await supabaseAdmin.from('accounts').select('config').eq('id', accountId).single();
-  return (data as any)?.config?.whatsapp_cs?.products_enabled === true;
+  const { productCardsEnabled } = await import('@/lib/cs/tools/registry');
+  return productCardsEnabled((data as any)?.config);
 }
 
 // Both product tools share the same two gates; neither may run before a brand is bound

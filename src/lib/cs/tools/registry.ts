@@ -52,3 +52,12 @@ export function buildCsToolset(opts: CsToolsetOpts): { tools: CsTool[]; defs: Op
   });
   return { tools, defs: tools.map((t) => t.def) };
 }
+
+/**
+ * Product cards are ON for every brand by default (Ido, 2026-10-11: "always have the option to
+ * show products"). Only an explicit `whatsapp_cs.products_enabled: false` switches a brand off —
+ * still one config edit, never a deploy. A brand with no catalog simply finds nothing to show.
+ */
+export function productCardsEnabled(config: any): boolean {
+  return config?.whatsapp_cs?.products_enabled !== false;
+}

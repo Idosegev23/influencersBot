@@ -28,7 +28,8 @@ vi.mock('@/lib/supabase', () => ({
 }));
 
 const enabled = () => ({ config: { whatsapp_cs: { enabled: true, products_enabled: true } } });
-const disabled = () => ({ config: { whatsapp_cs: { enabled: true } } });
+const disabled = () => ({ config: { whatsapp_cs: { enabled: true, products_enabled: false } } });
+const unset = () => ({ config: { whatsapp_cs: { enabled: true } } });
 
 const ctx = (over: any = {}) => ({
   waId: '972501112222', accountId: 'acc-1', chatSessionId: 'cs-1', ticketId: 't1',
@@ -71,7 +72,16 @@ describe('CS product tools', () => {
       expect(getRecommendations).not.toHaveBeenCalled();
     });
 
-    it('refuses when the brand has not opted in', async () => {
+    it('runs for a brand that never set the flag — cards are on by default', async () => {
+      H.account = unset();
+      getRecommendations.mockResolvedValue({ products: [product()] });
+      const t = await tool('search_products');
+      const res = await t.handler({ query: 'שיער יבש' }, ctx());
+      expect(res.ok).toBe(true);
+      expect(getRecommendations).toHaveBeenCalled();
+    });
+
+    it('refuses when the brand switched cards off explicitly', async () => {
       H.account = disabled();
       const t = await tool('search_products');
       const res = await t.handler({ query: 'שיער יבש' }, ctx());
