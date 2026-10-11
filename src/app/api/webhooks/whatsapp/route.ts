@@ -23,6 +23,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyWhatsAppSignature } from '@/lib/whatsapp-cloud/signature';
+import { redactCoexistenceSync } from '@/lib/whatsapp-cloud/redact-sync';
 import { createClient } from '@/lib/supabase';
 import { routeInboundToTicket } from '@/lib/support/route-inbound';
 import { toWaId, sendReaction, sendTyping } from '@/lib/whatsapp-cloud/client';
@@ -98,7 +99,8 @@ export async function POST(req: NextRequest) {
       phone_number_id: value?.metadata?.phone_number_id ?? null,
       event_type:      change?.field ?? null,
       signature_valid: sig.valid,
-      payload,
+      // Never the contacts or chat history of a Coexistence customer — counts only (D6).
+      payload:         redactCoexistenceSync(payload),
     })
     .select('id')
     .single();
