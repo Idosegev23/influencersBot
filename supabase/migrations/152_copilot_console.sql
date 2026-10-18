@@ -14,7 +14,9 @@
 --    that key's value whole (e.g. `branding`), every other copilot key and every
 --    key outside copilot are untouched.
 --
--- Both: invoker rights, search_path pinned, execute for service_role only.
+-- 3. copilot_delete_secret: undo the Vault secret of a console create that failed.
+--
+-- 1 and 2: invoker rights, search_path pinned. All three: execute for service_role only.
 -- ==================================================
 
 create or replace function public.partner_account_counts(p_account_ids uuid[], p_since timestamptz)
@@ -68,6 +70,22 @@ $$;
 
 comment on function public.copilot_merge_config(uuid, jsonb) is
   'Co-Pilot console: merge p_patch one level deep into accounts.config->copilot in a single UPDATE; returns the new copilot object, or null for an unknown account.';
+
+-- Rollback of a failed console create: remove the identify secret it stored. Same
+-- SECURITY DEFINER pattern as 150's copilot_store_secret/copilot_read_secret, and like
+-- the read it only touches Co-Pilot secrets (named copilot_*).
+create or replace function public.copilot_delete_secret(p_ref uuid)
+returns boolean language plpgsql security definer
+set search_path = vault, extensions, public, pg_temp as $$
+declare v_n int;
+begin
+  delete from vault.secrets s where s.id = p_ref and s.name like 'copilot\_%';
+  get diagnostics v_n = row_count;
+  return v_n > 0;
+end; $$;
+
+revoke all on function public.copilot_delete_secret(uuid) from public, anon, authenticated;
+grant execute on function public.copilot_delete_secret(uuid) to service_role;
 
 revoke execute on function public.partner_account_counts(uuid[], timestamptz) from public, anon, authenticated;
 revoke execute on function public.copilot_merge_config(uuid, jsonb)           from public, anon, authenticated;

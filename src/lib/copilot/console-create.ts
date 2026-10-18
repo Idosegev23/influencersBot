@@ -17,7 +17,11 @@ import { refuse, ok, latestScanJob, type ConsoleAccount } from './console-data';
 import { checkPublicUrl } from './public-url';
 
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
-export const RESERVED_SLUGS = new Set(['api', 'admin', 'console', 'login', 'embed', 'assets', '_next', 'static']);
+/** Paths the white-label app owns; the console frontend keeps the same list (pinned in a test). */
+export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
+  'api', 'admin', 'console', 'login', 'logout', 'embed', 'assets', '_next', 'static', 'associations',
+  'settings', 'install', 't', 'auth', 'www', 'favicon.ico', 'robots.txt', 'health',
+]);
 
 const log = (...a: unknown[]) => console.error('[copilot/console-create]', ...a);
 
@@ -86,15 +90,24 @@ export async function createAssociation(ctx: ConsoleContext, body: any, deps: Pa
   const accountId: string = acc.id;
 
   let hostCreated = false;
+  let secretRef: string | null = null;
   const rollback = async (why: string) => {
     log('rolling back association create', accountId, why);
     try {
+      // scan_jobs cascades from accounts in the migrations; delete explicitly anyway so a job a
+      // failed start created can never run against a missing account.
+      const { error: jErr } = await d.db.from('scan_jobs').delete().eq('account_id', accountId);
+      if (jErr) log('rollback scan_jobs failed', jErr.message);
       if (hostCreated) {
         const { error } = await d.db.from('tenant_domains').delete().eq('host', host).eq('account_id', accountId);
         if (error) log('rollback tenant_domains failed', error.message);
       }
       const { error } = await d.db.from('accounts').delete().eq('id', accountId).eq('partner_id', ctx.partnerId);
       if (error) log('rollback account failed', accountId, error.message);
+      if (secretRef) {
+        const { error: sErr } = await d.db.rpc('copilot_delete_secret', { p_ref: secretRef });
+        if (sErr) log('rollback secret failed', sErr.message);
+      }
     } catch (e) {
       log('rollback threw', accountId, e);
     }
@@ -113,6 +126,7 @@ export async function createAssociation(ctx: ConsoleContext, body: any, deps: Pa
   try {
     const { data: ref, error: sErr } = await d.db.rpc('copilot_store_secret', { p_secret: crypto.randomBytes(32).toString('hex') });
     if (sErr || typeof ref !== 'string' || !ref) throw new Error(sErr?.message ?? 'no secret id');
+    secretRef = ref;
     const { data: merged, error: mErr } = await d.db.rpc('copilot_merge_config', { p_account_id: accountId, p_patch: { identify_secret_ref: ref } });
     if (mErr || !merged) throw new Error(mErr?.message ?? 'merge returned nothing');
   } catch (e) {

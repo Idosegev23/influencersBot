@@ -17,6 +17,7 @@ const requireTenant = vi.fn();
 vi.mock('@/lib/copilot/auth', () => ({ requireTenant: (...a: any[]) => requireTenant(...a) }));
 
 import { POST } from '@/app/api/partner/v1/console/associations/route';
+import { RESERVED_SLUGS } from '@/lib/copilot/console-create';
 import { GET as scanGET } from '@/app/api/partner/v1/console/associations/[id]/scan/route';
 import { SECRET, PA, ACC1, ACC2, ACCX, BASE, tokenFor, tenantFor, world, type UserKey } from './console-fixture';
 
@@ -50,6 +51,7 @@ beforeEach(() => {
   const rpc = db.rpc.bind(db);
   db.rpc = (n: string, a: any) => { h.order.push(`rpc:${n}`); return rpc(n, a); };
   db.rpcs.copilot_store_secret = () => ({ data: 'vault-ref-1', error: null });
+  db.rpcs.copilot_delete_secret = () => ({ data: true, error: null });
   startPipeline.mockReset();
   startPipeline.mockImplementation(async () => { h.order.push('startPipeline'); return { jobId: 'job-1' }; });
   requireTenant.mockReset();
@@ -173,6 +175,37 @@ describe('POST console/associations', () => {
     startPipeline.mockImplementation(async () => ({ jobId: 'job-2' }));
     expect((await post('owner', GOOD)).status).toBe(201);
     expect(startPipeline).toHaveBeenCalledTimes(2);
+  });
+
+  it('rollback also deletes the Vault secret and any scan job the failed start created', async () => {
+    startPipeline.mockImplementation(async ({ accountId }: any) => {
+      db.tables.scan_jobs.push({ id: 'orphan-job', account_id: accountId, status: 'queued' });
+      throw new Error('publish failed');
+    });
+    db.tables.scan_jobs.push({ id: 'other-job', account_id: ACC1, status: 'succeeded' });
+    const res = await post('owner', GOOD);
+    expect(res.status).toBe(503);
+    expect(h.order).toContain('rpc:copilot_delete_secret');
+    expect(db.tables.scan_jobs.map((j) => j.id)).toEqual(['other-job']);
+  });
+
+  it('a successful create never deletes the secret', async () => {
+    expect((await post('owner', GOOD)).status).toBe(201);
+    expect(h.order).not.toContain('rpc:copilot_delete_secret');
+    expect(h.order).toContain('rpc:copilot_store_secret');
+  });
+
+  it('pins the reserved slugs (the console frontend uses the same list)', () => {
+    expect([...RESERVED_SLUGS].sort()).toEqual([
+      'api', 'admin', 'console', 'login', 'logout', 'embed', 'assets', '_next', 'static', 'associations',
+      'settings', 'install', 't', 'auth', 'www', 'favicon.ico', 'robots.txt', 'health',
+    ].sort());
+  });
+
+  it.each(['logout', 'associations', 'settings', 'install', 'auth', 'www', 'health'])('refuses the reserved slug %s', async (slug) => {
+    const res = await post('owner', { ...GOOD, slug });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'slug_reserved' });
   });
 
   it('rolls back when the identify secret cannot be stored', async () => {
