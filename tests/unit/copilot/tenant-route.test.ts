@@ -5,7 +5,7 @@ const requireTenant = vi.fn();
 vi.mock('@/lib/copilot/auth', () => ({ requireTenant: (...a: any[]) => requireTenant(...a) }));
 
 let assocConfig: Record<string, any> = {};
-let assocBranding: Record<string, unknown> = {};
+let assocBranding: any = {};
 let assocNull = false;
 vi.mock('@/lib/copilot/association', () => ({
   loadAssociation: async () =>
@@ -41,7 +41,7 @@ beforeEach(() => {
     website_url: 'https://www.buses.org/',
     copilot: { opening_questions: ['How do I join?'], allowed_origins: ['https://members.buses.org'] },
   };
-  partnerRow = { id: 'pA', name: 'Multiview', branding: { logo: 'x.png' } };
+  partnerRow = { id: 'pA', name: 'Multiview', branding: { logo: 'https://cdn.test/x.png' } };
 });
 
 describe('GET /tenant', () => {
@@ -79,6 +79,43 @@ describe('GET /tenant', () => {
     expect((await (await GET(req())).json()).openingQuestions).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
   });
 
+  it('keeps http only for local hosts and drops wildcards and null', async () => {
+    assocConfig.copilot.allowed_origins = ['http://evil.com', 'http://localhost:5050', 'https://*.buses.org', null, 'http://127.0.0.1:3000', 'http://[::1]:3000'];
+    expect((await (await GET(req())).json()).allowedOrigins).toEqual([
+      'https://www.buses.org', 'http://localhost:5050', 'http://127.0.0.1:3000', 'http://[::1]:3000',
+    ]);
+  });
+
+  it('whitelists branding keys and validates their values', async () => {
+    assocBranding = {
+      primary: '#0b2a4a', font: 'x'.repeat(41), secret_token: 'abc', logo: 'javascript:x', favicon: 'https://cdn.test/f.ico',
+      header_links: [{ label: 'Join', url: 'https://buses.org/join' }, { label: 'Bad', url: 'javascript:x' }, 'nope'],
+      footer_text: 'Hello',
+    };
+    expect((await (await GET(req())).json()).branding).toEqual({
+      primary: '#0b2a4a', favicon: 'https://cdn.test/f.ico', header_links: [{ label: 'Join', url: 'https://buses.org/join' }], footer_text: 'Hello',
+    });
+  });
+
+  it('caps header_links at 8', async () => {
+    assocBranding = { header_links: Array.from({ length: 12 }, (_, i) => ({ label: `l${i}`, url: 'https://a.test/' })) };
+    expect((await (await GET(req())).json()).branding.header_links).toHaveLength(8);
+  });
+
+  it('turns a non-object branding into {} on both host kinds', async () => {
+    assocBranding = 'oops';
+    expect((await (await GET(req())).json()).branding).toEqual({});
+    requireTenant.mockResolvedValue(PARTNER);
+    partnerRow = { id: 'pA', name: 'Multiview', branding: 'oops' };
+    expect((await (await GET(req())).json()).branding).toEqual({});
+  });
+
+  it('whitelists partner branding too', async () => {
+    requireTenant.mockResolvedValue(PARTNER);
+    partnerRow = { id: 'pA', name: 'Multiview', branding: { primary: '#fff', secret_token: 'abc' } };
+    expect((await (await GET(req())).json()).branding).toEqual({ primary: '#fff' });
+  });
+
   it('answers 404 when the association cannot be loaded', async () => {
     assocNull = true;
     expect((await GET(req())).status).toBe(404);
@@ -87,7 +124,7 @@ describe('GET /tenant', () => {
   it('returns the partner name and branding on a partner host', async () => {
     requireTenant.mockResolvedValue(PARTNER);
     const res = await GET(req());
-    expect(await res.json()).toEqual({ kind: 'partner', name: 'Multiview', branding: { logo: 'x.png' }, openingQuestions: [], allowedOrigins: [] });
+    expect(await res.json()).toEqual({ kind: 'partner', name: 'Multiview', branding: { logo: 'https://cdn.test/x.png' }, openingQuestions: [], allowedOrigins: [] });
   });
 
   it('answers 404 when the partner row is missing', async () => {
