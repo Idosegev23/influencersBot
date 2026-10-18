@@ -233,7 +233,10 @@ describe('runCopilotTurn', () => {
     const a = db.inserted.find((i: any) => i.row.role === 'assistant').row;
     expect(a.content).toBe('You can join [1].');
     expect(a.session_id).toBe('s1');
-    expect(a.metadata.copilot).toMatchObject({ cited: [1], related: 2, eventId: 'ev1', cta: { kind: 'join', url: 'https://buses.org/join' }, topic: 'membership', contact_requested: true });
+    expect(a.metadata.copilot).toMatchObject({ cited: [1], related_n: 2, eventId: 'ev1', cta: { kind: 'join', url: 'https://buses.org/join' }, topic: 'membership', contact_requested: true });
+    expect(a.metadata.copilot.sources).toEqual([{ n: 1, title: 'Membership', url: 'https://buses.org/membership/' }]);
+    expect(a.metadata.copilot.related).toEqual({ title: 'Marketplace', url: 'https://buses.org/marketplace/' });
+    expect(a.metadata.copilot.event).toEqual({ id: 'ev1', title: 'Marketplace 2027', startsOn: '2027-01-10', endsOn: null, location: null, url: 'https://buses.org/marketplace/', registrationUrl: 'https://buses.org/register' });
     expect(db.inserted[0].row).toEqual({ session_id: 's1', role: 'user', content: 'How do I join?' });
     expect(db.updates[0].patch).toEqual({ last_response_id: 'resp_1', last_turn_at: now.toISOString(), message_count: 6 });
     expect(emitted.at(-1)).toEqual({ type: 'done', messageId: 'm2' });
@@ -247,6 +250,8 @@ describe('runCopilotTurn', () => {
     expect(emitted.find((e) => e.type === 'sources' || e.type === 'cta' || e.type === 'event')).toBeUndefined();
     expect(emitted.at(-1)).toMatchObject({ type: 'done' });
     expect(db.inserted.find((i: any) => i.row.role === 'assistant').row.content).toBe('You can join as a');
+    expect(db.inserted.find((i: any) => i.row.role === 'assistant').row.metadata.copilot)
+      .toMatchObject({ sources: [], related: null, event: null, cta: null });
   });
 
   it('puts the new user message in the model input exactly once, even though it is saved first', async () => {

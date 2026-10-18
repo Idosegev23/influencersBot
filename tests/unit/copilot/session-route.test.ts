@@ -12,10 +12,26 @@ vi.mock('@/lib/copilot/association', () => ({
 }));
 
 const sessions: any[] = [];
+const messages: any[] = [];
 let insertError: any = null;
 vi.mock('@/lib/supabase', () => ({
   supabase: {
-    from: () => ({
+    from: (table: string) => table === 'chat_messages' ? ({
+      select: () => {
+        let sid = '';
+        let n = Infinity;
+        const b: any = {
+          eq: (_c: string, v: string) => { sid = v; return b; },
+          order: () => b,
+          limit: (k: number) => { n = k; return b; },
+          then: (ok: any, bad: any) => Promise.resolve({
+            data: messages.filter((m) => m.session_id === sid).sort((a, z) => (a.created_at < z.created_at ? 1 : -1)).slice(0, n),
+            error: null,
+          }).then(ok, bad),
+        };
+        return b;
+      },
+    }) : ({
       select: () => ({ eq: (_c: string, id: string) => ({ maybeSingle: async () => ({ data: sessions.find((s) => s.id === id) ?? null }) }) }),
       insert: (row: any) => ({ select: () => ({ single: async () => { if (insertError) return { data: null, error: insertError }; const s = { id: `s${sessions.length + 1}`, ...row }; sessions.push(s); return { data: s, error: null }; } }) }),
     }),
@@ -30,6 +46,7 @@ function req(body: any) {
 
 beforeEach(() => {
   sessions.length = 0;
+  messages.length = 0;
   insertError = null;
   requireTenant.mockResolvedValue(T);
   getOrCreateVisitor.mockResolvedValue({ id: 'v1', identity_source: null });
@@ -92,5 +109,59 @@ describe('POST /session', () => {
   it('passes through a tenant refusal', async () => {
     requireTenant.mockResolvedValue(Response.json({ error: 'host_not_owned' }, { status: 403 }));
     expect((await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa' }))).status).toBe(403);
+  });
+});
+
+describe('POST /session transcript restore', () => {
+  const at = (i: number) => new Date(Date.UTC(2026, 9, 18, 0, 0, i)).toISOString();
+
+  it('a new session has no messages', async () => {
+    const body = await (await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa' }))).json();
+    expect(body.messages).toEqual([]);
+  });
+
+  it('a resumed session returns its last 30 messages oldest first, with the cards each answer showed', async () => {
+    sessions.push({ id: 'old', account_id: 'acc', visitor_id: 'v1' });
+    for (let i = 0; i < 40; i++) {
+      messages.push(i % 2 === 0
+        ? { session_id: 'old', role: 'user', content: `Q${i}`, created_at: at(i), metadata: null }
+        : { session_id: 'old', role: 'assistant', content: `A${i}`, created_at: at(i), metadata: { copilot: {
+          sources: [{ n: 1, title: 'Join', url: 'https://buses.org/join' }, { n: 2, title: 'Bad', url: 'javascript:alert(1)' }],
+          related: { title: 'Marketplace', url: 'https://buses.org/marketplace/' },
+          event: { id: 'ev1', title: 'Marketplace 2027', startsOn: '2027-01-10', endsOn: null, location: 'Columbus', url: 'https://buses.org/m', registrationUrl: 'https://buses.org/r' },
+          cta: { kind: 'join', url: 'https://buses.org/join' },
+          topic: 'membership', contact_requested: true,
+        } } });
+    }
+    messages.push({ session_id: 'old', role: 'system', content: 'internal', created_at: at(99) });
+    messages.push({ session_id: 'someone-else', role: 'user', content: 'not yours', created_at: at(50) });
+    const body = await (await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa', sessionId: 'old' }))).json();
+    expect(body.resumed).toBe(true);
+    expect(body.messages).toHaveLength(29); // 30 newest rows, minus the system row
+    expect(body.messages[0]).toEqual({ role: 'assistant', content: 'A11', cards: expect.any(Object) });
+    expect(body.messages.at(-1)).toMatchObject({ role: 'assistant', content: 'A39' });
+    expect(body.messages.find((m: any) => m.role === 'user')).toEqual({ role: 'user', content: 'Q12', cards: null });
+    expect(body.messages[0].cards).toEqual({
+      sources: [{ n: 1, title: 'Join', url: 'https://buses.org/join' }],
+      related: { title: 'Marketplace', url: 'https://buses.org/marketplace/' },
+      event: { id: 'ev1', title: 'Marketplace 2027', startsOn: '2027-01-10', endsOn: null, location: 'Columbus', url: 'https://buses.org/m', registrationUrl: 'https://buses.org/r' },
+      cta: { kind: 'join', url: 'https://buses.org/join' },
+    });
+    expect(JSON.stringify(body.messages)).not.toMatch(/not yours|internal|javascript|contact_requested/);
+  });
+
+  it('older rows (related stored as a number, no event object) give empty cards, never a crash', async () => {
+    sessions.push({ id: 'old', account_id: 'acc', visitor_id: 'v1' });
+    messages.push({ session_id: 'old', role: 'assistant', content: 'A', created_at: at(1), metadata: { copilot: { related: 2, eventId: 'ev1', cta: { kind: 'evil', url: 'https://x' } } } });
+    const body = await (await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa', sessionId: 'old' }))).json();
+    expect(body.messages).toEqual([{ role: 'assistant', content: 'A', cards: { sources: [], related: null, event: null, cta: null } }]);
+  });
+
+  it('someone else’s session id gives a new session and no transcript', async () => {
+    sessions.push({ id: 'theirs', account_id: 'acc', visitor_id: 'v999' });
+    messages.push({ session_id: 'theirs', role: 'user', content: 'private', created_at: at(1) });
+    const body = await (await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa', sessionId: 'theirs' }))).json();
+    expect(body.resumed).toBe(false);
+    expect(body.messages).toEqual([]);
   });
 });

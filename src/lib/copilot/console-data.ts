@@ -14,6 +14,7 @@ import { canSeeAccount, type ConsoleContext } from './console-auth';
 import { sanitizeBranding, validateBranding, httpsUrl } from './branding';
 import { readContactRules, validContactRule } from './contact-trigger';
 import { isVerifiedIdentity } from './identity';
+import { cleanSources } from './history';
 
 const log = (...a: unknown[]) => console.error('[copilot/console]', ...a);
 export const refuse = (status: number, error: string, extra: Record<string, unknown> = {}) =>
@@ -288,14 +289,6 @@ export async function conversationTranscript(acc: ConsoleAccount, sessionId: str
         sources: m.role === 'assistant' ? cleanSources(m.metadata?.copilot?.sources) : [],
       })),
   });
-}
-
-export function cleanSources(raw: unknown): Array<{ n: number; title: string; url: string }> {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((x: any) => x && Number.isInteger(x.n) && typeof x.title === 'string' && typeof x.url === 'string' && /^https?:\/\//i.test(x.url))
-    .slice(0, 10)
-    .map((x: any) => ({ n: x.n, title: x.title, url: x.url }));
 }
 
 const EMAIL_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;

@@ -384,7 +384,14 @@ export async function runCopilotTurn(
         cited: meta.cited,
         // Titled links (after the link guard: only sources with a URL), for the recap email.
         sources: citedSources.map((s) => ({ n: s.n, title: s.title, url: s.url })),
-        related: meta.related, eventId: event ? event.id : null, cta: meta.cta, topic: meta.topic, contact_requested: contactRequested,
+        // The cards exactly as they were shown, so a resumed session can redraw them (/session messages).
+        related, related_n: meta.related,
+        eventId: event ? event.id : null,
+        event: event ? {
+          id: event.id, title: event.title, startsOn: event.startsOn, endsOn: event.endsOn,
+          location: event.location, url: event.url, registrationUrl: event.registrationUrl,
+        } : null,
+        cta: meta.cta, topic: meta.topic, contact_requested: contactRequested,
       } },
     }).select('id').single();
     if (error) log('assistant message insert failed', accountId, error.message);

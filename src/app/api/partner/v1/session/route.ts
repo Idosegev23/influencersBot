@@ -3,6 +3,7 @@ import { loadAssociation } from '@/lib/copilot/association';
 import { getOrCreateVisitor, isValidAnonId } from '@/lib/copilot/visitors';
 import { recordEvents } from '@/lib/copilot/events';
 import { isVerifiedIdentity } from '@/lib/copilot/identity';
+import { loadSessionHistory } from '@/lib/copilot/history';
 import type { AssociationTenant } from '@/lib/copilot/tenant';
 import { supabase } from '@/lib/supabase';
 
@@ -42,6 +43,9 @@ export async function POST(req: Request) {
     );
   }
 
+  // Only a resumed session (already checked: this association, this visitor) has a transcript to redraw.
+  const messages = resumed ? await loadSessionHistory(sessionId) : [];
+
   return Response.json({
     visitorId: visitor.id,
     sessionId,
@@ -50,5 +54,6 @@ export async function POST(req: Request) {
     openingQuestions: assoc.openingQuestions,
     // Never reveal the source: after /contact it would tell the caller whether a typed email is a member's.
     identity: { identified: isVerifiedIdentity(visitor.identity_source) },
+    messages,
   });
 }
