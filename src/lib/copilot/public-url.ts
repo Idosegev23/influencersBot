@@ -60,6 +60,7 @@ function v6Private(ip: string): boolean {
   if (g.slice(0, 7).every((x) => x === 0) && g[7] === 1) return true;         // ::1
   const embedded = (hi: number, lo: number) => `${hi >>> 8}.${hi & 0xff}.${lo >>> 8}.${lo & 0xff}`;
   if (g.slice(0, 5).every((x) => x === 0) && g[5] === 0xffff) return v4Private(embedded(g[6], g[7])); // ::ffff:a.b.c.d
+  if (g.slice(0, 4).every((x) => x === 0) && g[4] === 0xffff && g[5] === 0) return v4Private(embedded(g[6], g[7])); // ::ffff:0:a.b.c.d (SIIT)
   if (g.slice(0, 6).every((x) => x === 0)) return true;                       // ::a.b.c.d (deprecated compat)
   if (g[0] === 0x64 && g[1] === 0xff9b) return g.slice(2, 6).every((x) => x === 0) ? v4Private(embedded(g[6], g[7])) : true; // NAT64
   if ((g[0] & 0xfe00) === 0xfc00) return true;                                // fc00::/7 ULA
@@ -84,19 +85,54 @@ const BLOCKED_NAME = /(^|\.)(localhost|local|internal|localdomain|home\.arpa|int
 
 export type PublicUrlCheck = { ok: true; url: URL } | { ok: false; reason: string };
 
+export const LOOKUP_TIMEOUT_MS = 3000;
+const LOOKUP_TTL_MS = 60_000;
+type Addrs = Array<{ address: string; family: number }>;
+/** Per-lookup-function memo, so one crawl resolves each host once a minute (failures are not cached). */
+const memo = new WeakMap<LookupAll, Map<string, { addrs: Addrs; until: number }>>();
+
+/** Resolves `host` within `timeoutMs`, giving up early when `signal` aborts. */
+async function resolveHost(host: string, lookup: LookupAll, timeoutMs: number, signal?: AbortSignal | null): Promise<Addrs> {
+  let cache = memo.get(lookup);
+  if (!cache) { cache = new Map(); memo.set(lookup, cache); }
+  const hit = cache.get(host);
+  if (hit && hit.until > Date.now()) return hit.addrs;
+  if (signal?.aborted) throw new Error('aborted');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  try {
+    const addrs = await Promise.race([
+      lookup(host),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('lookup timeout')), timeoutMs); }),
+      new Promise<never>((_, reject) => {
+        if (!signal) return;
+        onAbort = () => reject(new Error('aborted'));
+        signal.addEventListener('abort', onAbort, { once: true });
+      }),
+    ]);
+    cache.set(host, { addrs, until: Date.now() + LOOKUP_TTL_MS });
+    if (cache.size > 500) cache.delete(cache.keys().next().value as string);
+    return addrs;
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener('abort', onAbort);
+  }
+}
+
 /**
- * Checks one URL. `allowIpLiteral` (default false) lets a public IP literal through,
- * for crawl links; a partner-supplied website must be a name.
+ * Checks one URL. The defaults are the strict rules for a partner-supplied website:
+ * a name (no IP literal) on port 80/443. Crawl fetches relax both
+ * (`allowIpLiteral`, `anyPort`); the address checks always apply.
  */
 export async function checkPublicUrl(
   raw: string,
-  opts: { allowIpLiteral?: boolean; lookup?: LookupAll } = {},
+  opts: { allowIpLiteral?: boolean; anyPort?: boolean; lookup?: LookupAll; timeoutMs?: number; signal?: AbortSignal | null } = {},
 ): Promise<PublicUrlCheck> {
   let u: URL;
   try { u = new URL(raw); } catch { return { ok: false, reason: 'unparseable' }; }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, reason: 'scheme' };
   if (u.username || u.password) return { ok: false, reason: 'credentials' };
-  if (u.port && u.port !== '80' && u.port !== '443') return { ok: false, reason: 'port' };
+  if (!opts.anyPort && u.port && u.port !== '80' && u.port !== '443') return { ok: false, reason: 'port' };
   const host = u.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
   if (!host) return { ok: false, reason: 'host' };
   if (net.isIP(host)) {
@@ -105,7 +141,9 @@ export async function checkPublicUrl(
   }
   if (!host.includes('.') || BLOCKED_NAME.test(host)) return { ok: false, reason: 'internal_name' };
   let addrs: Array<{ address: string }>;
-  try { addrs = await (opts.lookup ?? defaultLookup)(host); } catch { return { ok: false, reason: 'unresolvable' }; }
+  try {
+    addrs = await resolveHost(host, opts.lookup ?? defaultLookup, opts.timeoutMs ?? LOOKUP_TIMEOUT_MS, opts.signal);
+  } catch { return { ok: false, reason: 'unresolvable' }; }
   if (!addrs?.length) return { ok: false, reason: 'unresolvable' };
   if (addrs.some((a) => isPrivateAddress(a.address))) return { ok: false, reason: 'private_address' };
   return { ok: true, url: u };
@@ -117,18 +155,20 @@ export class BlockedUrlError extends Error {
 
 /**
  * fetch() that refuses non-public targets, including every redirect hop
- * (redirects are followed manually, at most `maxRedirects`).
+ * (redirects are followed manually, at most `maxRedirects`, default 10). Any port.
  */
 export async function fetchPublic(
   url: string,
   init: RequestInit = {},
-  opts: { maxRedirects?: number; lookup?: LookupAll; fetchImpl?: typeof fetch } = {},
+  opts: { maxRedirects?: number; lookup?: LookupAll; fetchImpl?: typeof fetch; lookupTimeoutMs?: number } = {},
 ): Promise<Response> {
   const f = opts.fetchImpl ?? fetch;
-  const max = opts.maxRedirects ?? 5;
+  const max = opts.maxRedirects ?? 10;
   let current = url;
   for (let hop = 0; ; hop++) {
-    const c = await checkPublicUrl(current, { allowIpLiteral: true, lookup: opts.lookup });
+    const c = await checkPublicUrl(current, {
+      allowIpLiteral: true, anyPort: true, lookup: opts.lookup, timeoutMs: opts.lookupTimeoutMs, signal: init.signal,
+    });
     if (c.ok === false) throw new BlockedUrlError(current, c.reason);
     const res = await f(current, { ...init, redirect: 'manual' });
     const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
