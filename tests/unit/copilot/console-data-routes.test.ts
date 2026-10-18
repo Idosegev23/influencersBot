@@ -111,7 +111,7 @@ describe('authorisation on every console data route', () => {
 
 describe('GET associations', () => {
   it('partner staff see every association of their partner, with slug, status and counts', async () => {
-    h.jobs.push({ id: 'j1', account_id: ACC2, status: 'running', created_at: '2026-10-18T00:00:00Z', step_logs: [{ step: 'create-account', status: 'completed', timestamp: '2026-10-18T00:00:01Z' }, { step: 'site-crawl', status: 'running', timestamp: '2026-10-18T00:01:00Z' }] });
+    h.jobs.push({ id: 'j1', account_id: ACC2, status: 'running', created_at: '2026-10-18T00:00:00Z', updated_at: new Date().toISOString(), step_logs: [{ step: 'create-account', status: 'completed', timestamp: '2026-10-18T00:00:01Z' }, { step: 'site-crawl', status: 'running', timestamp: '2026-10-18T00:01:00Z' }] });
     h.jobs.push({ id: 'j0', account_id: ACC1, status: 'succeeded', created_at: '2026-10-01T00:00:00Z', step_logs: [] });
     const res = await listGET(req('owner'));
     expect(res.status).toBe(200);

@@ -71,10 +71,24 @@ export function scanSummary(job: any, now = Date.now()): { status: AssociationSt
   return { status: 'ready', scan: null };
 }
 
+/**
+ * The job that describes the association now: newest first, skipping cancelled jobs
+ * and queued/running jobs that stopped showing life (an orphan must not read as
+ * "scanning" forever, nor a cancel as a failure).
+ */
+export function pickCurrentJob(jobs: any[] | null | undefined, now = Date.now()): any | null {
+  for (const j of jobs ?? []) {
+    if (j?.status === 'cancelled') continue;
+    if ((j?.status === 'queued' || j?.status === 'running') && !isLiveScan(j, now)) continue;
+    return j;
+  }
+  return null;
+}
+
 export async function latestScanJob(accountId: string): Promise<any | null> {
   try {
-    const jobs = await getScanJobsRepo().getByAccount(accountId, 1);
-    return jobs?.[0] ?? null;
+    const jobs = await getScanJobsRepo().getByAccount(accountId, 5);
+    return pickCurrentJob(jobs);
   } catch (e) {
     log('scan job read failed', accountId, e instanceof Error ? e.message : e);
     return null;

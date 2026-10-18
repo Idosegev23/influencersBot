@@ -229,7 +229,7 @@ describe('POST console/associations', () => {
 
 describe('GET console/associations/:id/scan', () => {
   it('reports the latest job with steps', async () => {
-    h.jobs.push({ id: 'j', account_id: ACC2, status: 'running', created_at: '2026-10-18T00:00:00Z', started_at: '2026-10-18T00:00:02Z', error_message: 'apify secret detail',
+    h.jobs.push({ id: 'j', account_id: ACC2, status: 'running', created_at: '2026-10-18T00:00:00Z', updated_at: new Date().toISOString(), started_at: '2026-10-18T00:00:02Z', error_message: 'apify secret detail',
       step_logs: [{ step: 'create-account', status: 'completed', timestamp: '2026-10-18T00:00:05Z' }, { step: 'ig-scan', status: 'running', timestamp: '2026-10-18T00:00:06Z' }] });
     const res = await scan('owner', ACC2);
     expect(res.status).toBe(200);
