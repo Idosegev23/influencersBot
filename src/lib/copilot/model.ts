@@ -64,10 +64,17 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 const msgOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export async function streamCopilotModel(
-  p: { instructions: string; input: Array<{ role: 'user' | 'assistant'; content: string }>; previousResponseId: string | null; onDelta: (t: string) => void },
+  p: {
+    instructions: string;
+    input: Array<{ role: 'user' | 'assistant'; content: string }>;
+    previousResponseId: string | null;
+    onDelta: (t: string) => void;
+    /** Self-contained input for the fallback, which never chains (e.g. history + the new message when `input` relies on previousResponseId). */
+    fallbackInput?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  },
   c: ModelClient = client(),
   opts: StreamTimeouts = {},
-): Promise<{ text: string; responseId: string | null; usage: TokenUsage[]; incomplete: boolean }> {
+): Promise<{ text: string; responseId: string | null; usage: TokenUsage[]; incomplete: boolean; fellBack: boolean }> {
   const primaryTimeoutMs = opts.primaryTimeoutMs ?? PRIMARY_TIMEOUT_MS;
   const idleTimeoutMs = opts.idleTimeoutMs ?? IDLE_TIMEOUT_MS;
   const fallbackTimeoutMs = opts.fallbackTimeoutMs ?? FALLBACK_TIMEOUT_MS;
@@ -129,7 +136,7 @@ export async function streamCopilotModel(
 
   try {
     await runPrimary();
-    if (text) return { text, responseId, usage, incomplete };
+    if (text) return { text, responseId, usage, incomplete, fellBack: false };
   } catch (e) {
     if (text) throw new CopilotModelError(msgOf(e), usage);
     console.error('[copilot/model]', 'primary failed, falling back', msgOf(e));
@@ -141,7 +148,7 @@ export async function streamCopilotModel(
   try {
     fb = await untilAborted(
       c.responses.create({
-        model: COPILOT_FALLBACK_MODEL, instructions: p.instructions, input: p.input,
+        model: COPILOT_FALLBACK_MODEL, instructions: p.instructions, input: p.fallbackInput ?? p.input,
         max_output_tokens: MAX_OUTPUT_TOKENS, reasoning: { effort: 'low' },
       }, { signal: fbSignal }),
       fbSignal,
@@ -153,5 +160,5 @@ export async function streamCopilotModel(
   const fbText: string = fb?.output_text ?? '';
   if (!fbText) throw new CopilotModelError('empty response from both models', usage);
   p.onDelta(fbText);
-  return { text: fbText, responseId: fb?.id ?? null, usage, incomplete: fb?.status === 'incomplete' };
+  return { text: fbText, responseId: fb?.id ?? null, usage, incomplete: fb?.status === 'incomplete', fellBack: true };
 }

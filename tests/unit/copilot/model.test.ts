@@ -17,7 +17,7 @@ describe('streamCopilotModel', () => {
     const deltas: string[] = [];
     const r = await streamCopilotModel({ instructions: 'i', input: [{ role: 'user', content: 'q' }], previousResponseId: 'prev', onDelta: (d) => deltas.push(d) }, { responses: { create } });
     expect(deltas.join('')).toBe('Hello');
-    expect(r).toEqual({ text: 'Hello', responseId: 'resp_1', incomplete: false, usage: [{ model: COPILOT_MODEL, inputTokens: 100, cachedInputTokens: 10, outputTokens: 20 }] });
+    expect(r).toEqual({ text: 'Hello', responseId: 'resp_1', incomplete: false, fellBack: false, usage: [{ model: COPILOT_MODEL, inputTokens: 100, cachedInputTokens: 10, outputTokens: 20 }] });
     expect(create.mock.calls[0][0]).toEqual(expect.objectContaining({ model: COPILOT_MODEL, previous_response_id: 'prev', stream: true, max_output_tokens: 1200 }));
   });
   it('falls back once without the chain when the primary fails before any text', async () => {
@@ -31,6 +31,23 @@ describe('streamCopilotModel', () => {
     expect(create.mock.calls[1][0]).toMatchObject({ model: COPILOT_FALLBACK_MODEL });
     expect(create.mock.calls[1][0]).not.toHaveProperty('previous_response_id');
     expect(create.mock.calls[1][0]).not.toHaveProperty('stream');
+  });
+  it('sends fallbackInput to the fallback (it cannot chain) and reports fellBack', async () => {
+    const create = vi.fn()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce({ id: 'resp_fb', output_text: 'Fallback answer', usage });
+    const history = [{ role: 'user' as const, content: 'Q1' }, { role: 'assistant' as const, content: 'A1' }, { role: 'user' as const, content: 'q' }];
+    const r = await streamCopilotModel({ instructions: 'i', input: [{ role: 'user', content: 'q' }], fallbackInput: history, previousResponseId: 'prev', onDelta: () => {} }, { responses: { create } });
+    expect(create.mock.calls[0][0].input).toEqual([{ role: 'user', content: 'q' }]);
+    expect(create.mock.calls[1][0].input).toEqual(history);
+    expect(r.fellBack).toBe(true);
+  });
+  it('uses input for the fallback when no fallbackInput is given', async () => {
+    const create = vi.fn()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce({ id: 'resp_fb', output_text: 'Fallback answer', usage });
+    await streamCopilotModel({ instructions: 'i', input: [{ role: 'user', content: 'q' }], previousResponseId: null, onDelta: () => {} }, { responses: { create } });
+    expect(create.mock.calls[1][0].input).toEqual([{ role: 'user', content: 'q' }]);
   });
   it('does not fall back after text was already shown', async () => {
     const create = vi.fn(async () => ({ async *[Symbol.asyncIterator]() { yield { type: 'response.output_text.delta', delta: 'Partial' }; throw new Error('cut'); } }));
@@ -61,7 +78,7 @@ describe('streamCopilotModel timeouts, terminal events and usage', () => {
       { type: 'response.incomplete', response: { id: 'resp_inc', usage } },
     ]));
     const r = await streamCopilotModel(req(), { responses: { create } });
-    expect(r).toEqual({ text: 'Part', responseId: 'resp_inc', incomplete: true, usage: [{ model: COPILOT_MODEL, inputTokens: 100, cachedInputTokens: 10, outputTokens: 20 }] });
+    expect(r).toEqual({ text: 'Part', responseId: 'resp_inc', incomplete: true, fellBack: false, usage: [{ model: COPILOT_MODEL, inputTokens: 100, cachedInputTokens: 10, outputTokens: 20 }] });
     expect(create).toHaveBeenCalledTimes(1);
   });
   it('falls back when response.failed arrives before any text', async () => {

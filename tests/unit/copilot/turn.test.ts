@@ -6,7 +6,8 @@ vi.mock('@/lib/supabase', () => ({ supabase: {} }));
 vi.mock('@/lib/costs/recorder', () => ({ recordTurnCost: vi.fn(async () => {}) }));
 
 import { runCopilotTurn, createLinkGuard, type TurnEvent } from '@/lib/copilot/turn';
-import { CopilotModelError } from '@/lib/copilot/model';
+import { CopilotModelError, streamCopilotModel } from '@/lib/copilot/model';
+import { EMPTY_ANSWER } from '@/lib/copilot/turn';
 
 const tenant = { partnerId: 'pA', accountId: 'acc', host: 'aba.copilot-dev.test' };
 const assoc = { accountId: 'acc', partnerId: 'pA', industry: 'motorcoach', branding: {}, openingQuestions: [],
@@ -18,20 +19,31 @@ const sources = [
 ];
 const events = [{ id: 'ev1', title: 'Marketplace 2027', startsOn: '2027-01-10', endsOn: null, location: null, url: 'https://buses.org/marketplace/', registrationUrl: 'https://buses.org/register', summary: null }];
 
-// Mock adjustment vs the brief: `history` lets a test return prior chat_messages rows
-// (newest first, as the real `.order(created_at desc).limit(10)` does), and `insertError`
-// lets a test fail the insert. With the defaults the mock behaves exactly as in the brief.
-function makeDb(session: any, opts: { history?: any[]; insertError?: any } = {}) {
-  const inserted: any[] = []; const updates: any[] = []; const reads: string[] = [];
+// Mock adjustments vs the brief (the brief's assertions are unchanged):
+// - `eq` chains any number of times, so the session-wide contact lookup
+//   (`.eq(session_id).eq(role).eq(metadata->copilot->>contact_requested).limit(1)`) is modelled.
+// - The history read returns `history` (newest first, as `.order(created_at desc).limit(10)` does)
+//   PLUS any chat_messages rows inserted earlier in the same test, as the real table would.
+// - `contactRow` makes the contact lookup find a row; `insertError` fails the insert;
+//   `reads` / `queries` record what was read. With the defaults it behaves as in the brief.
+function makeDb(session: any, opts: { history?: any[]; insertError?: any; contactRow?: boolean } = {}) {
+  const inserted: any[] = []; const updates: any[] = []; const reads: string[] = []; const queries: any[] = [];
+  const query = (t: string, cols: string, filters: Array<[string, unknown]>): any => ({
+    eq: (k: string, v: unknown) => query(t, cols, [...filters, [k, v]]),
+    order: () => query(t, cols, filters),
+    maybeSingle: async () => { reads.push(t); queries.push({ t, cols, filters }); return { data: t === 'chat_sessions' ? session : null }; },
+    limit: async () => {
+      reads.push(t); queries.push({ t, cols, filters });
+      if (t !== 'chat_messages') return { data: [] };
+      if (filters.some(([k]) => k === 'metadata->copilot->>contact_requested')) return { data: opts.contactRow ? [{ id: 'old' }] : [] };
+      const fresh = inserted.filter((i) => i.t === 'chat_messages').map((i) => ({ role: i.row.role, content: i.row.content, metadata: i.row.metadata ?? {} })).reverse();
+      return { data: [...fresh, ...(opts.history ?? [])] };
+    },
+  });
   const db: any = {
-    inserted, updates, reads,
+    inserted, updates, reads, queries,
     from: (t: string) => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => { reads.push(t); return { data: t === 'chat_sessions' ? session : null }; },
-          order: () => ({ limit: async () => { reads.push(t); return { data: t === 'chat_messages' ? (opts.history ?? []) : [] }; } }),
-        }),
-      }),
+      select: (cols: string) => query(t, cols, []),
       insert: (row: any) => ({ select: () => ({ single: async () => {
         if (opts.insertError) return { data: null, error: opts.insertError };
         inserted.push({ t, row }); return { data: { id: `m${inserted.length}` }, error: null };
@@ -237,6 +249,95 @@ describe('runCopilotTurn', () => {
     expect(db.inserted.find((i: any) => i.row.role === 'assistant').row.content).toBe('You can join as a');
   });
 
+  it('puts the new user message in the model input exactly once, even though it is saved first', async () => {
+    const history = [{ role: 'assistant', content: 'A1', metadata: {} }, { role: 'user', content: 'Q1', metadata: {} }];
+    const db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 2, last_response_id: null }, { history });
+    const deps = baseDeps(db);
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'Q2' }, emit, deps);
+    const p = (deps.model as any).mock.calls[0][0];
+    expect(p.input.filter((m: any) => m.content === 'Q2')).toHaveLength(1);
+    expect(p.fallbackInput.filter((m: any) => m.content === 'Q2')).toHaveLength(1);
+    expect(db.inserted[0].row).toMatchObject({ role: 'user', content: 'Q2' });
+  });
+
+  // ---- fallback and the chain ----
+
+  const liveChain = () => ({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 2, last_response_id: 'resp_0', last_turn_at: new Date(Date.now() - 60_000).toISOString() });
+  const twoTurns = [{ role: 'assistant', content: 'A1', metadata: {} }, { role: 'user', content: 'Q1', metadata: {} }];
+  const fullHistoryInput = [{ role: 'user', content: 'Q1' }, { role: 'assistant', content: 'A1' }, { role: 'user', content: 'Q2' }];
+
+  it('always hands the model the self-contained history input for the fallback', async () => {
+    const db = makeDb(liveChain(), { history: twoTurns });
+    const deps = baseDeps(db, { now: () => new Date() });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'Q2' }, emit, deps);
+    const p = (deps.model as any).mock.calls[0][0];
+    expect(p.input).toEqual([{ role: 'user', content: 'Q2' }]);
+    expect(p.fallbackInput).toEqual(fullHistoryInput);
+  });
+
+  it('a chained turn whose primary fails falls back on the history and drops the chain', async () => {
+    const create = vi.fn()
+      .mockRejectedValueOnce(new Error('primary down'))
+      .mockResolvedValueOnce({ id: 'resp_fb', output_text: 'Fallback answer.', usage: { input_tokens: 5, output_tokens: 2 } });
+    const db = makeDb(liveChain(), { history: twoTurns });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'Q2' }, emit,
+      baseDeps(db, { now: () => new Date(), model: (p: any) => streamCopilotModel(p, { responses: { create } }) }));
+    expect(create.mock.calls[0][0]).toMatchObject({ previous_response_id: 'resp_0', input: [{ role: 'user', content: 'Q2' }] });
+    expect(create.mock.calls[1][0].input).toEqual(fullHistoryInput);
+    expect(create.mock.calls[1][0]).not.toHaveProperty('previous_response_id');
+    expect(visibleOf(emitted)).toBe('Fallback answer.');
+    expect(db.updates[0].patch.last_response_id).toBeNull();
+    expect(db.updates[0].patch.message_count).toBe(4);
+  });
+
+  it('a chained turn answered by the primary keeps the new response id', async () => {
+    const create = vi.fn(async () => ({ async *[Symbol.asyncIterator]() {
+      yield { type: 'response.output_text.delta', delta: 'Primary answer.' };
+      yield { type: 'response.completed', response: { id: 'resp_new', usage: { input_tokens: 5, output_tokens: 2 } } };
+    } }));
+    const db = makeDb(liveChain(), { history: twoTurns });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'Q2' }, emit,
+      baseDeps(db, { now: () => new Date(), model: (p: any) => streamCopilotModel(p, { responses: { create } }) }));
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(db.updates[0].patch.last_response_id).toBe('resp_new');
+  });
+
+  it('stores a null chain when the model reports a fallback', async () => {
+    const db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'q' }, emit,
+      baseDeps(db, { model: modelSaying('Hi.', { responseId: 'resp_fb', fellBack: true } as any) }));
+    expect(db.updates[0].patch.last_response_id).toBeNull();
+  });
+
+  // ---- empty answers and failures after the model ----
+
+  it.each([
+    ['META only', '<<META>>{"cited":[1]}<</META>>'],
+    ['only a removed link', 'https://evil.example/pay\n<<META>>{"cited":[]}<</META>>'],
+  ])('answers with a neutral sentence when the visible answer is empty (%s)', async (_l, text) => {
+    const db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'q' }, emit, baseDeps(db, { model: modelSaying(text) }));
+    expect(visibleOf(emitted).trim()).toBe(EMPTY_ANSWER);
+    expect(db.inserted.find((i: any) => i.row.role === 'assistant').row.content).toBe(EMPTY_ANSWER);
+    expect(emitted.at(-1)).toMatchObject({ type: 'done', messageId: 'm2' });
+  });
+
+  it('still saves the answer, finishes and records cost once when the follow-up steps throw', async () => {
+    const copilot: any = { ...assoc.config.copilot };
+    Object.defineProperty(copilot, 'contact_trigger', { enumerable: true, get() { throw new Error('bad config'); } });
+    const badAssoc = { ...assoc, config: { ...assoc.config, copilot } };
+    const db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
+    const recordCost = vi.fn();
+    const usage = [{ model: 'gpt-6-luna', inputTokens: 10, cachedInputTokens: 0, outputTokens: 5 }];
+    await runCopilotTurn({ tenant, assoc: badAssoc as any, visitor, sessionId: 's1', message: 'How do I join?' }, emit,
+      baseDeps(db, { recordCost, escalate: vi.fn(async () => ({ escalated: false, reason: null, notified: 0, deduped: false })), model: modelSaying(`Join [1].\n${META}`, { usage }) }));
+    expect(visibleOf(emitted)).toBe('Join [1].\n');
+    expect(db.inserted.find((i: any) => i.row.role === 'assistant').row.content).toBe('Join [1].');
+    expect(emitted).not.toContainEqual({ type: 'contact_request' });
+    expect(emitted.at(-1)).toMatchObject({ type: 'done', messageId: 'm2' });
+    expect(recordCost).toHaveBeenCalledTimes(1);
+  });
+
   // ---- cost ----
 
   it('records cost from a successful turn', async () => {
@@ -245,6 +346,7 @@ describe('runCopilotTurn', () => {
     const recordCost = vi.fn();
     await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'q' }, emit,
       baseDeps(db, { model: modelSaying('Hi.', { usage }), recordCost }));
+    expect(recordCost).toHaveBeenCalledTimes(1);
     expect(recordCost).toHaveBeenCalledWith({ accountId: 'acc', sessionId: 's1', usage });
   });
 
@@ -255,6 +357,7 @@ describe('runCopilotTurn', () => {
     const recordEvents = vi.fn();
     await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'q' }, emit,
       baseDeps(db, { model: vi.fn(async () => { throw new CopilotModelError('down', usage); }), recordCost, recordEvents }));
+    expect(recordCost).toHaveBeenCalledTimes(1);
     expect(recordCost).toHaveBeenCalledWith({ accountId: 'acc', sessionId: 's1', usage });
     expect(emitted.at(-1)).toEqual({ type: 'error', error: 'answer_unavailable' });
     expect(db.inserted.map((i: any) => i.row.role)).toEqual(['user']);
@@ -300,6 +403,30 @@ describe('runCopilotTurn', () => {
     db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
     await runCopilotTurn({ tenant, assoc: assoc as any, visitor: { ...visitor, email: 'a@b.com' }, sessionId: 's1', message: 'How do I join?' }, emit, baseDeps(db, { model: modelSaying(`Join [1].\n${META}`) }));
     expect(emitted).not.toContainEqual({ type: 'contact_request' });
+  });
+
+  it('counts questions across the whole session, not the 10-row window', async () => {
+    const cfg = { ...assoc, config: { ...assoc.config, copilot: { ...assoc.config.copilot, contact_trigger: { kind: 'after_n_questions', n: 8 } } } };
+    const window = Array.from({ length: 10 }, (_, i) => ({ role: i % 2 ? 'user' : 'assistant', content: `m${i}`, metadata: {} }));
+    let db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 14 }, { history: window });
+    await runCopilotTurn({ tenant, assoc: cfg as any, visitor, sessionId: 's1', message: 'q' }, emit, baseDeps(db));
+    expect(emitted).toContainEqual({ type: 'contact_request' });
+    emitted = [];
+    db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 12 }, { history: window });
+    await runCopilotTurn({ tenant, assoc: cfg as any, visitor, sessionId: 's1', message: 'q' }, emit, baseDeps(db));
+    expect(emitted).not.toContainEqual({ type: 'contact_request' });
+  });
+
+  it('does not ask again when an earlier request is outside the loaded window', async () => {
+    let db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 30 }, { contactRow: true });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'How do I join?' }, emit, baseDeps(db, { model: modelSaying(`Join [1].\n${META}`) }));
+    expect(emitted).not.toContainEqual({ type: 'contact_request' });
+    const lookup = db.queries.find((q: any) => q.filters.some(([k]: any) => k === 'metadata->copilot->>contact_requested'));
+    expect(lookup.filters).toEqual([['session_id', 's1'], ['role', 'assistant'], ['metadata->copilot->>contact_requested', 'true']]);
+    emitted = [];
+    db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 30 }, { contactRow: false });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'How do I join?' }, emit, baseDeps(db, { model: modelSaying(`Join [1].\n${META}`) }));
+    expect(emitted).toContainEqual({ type: 'contact_request' });
   });
 
   // ---- member data ----
