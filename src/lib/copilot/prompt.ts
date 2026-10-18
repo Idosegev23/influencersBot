@@ -77,10 +77,11 @@ const PROTOCOL_RELATIVE = /(?<![:\w])\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+[^\s<>"')\]]
 // never match. How a match is treated depends on the TLD as written: see
 // sanitizeUntrusted.
 const BARE_DOMAIN = /(?<![@\w.-])[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}(?![A-Za-z0-9@-])(?:\/[^\s<>"')\]]*)?/g;
-// A TLD written with any capital letter is masked only when it is one of these, so
-// "today.Benefits", "travel.Membership" and "St.Louis" survive while "EVIL.COM" does not.
-const KNOWN_TLD = new Set(['com', 'org', 'net', 'edu', 'gov', 'io', 'co', 'us', 'uk', 'ca', 'au', 'de', 'fr', 'info', 'biz', 'app', 'dev', 'ai', 'me', 'tv', 'xyz', 'online', 'site', 'shop', 'store', 'club', 'live', 'news']);
-// Technology names spelt like a domain, kept exactly as written.
+// A last label is taken as a TLD when it is all lower-case, exactly two letters, all
+// upper-case, or one of these. Anything else (a mixed-case word of 3+ letters such as
+// "Benefits", "Louis", "Membership") is ordinary text, so "today.Benefits" survives.
+const KNOWN_TLD = new Set(['com', 'org', 'net', 'edu', 'gov', 'io', 'co', 'us', 'uk', 'ca', 'au', 'de', 'fr', 'info', 'biz', 'app', 'dev', 'ai', 'me', 'tv', 'xyz', 'online', 'site', 'shop', 'store', 'club', 'live', 'news', 'top', 'click', 'link', 'icu', 'buzz', 'sbs', 'cfd', 'lol', 'ru', 'cn']);
+// Technology names spelt like a domain, kept exactly as written when no path follows.
 const TECH_NAMES = new Set(['ASP.NET', 'VB.NET', 'ADO.NET']);
 // File and code extensions that look like a TLD but are not one worth masking.
 const NOT_A_TLD = new Set(['js', 'ts', 'jsx', 'tsx', 'json', 'css', 'xml', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'txt', 'csv', 'exe', 'mp3', 'mp4']);
@@ -107,12 +108,21 @@ function sanitizeUntrusted(text: string, siteHosts: string[]): string {
     .replace(SCHEME_OR_WWW, (m) => (onSite(/^www\./i.test(m) ? `https://${m}` : m, siteHosts) ? m : REMOVED))
     .replace(PROTOCOL_RELATIVE, mask('https:'))
     .replace(BARE_DOMAIN, (m) => {
-      const host = m.split('/')[0];
-      const tld = host.split('.').pop() ?? '';
-      if (tld !== tld.toLowerCase()) {
-        if (TECH_NAMES.has(host) || !KNOWN_TLD.has(tld.toLowerCase())) return m;
-      } else if (NOT_A_TLD.has(tld)) return m;
-      return onSite(`https://${m}`, siteHosts) ? m : REMOVED;
+      const slash = m.indexOf('/');
+      const host = slash < 0 ? m : m.slice(0, slash);
+      if (slash < 0 && TECH_NAMES.has(host)) return m;
+      const looksLikeTld = (l: string) =>
+        l === l.toLowerCase() || l.length === 2 || l === l.toUpperCase() || KNOWN_TLD.has(l.toLowerCase());
+      // A trailing ordinary word ("evil.com.Thanks") is text, not part of the host:
+      // drop it and judge what is left, so it cannot hide the domain in front.
+      const labels = host.split('.');
+      while (labels.length >= 2 && !looksLikeTld(labels[labels.length - 1])) labels.pop();
+      if (labels.length < 2) return m;
+      const tld = labels[labels.length - 1];
+      if (NOT_A_TLD.has(tld)) return m;
+      if (labels.length === host.split('.').length) return onSite(`https://${m}`, siteHosts) ? m : REMOVED;
+      const domain = labels.join('.');
+      return onSite(`https://${domain}`, siteHosts) ? m : REMOVED + m.slice(domain.length);
     });
 }
 
