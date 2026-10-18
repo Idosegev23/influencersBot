@@ -120,7 +120,7 @@ describe('POST /recap', () => {
     expect(await res.json()).toEqual({ ok: true });
     const mail = sendEmail.mock.calls[0][0];
     expect(mail.to).toBe('jane@acme.com');
-    expect(mail.from).toBe('ABA Assistant <assistant@mail.test>');
+    expect(mail.from).toBe('"ABA Assistant" <assistant@mail.test>');
     expect(mail.subject).toBe('Your conversation with the ABA assistant');
     expect(mail.html.indexOf('What are the dues?')).toBeLessThan(mail.html.indexOf('Dues are'));
     expect(mail.html).toContain('https://aba.org/dues');

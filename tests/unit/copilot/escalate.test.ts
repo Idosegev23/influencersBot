@@ -3,8 +3,11 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/lib/supabase', () => ({ supabase: {} }));
 vi.mock('@/lib/email', () => ({ sendEmail: vi.fn() }));
+// The staff-mail cap (src/lib/copilot/mail.ts) reads Redis; allowed unless a test says otherwise.
+const mailLimiter = vi.fn(async (_a: any): Promise<any> => ({ allowed: true, remaining: 1, resetAt: 0, retryAfterMs: 0 }));
+vi.mock('@/lib/redis', () => ({ redisSlidingWindowRateLimit: (a: any) => mailLimiter(a), isRedisAvailable: () => true }));
 
-import { escalateIfNeeded, detectEnglishEscalation } from '@/lib/copilot/escalate';
+import { escalateIfNeeded, detectEnglishEscalation, detectCopilotEscalation, assistantFrom } from '@/lib/copilot/escalate';
 
 function db(existing: any[] = []) {
   const inserts: any[] = [];
@@ -78,7 +81,7 @@ describe('escalateIfNeeded fixes', () => {
       const sendEmail = vi.fn(async () => ({ success: true }));
       await escalateIfNeeded(input, { detect: detectYes, sendEmail: sendEmail as any, db: db() });
       const mail = (sendEmail.mock.calls[0] as any)[0];
-      expect(mail.from.startsWith('American Bus Association Assistant <')).toBe(true);
+      expect(mail.from.startsWith('"American Bus Association Assistant" <')).toBe(true);
       expect(mail.from.split('<')[0]).not.toMatch(/bestie|influencerbot|imai/i);
       delete process.env.GMAIL_SEND_FROM;
       const send2 = vi.fn(async () => ({ success: true }));
@@ -152,7 +155,95 @@ describe('escalateIfNeeded merged path (real shared detector)', () => {
     ['can I talk to a person', 'Asked for a staff member'],
     ['Can I speak with someone about membership?', 'Asked for a staff member'],
     ["I'll contact my lawyer", 'Mentions legal action'],
+    ['I will sue you', 'Mentions legal action'],
+    ['my lawyer will contact you', 'Mentions legal action'],
+    ['We are filing a lawsuit against ABA', 'Mentions legal action'],
+    ['I am taking legal action against the association', 'Mentions legal action'],
   ])('escalates: %s', async (m, reason) => {
     expect(await run(m)).toMatchObject({ escalated: true, reason });
+  });
+});
+
+describe('legal: the shared detector is ignored, Copilot-local threats only', () => {
+  const run = (userMessage: string) => escalateIfNeeded({ ...input, userMessage, priorUserMessages: [] }, { sendEmail: vi.fn(async () => ({ success: true })) as any, db: db() });
+  it.each([
+    'What has the court decided about the ELD mandate?',
+    'Can ABA recommend an attorney for DOT compliance?',
+    'Do you have a lawyer referral service for members?',
+    'Where is the legal action center on your site?',
+    'Has ABA filed a lawsuit over the new FMCSA rule?',
+  ])('domain question does not escalate: %s', async (m) => {
+    expect(await run(m)).toEqual({ escalated: false, reason: null, notified: 0, deduped: false });
+  });
+  it('keeps abuse and sustained anger from the shared detector', async () => {
+    const r = detectCopilotEscalation('you are useless, this is ridiculous', ['this is ridiculous']);
+    expect(r.escalate).toBe(true);
+    expect(r.triggers).toContain('sustained_anger');
+    const shared = vi.fn(() => ({ escalate: true, severity: 'critical', reason: 'x', triggers: ['abuse', 'legal', 'human_demand'] })) as any;
+    const v = detectCopilotEscalation('whatever', [], shared);
+    expect(v.triggers).toEqual(['abuse']);
+    expect(v.severity).toBe('critical');
+  });
+});
+
+describe('escalation verdict computed up front (I5)', () => {
+  it('uses a precomputed verdict instead of detecting again', async () => {
+    const detect = vi.fn() as any;
+    const d = db();
+    const r = await escalateIfNeeded({ ...input, verdict: { escalate: true, severity: 'high', triggers: ['human_demand'] } }, { detect, sendEmail: vi.fn(async () => ({ success: true })) as any, db: d });
+    expect(detect).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ escalated: true, reason: 'Asked for a staff member' });
+    const none = await escalateIfNeeded({ ...input, verdict: { escalate: false, severity: null, triggers: [] } }, { detect, sendEmail: vi.fn() as any, db: db() });
+    expect(none.escalated).toBe(false);
+  });
+});
+
+describe('escalation mail cap and timeout (I2, I5)', () => {
+  it('records the request but sends no email when the association mail cap is reached', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mailLimiter.mockResolvedValueOnce({ allowed: false, remaining: 0, resetAt: 0, retryAfterMs: 1000 });
+    const d = db();
+    const sendEmail = vi.fn(async () => ({ success: true }));
+    const r = await escalateIfNeeded(input, { detect: detectYes, sendEmail: sendEmail as any, db: d });
+    expect(r).toMatchObject({ escalated: true, notified: 0, deduped: false });
+    expect(d.inserts).toHaveLength(1);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(mailLimiter).toHaveBeenLastCalledWith(expect.objectContaining({ key: 'rl:copilot:mail:acc', limit: 30 }));
+    expect(err.mock.calls.some((c) => c[0] === '[copilot/mail]')).toBe(true);
+    err.mockRestore();
+  });
+  it('does not hang on a stuck email send', async () => {
+    vi.useFakeTimers();
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const p = escalateIfNeeded(input, { detect: detectYes, sendEmail: vi.fn(() => new Promise(() => {})) as any, db: db() });
+      await vi.advanceTimersByTimeAsync(10_001);
+      expect(await p).toMatchObject({ escalated: true, notified: 0 });
+    } finally {
+      vi.useRealTimers();
+      err.mockRestore();
+    }
+  });
+});
+
+describe('assistantFrom (M2)', () => {
+  const withFrom = (fn: () => void) => {
+    const prev = process.env.GMAIL_SEND_FROM;
+    process.env.GMAIL_SEND_FROM = 'mailbox@platform.test';
+    try { fn(); } finally { if (prev === undefined) delete process.env.GMAIL_SEND_FROM; else process.env.GMAIL_SEND_FROM = prev; }
+  };
+  it('quotes an ASCII display name and strips quotes and backslashes', () => withFrom(() => {
+    expect(assistantFrom('American Bus Association')).toBe('"American Bus Association Assistant" <mailbox@platform.test>');
+    expect(assistantFrom('A "B" \\ C, Inc.\r\nBcc: x@y.z')).toBe('"A B C, Inc. Bcc: x@y.z Assistant" <mailbox@platform.test>');
+  }));
+  it('RFC 2047-encodes a non-ASCII display name', () => withFrom(() => {
+    const from = assistantFrom('LA BEAUTÉ')!;
+    const encoded = Buffer.from('LA BEAUTÉ Assistant', 'utf8').toString('base64');
+    expect(from).toBe(`=?UTF-8?B?${encoded}?= <mailbox@platform.test>`);
+  }));
+  it('is undefined without a sender mailbox', () => {
+    const prev = process.env.GMAIL_SEND_FROM;
+    delete process.env.GMAIL_SEND_FROM;
+    try { expect(assistantFrom('ABA')).toBeUndefined(); } finally { if (prev !== undefined) process.env.GMAIL_SEND_FROM = prev; }
   });
 });
