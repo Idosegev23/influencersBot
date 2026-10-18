@@ -3,7 +3,7 @@ import { loadAssociation } from '@/lib/copilot/association';
 import { getVisitor } from '@/lib/copilot/visitors';
 import { recordEvents } from '@/lib/copilot/events';
 import { checkChatLimits } from '@/lib/copilot/rate-limit';
-import { assistantFrom } from '@/lib/copilot/escalate';
+import { assistantSender } from '@/lib/copilot/escalate';
 import { buildRecapEmail, recipientHash, type RecapLink } from '@/lib/copilot/recap';
 import { bad, isUuid, readJsonBody, limited, associationNameOf } from '@/lib/copilot/http';
 import type { AssociationTenant } from '@/lib/copilot/tenant';
@@ -83,10 +83,12 @@ export async function POST(req: Request) {
 
   const associationName = associationNameOf(config);
   const { subject, html } = buildRecapEmail({ associationName, messages, sources });
-  const from = assistantFrom(associationName);
+  // A recap goes to the visitor: never from the platform mailbox.
+  const sender = assistantSender(associationName, { staffOnly: false });
+  if (!sender) { log('COPILOT_SEND_FROM not set, recap not sent', tenant.accountId); return bad(502, 'recap_unavailable'); }
   let sent = false;
   try {
-    const r = await sendEmail({ to, subject, html, ...(from ? { from } : {}) });
+    const r = await sendEmail({ to, subject, html, ...sender });
     sent = !!r?.success;
     if (!sent) log('recap email failed', tenant.accountId, r?.error);
   } catch (e) {

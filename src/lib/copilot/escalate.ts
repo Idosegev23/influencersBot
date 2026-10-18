@@ -79,9 +79,35 @@ export function staffRecipients(config: unknown): string[] {
 }
 
 /** `From` header in the association's name, or undefined when no sender mailbox is configured. */
+/** The partner-branded sender mailbox (address only), or null when unset or not a plain address. */
+export function copilotSendFrom(): string | null {
+  const a = process.env.COPILOT_SEND_FROM?.trim();
+  return a && /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/.test(a) ? a : null;
+}
+
+/**
+ * From header plus the mailbox to send as, for Co-Pilot mail. The white-label
+ * mailbox COPILOT_SEND_FROM is used when set (and impersonated, so Gmail does
+ * not rewrite it to the platform mailbox). Without it, mail to a visitor is not
+ * sent at all (null); mail to the association's own staff (escalations, contact
+ * notes) falls back to the platform mailbox so it never silently drops.
+ */
+export function assistantSender(associationName: string, opts: { staffOnly: boolean }): { from: string; impersonate?: string } | null {
+  const own = copilotSendFrom();
+  if (own) return { from: displayFrom(associationName, own), impersonate: own };
+  if (!opts.staffOnly) return null;
+  const platform = process.env.GMAIL_SEND_FROM?.trim();
+  return platform ? { from: displayFrom(associationName, platform) } : null;
+}
+
+/** Platform-mailbox From header (kept for callers and tests of the original helper). */
 export function assistantFrom(associationName: string): string | undefined {
   const sendFrom = process.env.GMAIL_SEND_FROM?.trim();
   if (!sendFrom) return undefined;
+  return displayFrom(associationName, sendFrom);
+}
+
+function displayFrom(associationName: string, sendFrom: string): string {
   // Display name only: strip characters that could break or inject into the From header.
   const cleaned = associationName.replace(/[\r\n<>"\\]/g, ' ').replace(/\s+/g, ' ').trim();
   const displayName = `${cleaned} Assistant`.trim();
@@ -148,13 +174,13 @@ export async function escalateIfNeeded(
 
   const lines = input.transcript.slice(-12).map((m) => `<p><b>${m.role === 'user' ? 'Visitor' : 'Assistant'}:</b> ${esc(m.content)}</p>`).join('');
   const html = `<div style="font-family:Arial,sans-serif;font-size:14px"><p>A visitor on the ${esc(input.associationName)} website needs a staff member.</p><p><b>Reason:</b> ${esc(reason)}<br><b>Visitor:</b> ${esc(input.visitorLabel)}</p><hr>${lines}</div>`;
-  const from = assistantFrom(input.associationName);
+  const sender = assistantSender(input.associationName, { staffOnly: true });
   // Capped per association and bounded by a timeout; never throws.
   const r = await sendCopilotMail(input.accountId, {
     to: recipients,
     subject: `[${input.associationName}] Visitor needs a staff member: ${reason}`,
     html,
-    ...(from ? { from } : {}),
+    ...(sender ?? {}),
   }, { send });
   if (!r?.success) console.error('[copilot/escalate]', 'email failed', input.accountId, r?.error);
   return { escalated: true, reason, notified: r?.success ? recipients.length : 0, deduped: false };

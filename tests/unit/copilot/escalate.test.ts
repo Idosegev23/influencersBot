@@ -91,6 +91,22 @@ describe('escalateIfNeeded fixes', () => {
       if (prev === undefined) delete process.env.GMAIL_SEND_FROM; else process.env.GMAIL_SEND_FROM = prev;
     }
   });
+  it('sends as the white-label mailbox when COPILOT_SEND_FROM is set', async () => {
+    const prev = [process.env.GMAIL_SEND_FROM, process.env.COPILOT_SEND_FROM];
+    try {
+      process.env.GMAIL_SEND_FROM = 'mailbox@platform.test';
+      process.env.COPILOT_SEND_FROM = 'assistant@multiview.test';
+      const sendEmail = vi.fn(async () => ({ success: true }));
+      await escalateIfNeeded(input, { detect: detectYes, sendEmail: sendEmail as any, db: db() });
+      const mail = (sendEmail.mock.calls[0] as any)[0];
+      expect(mail.from).toBe('"American Bus Association Assistant" <assistant@multiview.test>');
+      expect(mail.impersonate).toBe('assistant@multiview.test');
+      expect(JSON.stringify(mail)).not.toContain('platform.test');
+    } finally {
+      if (prev[0] === undefined) delete process.env.GMAIL_SEND_FROM; else process.env.GMAIL_SEND_FROM = prev[0];
+      if (prev[1] === undefined) delete process.env.COPILOT_SEND_FROM; else process.env.COPILOT_SEND_FROM = prev[1];
+    }
+  });
   it('drops malformed recipients and logs a failed send', async () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const sendEmail = vi.fn(async () => ({ success: false, error: 'boom' }));

@@ -31,7 +31,8 @@ beforeEach(() => {
   allowed = true;
   limiter.mockClear();
   send.mockClear();
-  process.env.GMAIL_SEND_FROM = 'mailbox@example.test';
+  process.env.COPILOT_SEND_FROM = 'mailbox@example.test';
+  process.env.GMAIL_SEND_FROM = 'vendor-mailbox@platform.test';
   db = memoryDb({
     console_users: [
       { id: 'u-owner', partner_id: P, account_id: null, email: 'owner@mv.test', name: 'Olive', role: 'owner', status: 'active' },
@@ -71,7 +72,8 @@ describe('requestLoginCode', () => {
     expect(row.code_hash).toBe(hashLoginCode('u-owner', code));
     expect(row.code_hash).not.toContain(code);
     expect(Date.parse(row.expires_at) - now).toBe(CODE_TTL_MS);
-    expect(sent[0]).toMatchObject({ to: 'owner@mv.test', from: '"Multiview" <mailbox@example.test>', subject: 'Your sign-in code' });
+    expect(sent[0]).toMatchObject({ to: 'owner@mv.test', from: '"Multiview" <mailbox@example.test>', impersonate: 'mailbox@example.test', subject: 'Your sign-in code' });
+    expect(JSON.stringify(sent[0])).not.toContain('platform.test');
     expect(JSON.stringify(sent[0]).toLowerCase()).not.toMatch(/bestie|influencerbot|ldrs|imai/);
   });
 
@@ -103,8 +105,9 @@ describe('requestLoginCode', () => {
     expect((await verifyLoginCode({ partnerId: P, email: 'owner@mv.test', code: second }, { ...deps(), secret: SECRET })).ok).toBe(true);
   });
 
-  it('never sends without a configured sender (would use the default vendor name)', async () => {
-    delete process.env.GMAIL_SEND_FROM;
+  it('never sends without COPILOT_SEND_FROM, even when the platform mailbox is set', async () => {
+    delete process.env.COPILOT_SEND_FROM;
+    process.env.GMAIL_SEND_FROM = 'vendor-mailbox@platform.test';
     const d = await requestLoginCode({ partnerId: P, email: 'owner@mv.test' }, deps());
     await d!();
     expect(send).not.toHaveBeenCalled();

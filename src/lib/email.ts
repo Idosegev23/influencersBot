@@ -58,9 +58,20 @@ function isConfigured(): boolean {
 
 // ── Auth ──
 
-function getAuthClient() {
+/**
+ * The mailbox the service account acts as. Gmail sends from the authenticated
+ * mailbox: a From address that is not that mailbox (or one of its verified
+ * send-as aliases) is rewritten to it. A caller that must send from another
+ * address passes `impersonate` (a mailbox in the same Workspace, covered by
+ * domain-wide delegation); the send fails rather than going out from ours.
+ */
+export function gmailSubjectFor(options: { impersonate?: string }): string | undefined {
+  return options.impersonate?.trim() || SEND_FROM;
+}
+
+function getAuthClient(subject: string | undefined = SEND_FROM) {
   const creds = getServiceAccountCredentials();
-  if (!creds || !SEND_FROM) {
+  if (!creds || !subject) {
     throw new Error('Gmail API not configured. Check GOOGLE_SERVICE_ACCOUNT_KEY and GMAIL_SEND_FROM.');
   }
 
@@ -68,7 +79,7 @@ function getAuthClient() {
     email: creds.client_email,
     key: creds.private_key,
     scopes: ['https://www.googleapis.com/auth/gmail.send'],
-    subject: SEND_FROM,
+    subject,
   });
 }
 
@@ -175,6 +186,8 @@ export interface SendEmailOptions {
    * to an end customer must carry the brand's own address here (see @/lib/support/reply-address).
    */
   replyTo?: string;
+  /** Send as this mailbox (Gmail API subject) instead of GMAIL_SEND_FROM. See gmailSubjectFor. */
+  impersonate?: string;
 }
 
 export interface SendEmailWithAttachmentsOptions extends SendEmailOptions {
@@ -192,7 +205,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{
   }
 
   try {
-    const auth = getAuthClient();
+    const auth = getAuthClient(gmailSubjectFor(options));
     const gmail = google.gmail({ version: 'v1', auth });
 
     const raw = buildRawEmail(options);

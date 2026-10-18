@@ -5,7 +5,7 @@ import { identityFromEmail, companyFromEmail } from '@/lib/copilot/identity';
 import { getAmsAdapter } from '@/lib/copilot/ams';
 import { recordEvents, type InteractionEventInput } from '@/lib/copilot/events';
 import { checkChatLimits } from '@/lib/copilot/rate-limit';
-import { escapeHtml as esc, staffRecipients, assistantFrom } from '@/lib/copilot/escalate';
+import { escapeHtml as esc, staffRecipients, assistantSender } from '@/lib/copilot/escalate';
 import { bad, isUuid, readJsonBody, limited, associationNameOf } from '@/lib/copilot/http';
 import type { IdentityUpdate } from '@/lib/copilot/identity';
 import type { AssociationTenant } from '@/lib/copilot/tenant';
@@ -134,14 +134,14 @@ export async function POST(req: Request) {
       + `<p><b>Name ${UNVERIFIED}:</b> ${esc(name ?? 'Not given')}<br><b>Email ${UNVERIFIED}:</b> ${esc(email)}<br><b>Company ${UNVERIFIED}:</b> ${esc(company ?? 'Not given')}`
       + (matched ? `<br><b>Company matched from the email address:</b> ${esc(matched)}` : '') + '</p>'
       + (lines ? `<hr><p><b>Recent conversation</b></p>${lines}` : '') + '</div>';
-    const from = assistantFrom(associationName);
+    const sender = assistantSender(associationName, { staffOnly: true });
     // Capped per association, bounded by a timeout, never throws.
     const r = await sendCopilotMail(tenant.accountId, {
       to: recipients,
       subject: `[${associationName.replace(/[\r\n]+/g, ' ')}] New contact from the website assistant`,
       html,
       replyTo: email,
-      ...(from ? { from } : {}),
+      ...(sender ?? {}),
     });
     staffNotified = !!r?.success;
     if (!r?.success) log('staff email not sent', tenant.accountId, r?.error);

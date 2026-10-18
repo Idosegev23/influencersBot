@@ -24,7 +24,7 @@ const req = (path: string, body: any) => new Request(`http://x/api/partner/v1/co
 
 beforeEach(() => {
   process.env.CONSOLE_SESSION_SECRET = 'k'.repeat(48);
-  process.env.GMAIL_SEND_FROM = 'mailbox@example.test';
+  process.env.COPILOT_SEND_FROM = 'mailbox@example.test';
   db = memoryDb({
     console_users: [{ id: 'u1', partner_id: P, account_id: null, email: 'owner@mv.test', name: 'Olive', role: 'owner', status: 'active' }],
     console_login_codes: [],

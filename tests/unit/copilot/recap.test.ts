@@ -94,7 +94,17 @@ describe('POST /recap', () => {
     getVisitor.mockResolvedValue({ ...baseVisitor });
     checkChatLimits.mockResolvedValue({ allowed: true });
     sendEmail.mockResolvedValue({ success: true });
-    process.env.GMAIL_SEND_FROM = 'assistant@mail.test';
+    process.env.GMAIL_SEND_FROM = 'platform@vendor.test';
+    process.env.COPILOT_SEND_FROM = 'assistant@mail.test';
+  });
+
+  it('502 recap_unavailable without COPILOT_SEND_FROM: a visitor never gets mail from the platform mailbox', async () => {
+    delete process.env.COPILOT_SEND_FROM;
+    getVisitor.mockResolvedValueOnce({ ...baseVisitor, email: 'jane@acme.com' });
+    const res = await POST(req({ visitorId: VID, sessionId: SID }));
+    expect(res.status).toBe(502);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(recordEvents).not.toHaveBeenCalled();
   });
 
   it('409 recap_not_configured unless enabled, without sending', async () => {
@@ -121,6 +131,8 @@ describe('POST /recap', () => {
     const mail = sendEmail.mock.calls[0][0];
     expect(mail.to).toBe('jane@acme.com');
     expect(mail.from).toBe('"ABA Assistant" <assistant@mail.test>');
+    expect(mail.impersonate).toBe('assistant@mail.test');
+    expect(JSON.stringify(mail)).not.toContain('vendor.test');
     expect(mail.subject).toBe('Your conversation with the ABA assistant');
     expect(mail.html.indexOf('What are the dues?')).toBeLessThan(mail.html.indexOf('Dues are'));
     expect(mail.html).toContain('https://aba.org/dues');

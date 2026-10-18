@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { sendEmail } from '@/lib/email';
 import { redisSlidingWindowRateLimit, isRedisAvailable } from '@/lib/redis';
 import { requireTenant } from './auth';
+import { copilotSendFrom } from './escalate';
 import type { Tenant } from './tenant';
 
 export type ConsoleRole = 'owner' | 'admin' | 'viewer';
@@ -95,9 +96,10 @@ export async function holdUntil(startedAt: number, min = MIN_RESPONSE_MS, now = 
   if (left > 0) await sleep(left);
 }
 
-function partnerFrom(): string | null {
-  const sendFrom = process.env.GMAIL_SEND_FROM?.trim();
-  return sendFrom ? `"Multiview" <${sendFrom}>` : null;
+/** Sign-in codes go out only from the white-label mailbox, as that mailbox; never from the platform one. */
+function partnerSender(): { from: string; impersonate: string } | null {
+  const a = copilotSendFrom();
+  return a ? { from: `"Multiview" <${a}>`, impersonate: a } : null;
 }
 
 export function loginCodeEmail(code: string): { subject: string; html: string } {
@@ -171,11 +173,11 @@ export async function requestLoginCode(
   if (insErr) { log('code insert failed', insErr.message); return null; }
 
   return async () => {
-    const from = partnerFrom();
-    // Without a configured sender the mail would go out under the default (vendor) name: never.
-    if (!from) { log('GMAIL_SEND_FROM not set, sign-in code not sent'); return; }
+    const sender = partnerSender();
+    // Without the white-label mailbox the mail would go out from the platform's: never.
+    if (!sender) { log('COPILOT_SEND_FROM not set, sign-in code not sent'); return; }
     try {
-      const r = await d.send({ to: email, from, ...loginCodeEmail(code) });
+      const r = await d.send({ to: email, ...sender, ...loginCodeEmail(code) });
       if (!r?.success) log('sign-in code email failed', r?.error);
     } catch (e) {
       log('sign-in code email threw', e);
