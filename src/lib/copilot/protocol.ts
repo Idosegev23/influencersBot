@@ -29,6 +29,13 @@ export const EMPTY_META: CopilotMeta = Object.freeze({ ...emptyMeta(), cited: Ob
 const MARKERS = [META_OPEN.toLowerCase(), META_CLOSE.toLowerCase()];
 const STRAY_CLOSE = /<<\/META>>/gi;
 
+/** Remove stray close markers until none is left (removal can splice a new one together). */
+function stripStrayClose(s: string): string {
+  let prev: string;
+  do { prev = s; s = s.replace(STRAY_CLOSE, ''); } while (s !== prev);
+  return s;
+}
+
 /** Length of the longest suffix of s that is a proper prefix of a marker (case-insensitive). */
 function heldSuffixLength(s: string): number {
   const lower = s.toLowerCase();
@@ -49,15 +56,22 @@ export function createVisibleTextSplitter() {
     push(delta: string): string {
       if (inMeta) { meta += delta; return ''; }
       buffer += delta;
-      const i = buffer.toLowerCase().indexOf(META_OPEN.toLowerCase());
+      const openAt = (t: string) => t.toLowerCase().indexOf(META_OPEN.toLowerCase());
+      // Strip stray close markers only from text before the real open marker, so the
+      // real close marker is never eaten; re-check afterwards because removal can
+      // splice a new marker together (`<<ME<</META>>TA>>`).
+      let i = openAt(buffer);
+      if (i >= 0) { buffer = stripStrayClose(buffer.slice(0, i)) + buffer.slice(i); } else { buffer = stripStrayClose(buffer); }
+      i = openAt(buffer);
       if (i >= 0) {
-        const out = buffer.slice(0, i).replace(STRAY_CLOSE, '');
+        let out = buffer.slice(0, i);
+        const partial = heldSuffixLength(out);
+        if (partial >= 2) out = out.slice(0, out.length - partial);
         meta = buffer.slice(i + META_OPEN.length);
         buffer = '';
         inMeta = true;
         return out;
       }
-      buffer = buffer.replace(STRAY_CLOSE, '');
       const hold = heldSuffixLength(buffer);
       const out = buffer.slice(0, buffer.length - hold);
       buffer = buffer.slice(buffer.length - hold);
@@ -67,11 +81,11 @@ export function createVisibleTextSplitter() {
       if (!inMeta) {
         // A held suffix of two or more characters is a partial marker from a truncated
         // stream: drop it. A single held "<" is ordinary text.
-        const v = buffer.length >= 2 ? '' : buffer;
+        const v = buffer.length >= 2 ? '' : stripStrayClose(buffer);
         buffer = '';
         return { visible: v, rawMeta: null };
       }
-      const close = meta.indexOf(META_CLOSE);
+      const close = meta.toLowerCase().indexOf(META_CLOSE.toLowerCase());
       return { visible: '', rawMeta: (close >= 0 ? meta.slice(0, close) : meta).trim() || null };
     },
   };

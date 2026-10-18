@@ -42,6 +42,19 @@ describe('createVisibleTextSplitter', () => {
       expect(end.rawMeta).toBe('{"cited":[1]}');
     }
   });
+  it('finds the close marker case-insensitively', () => {
+    const s = createVisibleTextSplitter();
+    s.push('Hi\n<<META>>{"cited":[1]}<</meta>> junk');
+    expect(s.end().rawMeta).toBe('{"cited":[1]}');
+  });
+  it('strips spliced stray close markers to a fixed point', () => {
+    const s = createVisibleTextSplitter();
+    const shown = s.push('a <</ME<</META>>TA>> b') + s.end().visible;
+    expect(shown).toBe('a  b');
+    const t = createVisibleTextSplitter();
+    expect(t.push('x <<ME<</META>>TA>>{"cited":[1]}').trim()).toBe('x');
+    expect(t.end().rawMeta).toBe('{"cited":[1]}');
+  });
   it('reports no meta when the model omits it', () => {
     const s = createVisibleTextSplitter();
     s.push('Plain answer.');

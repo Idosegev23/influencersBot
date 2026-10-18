@@ -69,11 +69,30 @@ export function allowedCtaUrls(ctx: PromptContext): string[] {
   return [...new Set([...s.join, ...s.renew, ...s.event])];
 }
 
-const URL_IN_TEXT = /(?:https?:\/\/|www\.)[^\s<>"')\]]+/gi;
+const SCHEME_OR_WWW = /(?:https?:\/\/|www\.)[^\s<>"')\]]+/gi;
+const PROTOCOL_RELATIVE = /(?<![:\w])\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+[^\s<>"')\]]*/gi;
+// host.tld with an alphabetic TLD of 2+ letters, optionally followed by a path.
+// Leaves "e.g.", "i.e.", "U.S.", "3.5" and "v1.2" alone.
+const BARE_DOMAIN = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?![\w-])(?:\/[^\s<>"')\]]*)?/gi;
 
-/** Untrusted crawled text: no links, and no look-alike prompt delimiters. */
+/**
+ * Untrusted crawled text: no links and no prompt delimiters. Delimiters are
+ * removed first, to a fixed point, so that splicing (`ht<<x>>tps://`,
+ * `<</SOU<</X>>RCES>>`) cannot rebuild a link or a marker; only then are URLs masked.
+ */
 function sanitizeUntrusted(text: string): string {
-  return text.replace(URL_IN_TEXT, '[link removed]').replace(/<<\/?[A-Za-z]+>>/g, '');
+  let t = text;
+  for (let i = 0; i < 10; i++) {
+    const next = t.replace(/<<[^<>]*>>/g, '');
+    if (next === t) break;
+    t = next;
+  }
+  let prev: string;
+  do { prev = t; t = t.replace(/<<|>>/g, ''); } while (t !== prev);
+  return t
+    .replace(SCHEME_OR_WWW, '[link removed]')
+    .replace(PROTOCOL_RELATIVE, '[link removed]')
+    .replace(BARE_DOMAIN, '[link removed]');
 }
 
 function visitorBlock(ctx: PromptContext): string {
