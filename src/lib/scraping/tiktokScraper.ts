@@ -78,25 +78,41 @@ export function pickJpegCover(video: any): string | undefined {
 }
 
 export async function getTiktokVideos(handle: string, limit = 20): Promise<TiktokVideo[]> {
+  // The endpoint returns 10 per page and reports has_more / max_cursor. Reading only the
+  // first page capped every account at 10 videos whatever `limit` asked for (verified on
+  // @godomrep: 113 videos, 10 scanned). `max_cursor` is the paging parameter; `cursor` is
+  // silently ignored and returns page one again.
+  const out: TiktokVideo[] = [];
+  const seen = new Set<string>();
+  let cursor: string | undefined;
   try {
-    const { data } = await client().get('/v3/tiktok/profile/videos', { params: { handle: normalizeTiktokHandle(handle) } });
-    const list: any[] = data?.aweme_list || [];
-    return list
-      .slice(0, limit)
-      .map((v) => ({
-        id: String(v.aweme_id),
-        shareUrl: v.share_url,
-        desc: v.desc,
-        views: v.statistics?.play_count,
-        likes: v.statistics?.digg_count,
-        comments: v.statistics?.comment_count,
-        createTime: v.create_time,
-        cover: pickJpegCover(v.video),
-      }))
-      .filter((v) => v.id && v.shareUrl);
+    for (let page = 0; page < 12 && out.length < limit; page++) {
+      const { data } = await client().get('/v3/tiktok/profile/videos', {
+        params: { handle: normalizeTiktokHandle(handle), ...(cursor ? { max_cursor: cursor } : {}) },
+      });
+      const list: any[] = data?.aweme_list || [];
+      for (const v of list) {
+        const id = String(v.aweme_id);
+        if (!id || seen.has(id) || !v.share_url) continue;
+        seen.add(id);
+        out.push({
+          id,
+          shareUrl: v.share_url,
+          desc: v.desc,
+          views: v.statistics?.play_count,
+          likes: v.statistics?.digg_count,
+          comments: v.statistics?.comment_count,
+          createTime: v.create_time,
+          cover: pickJpegCover(v.video),
+        });
+      }
+      if (!data?.has_more || !data?.max_cursor || list.length === 0) break;
+      cursor = String(data.max_cursor);
+    }
   } catch {
-    return [];
+    // Keep what earlier pages returned; a failure on page N must not discard pages 1..N-1.
   }
+  return out.slice(0, limit);
 }
 
 /** Strip WEBVTT markup/timestamps to plain text. */

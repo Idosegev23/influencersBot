@@ -43,9 +43,17 @@ function client(): AxiosInstance {
 }
 
 /** A raw channel input (URL or @handle) → the params ScrapeCreators expects. */
-function channelParams(handleOrUrl: string): Record<string, string> {
+export function channelParams(handleOrUrl: string): Record<string, string> {
   const s = handleOrUrl.trim();
-  if (/youtube\.com|youtu\.be/i.test(s)) return { url: s };
+  if (/youtube\.com|youtu\.be/i.test(s)) {
+    // ScrapeCreators' channel endpoints no longer accept `url` — they answer HTTP 400
+    // "You must provide a handle or a channelId", which this module swallows, so every
+    // account given a YouTube LINK scanned zero videos with no error anywhere.
+    const channelId = s.match(/youtube\.com\/channel\/(UC[\w-]+)/i)?.[1];
+    if (channelId) return { channelId };
+    const name = s.match(/youtube\.com\/(?:@|c\/|user\/)([^/?#\s]+)/i)?.[1];
+    if (name) return { handle: `@${decodeURIComponent(name)}` };
+  }
   return { handle: s.startsWith('@') ? s : `@${s}` };
 }
 

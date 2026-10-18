@@ -6,7 +6,7 @@ import type { StepContext } from '../types';
 import { enrichSkips, type StepResult } from './index';
 
 const QUOTE_VIDEO_CAP = 10;
-const FULL_VIDEO_CAP = 25;
+const FULL_VIDEO_CAP = 40;
 
 // instagram_posts.views_count is int4 — clamp so a huge view count doesn't
 // overflow the column and fail the upsert.
