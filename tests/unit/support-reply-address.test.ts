@@ -30,6 +30,18 @@ describe('buildRawEmail Reply-To', () => {
   });
 });
 
+describe('buildRawEmail From', () => {
+  it('uses a passed From header instead of the BestieAI default', () => {
+    const raw = decode(buildRawEmail({ to: 'c@x.com', subject: 'hi', html: '<p>hi</p>', from: 'Acme Assistant <mail@x.com>' }));
+    expect(raw).toContain('From: Acme Assistant <mail@x.com>');
+    expect(raw).not.toContain('BestieAI');
+  });
+  it('keeps the BestieAI default when none is passed', () => {
+    const raw = decode(buildRawEmail({ to: 'c@x.com', subject: 'hi', html: '<p>hi</p>' }));
+    expect(raw).toContain('From: BestieAI <');
+  });
+});
+
 describe('resolveBrandReplyTo', () => {
   beforeEach(() => vi.resetModules());
 

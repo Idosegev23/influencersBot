@@ -167,6 +167,8 @@ export interface SendEmailOptions {
   cc?: string | string[];
   subject: string;
   html: string;
+  /** Full From header value, e.g. `Brand Assistant <mailbox@domain>`. Defaults to the BestieAI sender. */
+  from?: string;
   /**
    * Where a REPLY should land. Bestie sends from one shared mailbox, so without this every
    * customer who hits "reply" writes to bestie@ — an inbox no brand watches. Any mail addressed
