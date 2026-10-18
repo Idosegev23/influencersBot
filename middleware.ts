@@ -34,6 +34,9 @@ const RATE_LIMITS = {
   // Co-Pilot partner API: server-to-server and browser calls on behalf of a
   // partner's visitors, keyed per partner key (not per IP) — see below.
   partner: { windowMs: 60 * 1000, maxRequests: 600 },
+  // /api/partner/v1/tenant is read on every page view of the white-label app (branding,
+  // allowed origins). Its own bucket, so page loads cannot starve chat and vice versa.
+  partnerTenant: { windowMs: 60 * 1000, maxRequests: 1200 },
 };
 
 /**
@@ -269,8 +272,9 @@ export async function middleware(request: NextRequest) {
     } else if (pathname.startsWith('/api/partner/')) {
       // Keyed on a hash of the partner's bearer key, so one partner's traffic from many
       // visitors does not share a single IP bucket. The raw key never lands in the store.
-      config = RATE_LIMITS.partner;
-      prefix = 'partner';
+      const isTenant = pathname === '/api/partner/v1/tenant' || pathname === '/api/partner/v1/tenant/';
+      config = isTenant ? RATE_LIMITS.partnerTenant : RATE_LIMITS.partner;
+      prefix = isTenant ? 'partnerTenant' : 'partner';
       const bearer = request.headers.get('authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
       if (bearer) subject = `key:${await sha256Hex(bearer)}`;
     } else if (pathname.startsWith('/api/chat')) {

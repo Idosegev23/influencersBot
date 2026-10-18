@@ -31,4 +31,18 @@ describe('middleware: partner API rate limit', () => {
     expect(statuses[600]).toBe(429);
     expect((await call('/api/partner/v1/session', { 'x-forwarded-for': '10.0.0.3' })).status).not.toBe(429);
   });
+
+  it('gives /api/partner/v1/tenant its own 1200/min bucket: tenant lookups and the rest never starve each other', async () => {
+    const k = { authorization: 'Bearer cpk_rate_T', 'x-forwarded-for': '10.0.0.9' };
+    const tenant = await hammer(1201, '/api/partner/v1/tenant', k);
+    expect(tenant.slice(0, 1200).every((s) => s !== 429)).toBe(true);
+    expect(tenant[1200]).toBe(429);
+    // The partner bucket for the same key is untouched.
+    expect((await call('/api/partner/v1/events', k)).status).not.toBe(429);
+
+    const k2 = { authorization: 'Bearer cpk_rate_U', 'x-forwarded-for': '10.0.0.9' };
+    const rest = await hammer(601, '/api/partner/v1/chat', k2);
+    expect(rest[600]).toBe(429);
+    expect((await call('/api/partner/v1/tenant', k2)).status).not.toBe(429);
+  });
 });
