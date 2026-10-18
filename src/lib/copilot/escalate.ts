@@ -78,7 +78,6 @@ export function staffRecipients(config: unknown): string[] {
   return Array.isArray(list) ? list.filter((r: unknown): r is string => typeof r === 'string' && EMAIL_RE.test(r)) : [];
 }
 
-/** `From` header in the association's name, or undefined when no sender mailbox is configured. */
 /** The partner-branded sender mailbox (address only), or null when unset or not a plain address. */
 export function copilotSendFrom(): string | null {
   const a = process.env.COPILOT_SEND_FROM?.trim();

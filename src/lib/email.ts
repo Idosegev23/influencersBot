@@ -239,7 +239,7 @@ export async function sendEmailWithAttachments(
   }
 
   try {
-    const auth = getAuthClient();
+    const auth = getAuthClient(gmailSubjectFor(options));
     const gmail = google.gmail({ version: 'v1', auth });
     const raw = buildRawEmailWithAttachments(options);
 
