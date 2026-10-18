@@ -46,3 +46,36 @@ describe('retrieveAssociationSources', () => {
     expect(out.map((s) => s.url)).toEqual(['https://buses.org/events/']);
   });
 });
+
+describe('isExcluded canonicalisation', () => {
+  it('ignores scheme and www and matches http rules by host and path', () => {
+    const rules = ['https://buses.org/archive'];
+    expect(isExcluded('https://www.buses.org/archive/x', rules)).toBe(true);
+    expect(isExcluded('http://buses.org/archive/y', rules)).toBe(true);
+    expect(isExcluded('https://buses.org/events/', rules)).toBe(false);
+    expect(isExcluded('https://other.org/archive/x', rules)).toBe(false);
+  });
+  it('collapses repeated slashes in path rules and page URLs', () => {
+    expect(isExcluded('https://buses.org//archive/x', ['/archive'])).toBe(true);
+    expect(isExcluded('https://buses.org/events/', ['/archive'])).toBe(false);
+  });
+  it('percent-decodes so encoded Hebrew paths match decoded rules', () => {
+    expect(isExcluded('https://buses.org/%D7%9E%D7%99%D7%93%D7%A2/x', ['/מידע'])).toBe(true);
+    expect(isExcluded('https://buses.org/%D7%90%D7%97%D7%A8/x', ['/מידע'])).toBe(false);
+  });
+  it('fails closed on an unparsable URL when rules exist, keeps it when none', () => {
+    expect(isExcluded('not a url', ['/archive'])).toBe(true);
+    expect(isExcluded('not a url', [])).toBe(false);
+  });
+});
+
+describe('toCopilotSources canonical dedupe', () => {
+  it('collapses /p and /p/ to one source, first wins', () => {
+    const out = toCopilotSources([
+      src('a', 'https://buses.org/p'),
+      src('b', 'https://buses.org/p/'),
+      src('c', 'https://buses.org/q'),
+    ] as any, []);
+    expect(out.map((s) => s.id)).toEqual(['a', 'c']);
+  });
+});
