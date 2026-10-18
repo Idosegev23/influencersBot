@@ -120,7 +120,39 @@ describe('detectEnglishEscalation', () => {
     expect(detectEnglishEscalation('this is ridiculous', ['you are useless'])).toMatchObject({ escalate: true, triggers: ['sustained_anger'] });
     expect(detectEnglishEscalation('this is ridiculous', ['hello']).escalate).toBe(false);
   });
+  it('ignores negated and ordinary contact phrasing', () => {
+    for (const m of ["I don't want to speak to someone", 'no need to talk to a person', 'Please do not contact me', 'Will you contact me with updates?']) {
+      expect(detectEnglishEscalation(m).escalate).toBe(false);
+    }
+  });
   it('does not fire on ordinary text', () => {
     expect(detectEnglishEscalation('Tell me about human resources at ABA').escalate).toBe(false);
+  });
+});
+
+describe('escalateIfNeeded merged path (real shared detector)', () => {
+  const run = (userMessage: string, priorUserMessages: string[] = []) => {
+    const d = db();
+    const sendEmail = vi.fn(async () => ({ success: true }));
+    return escalateIfNeeded({ ...input, userMessage, priorUserMessages }, { sendEmail: sendEmail as any, db: d });
+  };
+  it.each([
+    'Do you offer human trafficking training?',
+    'Where can I find human resources guidance?',
+    'Who is my congressional representative?',
+    'I want to become a fleet manager',
+    'Please do not contact me',
+    "Don't call someone about this",
+    'Will you contact me with updates?',
+  ])('does not escalate: %s', async (m) => {
+    expect(await run(m)).toEqual({ escalated: false, reason: null, notified: 0, deduped: false });
+  });
+  it.each([
+    ['I want to speak to someone', 'Asked for a staff member'],
+    ['can I talk to a person', 'Asked for a staff member'],
+    ['Can I speak with someone about membership?', 'Asked for a staff member'],
+    ["I'll contact my lawyer", 'Mentions legal action'],
+  ])('escalates: %s', async (m, reason) => {
+    expect(await run(m)).toMatchObject({ escalated: true, reason });
   });
 });

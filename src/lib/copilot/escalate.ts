@@ -22,10 +22,25 @@ type Trigger = 'legal' | 'abuse' | 'human_demand' | 'sustained_anger';
 interface Verdict { escalate: boolean; severity: string | null; reason: string; triggers: Trigger[] }
 
 const HUMAN_DEMAND_EN = [
-  /\b(speak|talk|chat)\s+(to|with)\s+(someone|somebody|a person|a human|a real person|staff|a staff member|an agent|a representative|customer service)\b/i,
-  /\b(contact|reach|call)\s+(me|someone|staff)\b/i,
-  /\b(human|real person) please\b/i,
+  /\b(speak|talk|chat)\s+(to|with)\s+(someone|somebody|a person|a human|a real person|staff|a staff member|an agent|a representative|customer service)\b/gi,
+  /\b(have|get)\s+(someone|somebody|staff|a staff member)\s+(contact|call|reach|email)\s+me\b/gi,
+  /\b(human|real person) please\b/gi,
 ];
+const NEGATION = /\b(not|don'?t|never|no need)\b/i;
+
+/** True when a match is preceded, within three words, by a negation ("I don't want to speak to someone"). */
+function negated(text: string, index: number): boolean {
+  const words = text.slice(0, index).replace(/[\u2019\u2018]/g, "'").split(/\s+/).filter(Boolean).slice(-3);
+  return NEGATION.test(words.join(' '));
+}
+
+function asksForStaff(message: string): boolean {
+  return HUMAN_DEMAND_EN.some((re) => {
+    re.lastIndex = 0;
+    for (let m = re.exec(message); m; m = re.exec(message)) if (!negated(message, m.index)) return true;
+    return false;
+  });
+}
 const ANGER_EN = /\b(ridiculous|unacceptable|useless|terrible|furious|waste of time)\b/i;
 
 /**
@@ -34,7 +49,7 @@ const ANGER_EN = /\b(ridiculous|unacceptable|useless|terrible|furious|waste of t
  */
 export function detectEnglishEscalation(message: string, priorUserMessages: string[] = []): Verdict {
   const triggers: Trigger[] = [];
-  if (HUMAN_DEMAND_EN.some((re) => re.test(message))) triggers.push('human_demand');
+  if (asksForStaff(message)) triggers.push('human_demand');
   if (ANGER_EN.test(message) && priorUserMessages.some((m) => ANGER_EN.test(m))) triggers.push('sustained_anger');
   return { escalate: triggers.length > 0, severity: triggers.length ? 'high' : null, reason: triggers.map((t) => REASONS[t]).join(' + '), triggers };
 }
@@ -55,10 +70,13 @@ export async function escalateIfNeeded(
 
   const shared = detect(input.userMessage, input.priorUserMessages);
   const en = detectEnglishEscalation(input.userMessage, input.priorUserMessages);
-  const triggers = Array.from(new Set([...(shared.triggers ?? []), ...en.triggers])) as Trigger[];
+  // The shared detector's human_demand fires on bare domain words ("human resources", "representative"),
+  // so it is ignored here: the English detector owns staff requests.
+  const sharedTriggers = (shared.triggers ?? []).filter((t) => t !== 'human_demand');
+  const triggers = Array.from(new Set([...sharedTriggers, ...en.triggers])) as Trigger[];
   const v = {
-    escalate: shared.escalate || en.escalate,
-    severity: shared.severity === 'critical' || en.severity === 'critical' ? 'critical' : (shared.severity ?? en.severity),
+    escalate: triggers.length > 0,
+    severity: triggers.includes('legal') || triggers.includes('abuse') ? 'critical' : 'high',
     triggers,
   };
   if (!v.escalate) return { escalated: false, reason: null, notified: 0, deduped: false };
