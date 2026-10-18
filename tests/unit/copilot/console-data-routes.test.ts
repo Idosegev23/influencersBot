@@ -188,7 +188,7 @@ describe('GET associations/:id/conversations', () => {
     const first = await (await convGET(req('owner'), p({ id: ACC1 }))).json();
     expect(first.conversations).toHaveLength(25);
     expect(first.conversations[0].id).toBe('bbbbbbbb-bbbb-4bbb-8bbb-000000000029');
-    expect(first.nextCursor).toBe(first.conversations[24].startedAt);
+    expect(typeof first.nextCursor).toBe('string');
     const second = await (await convGET(req('owner', `http://x/?cursor=${encodeURIComponent(first.nextCursor)}`), p({ id: ACC1 }))).json();
     expect(second.conversations).toHaveLength(5);
     expect(second.nextCursor).toBeNull();
@@ -196,11 +196,41 @@ describe('GET associations/:id/conversations', () => {
     expect(new Set(all).size).toBe(30);
   });
 
+  it('the cursor is (startedAt, id): sessions sharing one timestamp are neither skipped nor repeated', async () => {
+    db.tables.chat_sessions = db.tables.chat_sessions.filter((x) => x.account_id !== ACC1);
+    for (let i = 0; i < 40; i++) {
+      db.tables.chat_sessions.push({ id: `eeeeeeee-eeee-4eee-8eee-${String(i).padStart(12, '0')}`, account_id: ACC1, ref_source: 'copilot', created_at: i < 30 ? '2026-10-09T00:00:00.000Z' : `2026-10-0${(i % 8) + 1}T00:00:00.000Z`, message_count: 0 });
+    }
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 5; page++) {
+      const url: string = cursor ? `http://x/?cursor=${encodeURIComponent(cursor)}` : 'http://x/';
+      const body: any = await (await convGET(req('owner', url), p({ id: ACC1 }))).json();
+      seen.push(...body.conversations.map((c: any) => c.id));
+      cursor = body.nextCursor;
+      if (!cursor) break;
+    }
+    expect(seen).toHaveLength(40);
+    expect(new Set(seen).size).toBe(40);
+  });
+
+  it('looks up the first messages of a page in one query', async () => {
+    const before = db.log.length;
+    const calls: string[] = [];
+    const from = db.from.bind(db);
+    db.from = (t: string) => { calls.push(t); return from(t); };
+    await convGET(req('owner'), p({ id: ACC1 }));
+    expect(calls.filter((t) => t === 'chat_messages')).toHaveLength(1);
+    void before;
+  });
+
   it('rows carry flags and a 120-char first message, anonymised unless identified, never raw ids', async () => {
     const { conversations } = await (await convGET(req('owner'), p({ id: ACC1 }))).json();
     const identified = conversations[0];
     const escalated = conversations[1];
     expect(identified).toMatchObject({ identified: true, escalated: false, messageCount: 2 });
+    expect(identified.firstMessage).toContain('me@corp.com');
+    expect(identified.firstMessage).not.toContain('[email]');
     expect(escalated).toMatchObject({ identified: false, escalated: true });
     expect(escalated.firstMessage.length).toBeLessThanOrEqual(120);
     expect(escalated.firstMessage).toContain('[phone]');
@@ -235,6 +265,15 @@ describe('GET associations/:id/conversations/:sessionId', () => {
       { role: 'assistant', content: 'See [1]', createdAt: '2026-10-10T00:00:02Z', sources: [{ n: 1, title: 'Join', url: 'https://buses.org/join' }] },
     ]);
     expect(JSON.stringify(body)).not.toMatch(/Typed Name|typed@corp|anon_zzz|"v1"/);
+  });
+
+  it('assistant messages are redacted too for an unverified visitor (the model may echo what they typed)', async () => {
+    db.tables.chat_messages.push({ session_id: S1, role: 'assistant', content: 'I noted typed@corp.com and 202-555-0147.', created_at: '2026-10-10T00:00:04Z', metadata: {} });
+    const body = await (await transcriptGET(req('owner'), p({ id: ACC1, sessionId: S1 }))).json();
+    expect(body.messages.at(-1).content).toBe('I noted [email] and [phone].');
+    db.tables.chat_sessions[0].visitor_id = 'v2';
+    const verified = await (await transcriptGET(req('owner'), p({ id: ACC1, sessionId: S1 }))).json();
+    expect(verified.messages.at(-1).content).toBe('I noted typed@corp.com and 202-555-0147.');
   });
 
   it('a verified member shows their name', async () => {
@@ -298,6 +337,13 @@ describe('PATCH associations/:id/settings', () => {
     expect(db.tables.accounts.find((a) => a.id === ACC1)!.config.copilot.tone).toBe('after scan');
   });
 
+  it('branding keys merge onto the stored branding; null clears one key', async () => {
+    const r1 = await patch('owner', ACC1, { branding: { logo: 'https://www.buses.org/logo.svg' } });
+    expect((await r1.json()).settings.branding).toEqual({ primary: '#041423', logo: 'https://www.buses.org/logo.svg' });
+    const r2 = await patch('owner', ACC1, { branding: { primary: null } });
+    expect((await r2.json()).settings.branding).toEqual({ logo: 'https://www.buses.org/logo.svg' });
+  });
+
   it('clears a link with null', async () => {
     const { settings } = await (await patch('owner', ACC1, { links: { join: null } })).json();
     expect(settings.links.join).toBeNull();
@@ -335,5 +381,7 @@ describe('redactContact', () => {
   it('redacts emails and phone numbers but keeps dates and short numbers', () => {
     expect(redactContact('mail a.b@x.org or call 054-123-4567 on 2026-10-18 about order 12345'))
       .toBe('mail [email] or call [phone] on 2026-10-18 about order 12345');
+    expect(redactContact('ext 555-0147 or 5550147, member 1234567, on 10/18/2026, room 123456'))
+      .toBe('ext [phone] or [phone], member [phone], on 10/18/2026, room 123456');
   });
 });

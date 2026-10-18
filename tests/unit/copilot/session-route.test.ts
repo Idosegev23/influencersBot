@@ -20,12 +20,14 @@ vi.mock('@/lib/supabase', () => ({
       select: () => {
         let sid = '';
         let n = Infinity;
+        let roles: string[] | null = null;
         const b: any = {
           eq: (_c: string, v: string) => { sid = v; return b; },
+          in: (_c: string, v: string[]) => { roles = v; return b; },
           order: () => b,
           limit: (k: number) => { n = k; return b; },
           then: (ok: any, bad: any) => Promise.resolve({
-            data: messages.filter((m) => m.session_id === sid).sort((a, z) => (a.created_at < z.created_at ? 1 : -1)).slice(0, n),
+            data: messages.filter((m) => m.session_id === sid && (!roles || roles.includes(m.role))).sort((a, z) => (a.created_at < z.created_at ? 1 : -1)).slice(0, n),
             error: null,
           }).then(ok, bad),
         };
@@ -137,11 +139,10 @@ describe('POST /session transcript restore', () => {
     messages.push({ session_id: 'someone-else', role: 'user', content: 'not yours', created_at: at(50) });
     const body = await (await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa', sessionId: 'old' }))).json();
     expect(body.resumed).toBe(true);
-    expect(body.messages).toHaveLength(29); // 30 newest rows, minus the system row
-    expect(body.messages[0]).toEqual({ role: 'assistant', content: 'A11', cards: expect.any(Object) });
+    expect(body.messages).toHaveLength(30); // the 30 newest user/assistant rows; the system row is filtered in the query
+    expect(body.messages[0]).toEqual({ role: 'user', content: 'Q10', cards: null });
     expect(body.messages.at(-1)).toMatchObject({ role: 'assistant', content: 'A39' });
-    expect(body.messages.find((m: any) => m.role === 'user')).toEqual({ role: 'user', content: 'Q12', cards: null });
-    expect(body.messages[0].cards).toEqual({
+    expect(body.messages[1].cards).toEqual({
       sources: [{ n: 1, title: 'Join', url: 'https://buses.org/join' }],
       related: { title: 'Marketplace', url: 'https://buses.org/marketplace/' },
       event: { id: 'ev1', title: 'Marketplace 2027', startsOn: '2027-01-10', endsOn: null, location: 'Columbus', url: 'https://buses.org/m', registrationUrl: 'https://buses.org/r' },
@@ -163,5 +164,39 @@ describe('POST /session transcript restore', () => {
     const body = await (await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa', sessionId: 'theirs' }))).json();
     expect(body.resumed).toBe(false);
     expect(body.messages).toEqual([]);
+  });
+});
+
+describe('POST /session resumeOnly and caching', () => {
+  it('resumeOnly with a session that cannot be resumed: 200 {resumed:false}, no insert, no session_started', async () => {
+    sessions.push({ id: 'theirs', account_id: 'acc', visitor_id: 'v999' });
+    for (const sessionId of ['theirs', 'missing', undefined]) {
+      const res = await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa', sessionId, resumeOnly: true }));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ resumed: false });
+    }
+    expect(sessions).toHaveLength(1);
+    expect(recordEvents).not.toHaveBeenCalled();
+  });
+
+  it('resumeOnly with the visitor’s own session resumes normally', async () => {
+    sessions.push({ id: 'old', account_id: 'acc', visitor_id: 'v1' });
+    const body = await (await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa', sessionId: 'old', resumeOnly: true }))).json();
+    expect(body).toMatchObject({ sessionId: 'old', resumed: true, messages: [] });
+  });
+
+  it('without resumeOnly an unresumable session still opens a new one (insert count 1)', async () => {
+    const res = await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa', sessionId: 'missing' }));
+    expect((await res.json()).resumed).toBe(false);
+    expect(sessions).toHaveLength(1);
+    expect(recordEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers are never cached', async () => {
+    const res = await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa' }));
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    sessions.push({ id: 'theirs2', account_id: 'acc', visitor_id: 'v999' });
+    const r2 = await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa', sessionId: 'theirs2', resumeOnly: true }));
+    expect(r2.headers.get('cache-control')).toBe('no-store');
   });
 });

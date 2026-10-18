@@ -52,7 +52,8 @@ export type HistoryMessage =
 export async function loadSessionHistory(sessionId: string, db: any = supabase): Promise<HistoryMessage[]> {
   try {
     const { data, error } = await db.from('chat_messages').select('role, content, metadata, created_at')
-      .eq('session_id', sessionId).order('created_at', { ascending: false }).limit(RESUME_MESSAGE_LIMIT);
+      .eq('session_id', sessionId).in('role', ['user', 'assistant'])
+      .order('created_at', { ascending: false }).limit(RESUME_MESSAGE_LIMIT);
     if (error) { console.error('[copilot/history]', 'read failed', error.message); return []; }
     return ((data ?? []) as any[])
       .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')

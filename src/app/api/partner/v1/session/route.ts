@@ -4,21 +4,24 @@ import { getOrCreateVisitor, isValidAnonId } from '@/lib/copilot/visitors';
 import { recordEvents } from '@/lib/copilot/events';
 import { isVerifiedIdentity } from '@/lib/copilot/identity';
 import { loadSessionHistory } from '@/lib/copilot/history';
+import { noStore } from '@/lib/copilot/console-auth';
 import type { AssociationTenant } from '@/lib/copilot/tenant';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
+const NO_STORE = { 'Cache-Control': 'no-store' };
+
 export async function POST(req: Request) {
   const t = await requireTenant(req, { association: true });
-  if (t instanceof Response) return t;
+  if (t instanceof Response) return noStore(t);
   const tenant = t as AssociationTenant;
 
   const body = await req.json().catch(() => null);
-  if (!body || !isValidAnonId(body.anonId)) return Response.json({ error: 'invalid_anon_id' }, { status: 400 });
+  if (!body || !isValidAnonId(body.anonId)) return Response.json({ error: 'invalid_anon_id' }, { status: 400, headers: NO_STORE });
 
   const assoc = await loadAssociation(tenant);
-  if (!assoc) return Response.json({ error: 'association_unavailable' }, { status: 404 });
+  if (!assoc) return Response.json({ error: 'association_unavailable' }, { status: 404, headers: NO_STORE });
 
   const visitor = await getOrCreateVisitor(tenant, body.anonId);
 
@@ -28,13 +31,15 @@ export async function POST(req: Request) {
     const { data: s } = await supabase.from('chat_sessions').select('id, account_id, visitor_id').eq('id', body.sessionId).maybeSingle();
     if (s && s.account_id === tenant.accountId && s.visitor_id === visitor.id) { sessionId = s.id; resumed = true; }
   }
+  // resumeOnly: the caller only wants to redraw an existing chat; never open a new one.
+  if (!sessionId && body.resumeOnly === true) return Response.json({ resumed: false }, { headers: NO_STORE });
   if (!sessionId) {
     const { data: s, error } = await supabase.from('chat_sessions')
       .insert({ account_id: tenant.accountId, visitor_id: visitor.id, anon_id: body.anonId, ref_source: 'copilot' })
       .select('id').single();
     if (error || !s) {
       console.error('[copilot/session]', 'session insert failed', error?.message ?? 'no row returned');
-      return Response.json({ error: 'session_unavailable' }, { status: 500 });
+      return Response.json({ error: 'session_unavailable' }, { status: 500, headers: NO_STORE });
     }
     sessionId = s.id;
     await recordEvents(
@@ -55,5 +60,5 @@ export async function POST(req: Request) {
     // Never reveal the source: after /contact it would tell the caller whether a typed email is a member's.
     identity: { identified: isVerifiedIdentity(visitor.identity_source) },
     messages,
-  });
+  }, { headers: NO_STORE });
 }

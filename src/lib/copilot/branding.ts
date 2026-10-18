@@ -55,13 +55,14 @@ const FONT_RE = /^[A-Za-z0-9][A-Za-z0-9 \-]{0,39}$/;
  * field, so staff never save a value that then quietly disappears. Colours must
  * be hex (they end up in CSS) and the font a plain family name.
  */
-export function validateBranding(raw: unknown): { ok: true; value: Record<string, unknown> } | { ok: false; field: string } {
+export function validateBranding(raw: unknown): { ok: true; value: Record<string, unknown>; cleared: string[] } | { ok: false; field: string } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, field: 'branding' };
   const b = raw as Record<string, unknown>;
   const out: Record<string, unknown> = {};
+  const cleared: string[] = [];
   for (const [k, v] of Object.entries(b)) {
     if (!(BRANDING_KEYS as readonly string[]).includes(k)) return { ok: false, field: `branding.${k}` };
-    if (v === null || v === '') continue; // cleared
+    if (v === null || v === '') { cleared.push(k); continue; }
     if ((BRANDING_COLOR_KEYS as readonly string[]).includes(k)) {
       if (typeof v !== 'string' || !COLOR_RE.test(v.trim())) return { ok: false, field: `branding.${k}` };
       out[k] = v.trim();
@@ -87,5 +88,5 @@ export function validateBranding(raw: unknown): { ok: true; value: Record<string
       out[k] = links;
     }
   }
-  return { ok: true, value: out };
+  return { ok: true, value: out, cleared };
 }

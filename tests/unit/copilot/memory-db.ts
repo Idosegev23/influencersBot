@@ -44,7 +44,7 @@ export function memoryDb(seed: Record<string, Row[]> = {}): MemoryDb {
       let inserted: Row[] = [];
       let returning = false;
       const filters: Filter[] = [];
-      let order: { col: string; asc: boolean } | null = null;
+      const orders: Array<{ col: string; asc: boolean }> = [];
       let limit = Infinity;
       let range: [number, number] | null = null;
 
@@ -75,9 +75,14 @@ export function memoryDb(seed: Record<string, Row[]> = {}): MemoryDb {
           db.log.push({ table, op: 'delete' });
           return { data: returning ? hit : null, error: null };
         }
-        if (order) {
-          const { col, asc } = order;
-          hit = [...hit].sort((a, b) => (get(a, col) < get(b, col) ? -1 : get(a, col) > get(b, col) ? 1 : 0) * (asc ? 1 : -1));
+        if (orders.length) {
+          hit = [...hit].sort((a, b) => {
+            for (const { col, asc } of orders) {
+              const c = get(a, col) < get(b, col) ? -1 : get(a, col) > get(b, col) ? 1 : 0;
+              if (c) return asc ? c : -c;
+            }
+            return 0;
+          });
         }
         if (range) hit = hit.slice(range[0], range[1] + 1);
         hit = hit.slice(0, limit);
@@ -97,7 +102,7 @@ export function memoryDb(seed: Record<string, Row[]> = {}): MemoryDb {
         lt: (c: string, v: any) => { filters.push((r) => get(r, c) < v); return b; },
         like: (c: string, v: string) => { const re = new RegExp('^' + v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*') + '$'); filters.push((r) => re.test(String(get(r, c) ?? ''))); return b; },
         ilike: (c: string, v: string) => { const re = new RegExp('^' + v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*') + '$', 'i'); filters.push((r) => re.test(String(get(r, c) ?? ''))); return b; },
-        order: (col: string, o?: { ascending?: boolean }) => { order = { col, asc: o?.ascending !== false }; return b; },
+        order: (col: string, o?: { ascending?: boolean }) => { orders.push({ col, asc: o?.ascending !== false }); return b; },
         limit: (n: number) => { limit = n; return b; },
         range: (a: number, z: number) => { range = [a, z]; return b; },
         maybeSingle: async () => { const r = run(); if (r.error) return r; const d = Array.isArray(r.data) ? r.data[0] ?? null : r.data; return { data: d, error: null }; },

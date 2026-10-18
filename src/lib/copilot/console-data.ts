@@ -189,37 +189,66 @@ export async function associationDetail(ctx: ConsoleContext, acc: ConsoleAccount
 }
 
 const EMAIL_IN_TEXT = /[^\s@<>()[\],;:"']+@[^\s@<>()[\],;:"']+\.[a-z]{2,}/gi;
-const PHONE_IN_TEXT = /(?:\+?\d[\d\s().-]{7,}\d)/g;
+const PHONE_IN_TEXT = /\+?\d[\d\s().-]{5,}\d/g;
+const DATE_LIKE = /^\d{4}-\d{1,2}-\d{1,2}$|^\d{1,2}[.-]\d{1,2}[.-]\d{2,4}$/;
 
-/** Anonymise what an unverified visitor typed: emails and phone numbers never reach staff screens. */
+/**
+ * Anonymise text an unverified visitor typed (or the assistant echoed): emails, and
+ * any run of 7 or more digits (with separators) that is not a date, never reach staff screens.
+ */
 export function redactContact(text: string): string {
   return text.replace(EMAIL_IN_TEXT, '[email]').replace(PHONE_IN_TEXT, (m) => {
-    // 9 to 15 digits is a phone number; fewer is a date, a year or an order number.
     const digits = m.replace(/\D/g, '').length;
-    return digits >= 9 && digits <= 15 ? '[phone]' : m;
+    return digits >= 7 && !DATE_LIKE.test(m.trim()) ? '[phone]' : m;
   });
+}
+
+/** Opaque keyset cursor over (created_at desc, id desc). */
+export function encodeCursor(createdAt: string, id: string): string {
+  return Buffer.from(JSON.stringify([createdAt, id])).toString('base64url');
+}
+export function decodeCursor(raw: string): { createdAt: string; id: string } | null {
+  if (raw.length > 200) return null;
+  try {
+    const v = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+    if (!Array.isArray(v) || v.length !== 2 || typeof v[0] !== 'string' || !Number.isFinite(Date.parse(v[0])) || !isUuid(v[1])) return null;
+    return { createdAt: v[0], id: v[1] };
+  } catch {
+    return null;
+  }
 }
 
 /** GET associations/:id/conversations?cursor= */
 export async function listConversations(acc: ConsoleAccount, cursor: string | null, db: any = supabase) {
-  if (cursor !== null && (cursor.length > 40 || !Number.isFinite(Date.parse(cursor)))) return refuse(400, 'invalid_cursor');
-  let q = db.from('chat_sessions').select('id, created_at, last_turn_at, message_count, identified_at')
-    .eq('account_id', acc.id).eq('ref_source', 'copilot');
-  if (cursor) q = q.lt('created_at', cursor);
-  const { data, error } = await q.order('created_at', { ascending: false }).limit(CONVERSATION_PAGE + 1);
-  if (error) { log('sessions read failed', error.message); return refuse(503, 'unavailable'); }
-  const rows = (data ?? []) as any[];
+  const after = cursor === null ? null : decodeCursor(cursor);
+  if (cursor !== null && !after) return refuse(400, 'invalid_cursor');
+  const COLS = 'id, created_at, last_turn_at, message_count, identified_at';
+  const base = () => db.from('chat_sessions').select(COLS).eq('account_id', acc.id).eq('ref_source', 'copilot');
+  // Keyset on (created_at, id): the rest of the cursor's own timestamp, then everything older.
+  const reads = after
+    ? [
+      base().eq('created_at', after.createdAt).lt('id', after.id).order('id', { ascending: false }).limit(CONVERSATION_PAGE + 1),
+      base().lt('created_at', after.createdAt).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(CONVERSATION_PAGE + 1),
+    ]
+    : [base().order('created_at', { ascending: false }).order('id', { ascending: false }).limit(CONVERSATION_PAGE + 1)];
+  const results = await Promise.all(reads);
+  const failed = results.find((r: any) => r.error);
+  if (failed) { log('sessions read failed', failed.error.message); return refuse(503, 'unavailable'); }
+  const rows = results.flatMap((r: any) => (r.data ?? []) as any[]).slice(0, CONVERSATION_PAGE + 1);
   const page = rows.slice(0, CONVERSATION_PAGE);
   const ids = page.map((s) => s.id);
 
   const [firsts, escalated] = await Promise.all([
-    Promise.all(page.map(async (s) => {
-      const { data: m, error: mErr } = await db.from('chat_messages').select('content')
-        .eq('session_id', s.id).eq('role', 'user').order('created_at', { ascending: true }).limit(1);
-      if (mErr) { log('first message read failed', mErr.message); return null; }
-      const c = Array.isArray(m) && typeof m[0]?.content === 'string' ? m[0].content : null;
-      return c;
-    })),
+    (async () => {
+      const out = new Map<string, string>();
+      if (!ids.length) return out;
+      // One query for the page. Oldest first, so the first row per session is its opening message.
+      const { data: m, error: mErr } = await db.from('chat_messages').select('session_id, content, created_at')
+        .in('session_id', ids).eq('role', 'user').order('created_at', { ascending: true }).limit(1000);
+      if (mErr) { log('first messages read failed', mErr.message); return out; }
+      for (const r of (m ?? []) as any[]) if (!out.has(r.session_id) && typeof r.content === 'string') out.set(r.session_id, r.content);
+      return out;
+    })(),
     (async () => {
       if (!ids.length) return new Set<string>();
       const { data: r, error: rErr } = await db.from('support_requests').select('session_id')
@@ -229,10 +258,11 @@ export async function listConversations(acc: ConsoleAccount, cursor: string | nu
     })(),
   ]);
 
+  const last = page[page.length - 1];
   return ok({
-    conversations: page.map((s, i) => {
+    conversations: page.map((s) => {
       const identified = !!s.identified_at;
-      const first = firsts[i];
+      const first = firsts.get(s.id) ?? null;
       const text = first == null ? null : (identified ? first : redactContact(first));
       return {
         id: s.id,
@@ -244,7 +274,7 @@ export async function listConversations(acc: ConsoleAccount, cursor: string | nu
         identified,
       };
     }),
-    nextCursor: rows.length > CONVERSATION_PAGE ? page[page.length - 1].created_at : null,
+    nextCursor: rows.length > CONVERSATION_PAGE && last ? encodeCursor(last.created_at, last.id) : null,
   });
 }
 
@@ -284,7 +314,7 @@ export async function conversationTranscript(acc: ConsoleAccount, sessionId: str
       .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
       .map((m) => ({
         role: m.role,
-        content: m.role === 'user' && !verified ? redactContact(m.content) : m.content,
+        content: verified ? m.content : redactContact(m.content),
         createdAt: m.created_at,
         sources: m.role === 'assistant' ? cleanSources(m.metadata?.copilot?.sources) : [],
       })),
@@ -311,7 +341,10 @@ export function buildSettingsPatch(body: any, current: Record<string, any>): Set
   if ('branding' in body) {
     const b = validateBranding(body.branding);
     if (b.ok === false) return { ok: false, field: b.field };
-    patch.branding = b.value;
+    // Merge onto the stored branding: a key not sent stays, a key sent as null is removed.
+    const cur = current.branding && typeof current.branding === 'object' && !Array.isArray(current.branding) ? { ...current.branding } : {};
+    for (const k of b.cleared) delete cur[k];
+    patch.branding = { ...cur, ...b.value };
   }
   if ('opening_questions' in body) {
     const v = body.opening_questions;
