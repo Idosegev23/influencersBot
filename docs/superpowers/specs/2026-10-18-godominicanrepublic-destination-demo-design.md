@@ -41,3 +41,30 @@
 - **The held integration branch has an archetype registry** (`src/lib/archetypes/registry.ts`) that `main` does not. When it merges, `destination` resolves to `UNKNOWN_BEHAVIOUR` (no content tabs, commerce DM menu) unless a registry entry is added. Port the branch points listed in this commit into one registry entry before merging.
 - Five unit tests fail on a clean `origin/main` and are unrelated: `agent-tools`, `crm-wa-worker`, `cs-worker-route` (2), and `admin/scans-list` (stale step count, fixed here).
 - Step-count tests are now derived from `SCAN_STEPS`; they had gone stale four times.
+
+## 4. Results (2026-10-18)
+
+Account `7911a144-88c2-4949-8d79-ca1fc210c707`, username `godomrep`, English, 45-day demo window to 2026-12-02. Chat: `/chat/godomrep`. Dashboard: `/influencer/godomrep/login`, password `123456`.
+
+Scan (jobs `d324e3de` full, `9c66912e` YouTube/TikTok enrich): 805 site pages, 2,049 knowledge chunks (0 unlabelled), 540 posts (X 100, Facebook 300, Instagram 70, TikTok 40, YouTube 30), persona, 7 content insights.
+
+Bot probe (8 live questions): grounded answers with real page URLs, no invented price, entry and safety questions caveated and pointed at the official page, discount question answered honestly.
+
+Browser audit: 0 Hebrew and LTR on 5 chat tabs (desktop and mobile) and 21 dashboard pages, 0 broken images.
+
+## 5. What the build found along the way (all fixed unless noted)
+
+| Finding | Effect | Fix |
+|---|---|---|
+| ScrapeCreators YouTube endpoints reject `url`, the scraper sent it for any link and swallowed the 400 | every account given a YouTube link scanned 0 videos | extract handle / channel id (`70d6eb10`) |
+| TikTok read only page one | 10 of 113 videos | follow `max_cursor`, cap 40 |
+| Topic labelling is one DB write per chunk after the website ingest | ~1,450 chunks overran the 600s limit; QStash retries (3) ran out with 439 unlabelled; job stalled with no error | re-published via `/api/pipeline/retry`. **Not fixed**: batch the writes before the next large site |
+| Browse cards ignored the crawled page's hero image, kept the site-name suffix and contact details, were right-aligned in English | placeholder emoji on all 622 pages | `9be729c0` |
+| `formatRelativeTime` fell back to a Hebrew date for English | "9 באוק׳ 2026" on the dashboard | `9be729c0` |
+| Discover titled an organisation by its first word | "Dominican's most viral videos" | `9be729c0` |
+| Insights counted YouTube (no likes) as 0 and X (popular-only) as a timeline | "YouTube averages 0", "4,152 days of history" | `9be729c0` |
+| `finalize` rewrites display name, greeting, theme and widget links on every run | re-running any step undoes manual config | re-apply after any re-run (SQL in the session log) |
+
+## 6. Known limitation
+
+`/demo/<accountId>` (the widget previewed on the customer's own site) does not render for godominicanrepublic.com. The site is a Next.js app that keeps its content hidden until its own scripts hydrate, and they fail under our origin; stripping the scripts leaves a blank page. The widget itself and the chat page work. The demo page chrome is also Hebrew for this English account. Share `/chat/godomrep`, not `/demo/...`.
