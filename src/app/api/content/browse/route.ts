@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { cleanPageTitles, cleanExcerpt, decodeEntities } from '@/lib/content/browse-card';
 
 /**
  * GET /api/content/browse?username=X&topics=food,beauty&entityTypes=transcription,post&page=1&limit=20
@@ -104,7 +105,7 @@ async function fallbackQuery(
   const docIds = [...new Set(chunks.map(c => c.document_id))];
   const { data: docs } = await supabase
     .from('documents')
-    .select('id, title, source_id, entity_type')
+    .select('id, title, source_id, entity_type, metadata')
     .in('id', docIds);
 
   const docMap = new Map((docs || []).map(d => [d.id, d]));
@@ -161,10 +162,14 @@ async function fallbackQuery(
     }
   }
 
+  // Page titles share the site's branding as a suffix; infer and strip it across the batch.
+  const rawTitles = chunks.map(c => docMap.get(c.document_id)?.title || c.chunk_text.substring(0, 50).replace(/\n/g, ' '));
+  const titles = cleanPageTitles(rawTitles);
+
   // Build response items
-  const items = chunks.map(chunk => {
+  const items = chunks.map((chunk, idx) => {
     const doc = docMap.get(chunk.document_id);
-    const title = doc?.title || chunk.chunk_text.substring(0, 50).replace(/\n/g, ' ');
+    const title = titles[idx];
 
     // Get thumbnail
     let thumbnail_url: string | null = null;
@@ -178,18 +183,19 @@ async function fallbackQuery(
       if (!thumbnail_url && thumbMap.has(doc.source_id)) {
         thumbnail_url = thumbMap.get(doc.source_id) || null;
       }
+      // A crawled page carries its own hero image. This lookup only knew about posts,
+      // so all 622 destination pages rendered a placeholder emoji.
+      if (!thumbnail_url && doc.entity_type === 'website') {
+        const img = (doc.metadata as { image_url?: unknown } | null)?.image_url;
+        if (typeof img === 'string' && /^https?:\/\//.test(img)) thumbnail_url = img;
+      }
     }
 
-    const excerpt = chunk.chunk_text
-      .replace(/\[שאלות קשורות:.*?\]/g, '')
-      .replace(/\[סיכום:.*?\]/g, '')
-      .replace(/\n/g, ' ')
-      .trim()
-      .substring(0, 120);
+    const excerpt = cleanExcerpt(chunk.chunk_text, chunk.entity_type);
 
     return {
       id: chunk.id,
-      title: title.substring(0, 80),
+      title: decodeEntities(title).substring(0, 80),
       excerpt,
       thumbnail_url,
       topic: chunk.topic,

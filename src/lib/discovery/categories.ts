@@ -222,9 +222,16 @@ export const CATEGORY_MAP = new Map<string, DiscoveryCategory>(
 /**
  * Resolve {name} placeholders in title/subtitle templates
  */
-export function resolveCategoryTitle(template: string, influencerName: string): string {
-  const firstName = influencerName.split(' ')[0];
-  return template.replace(/\{name\}/g, firstName);
+export function resolveCategoryTitle(
+  template: string,
+  influencerName: string,
+  opts?: { fullName?: boolean },
+): string {
+  // A creator is addressed by first name ("Dana's most viral videos"). An organisation is
+  // not: "Dominican Republic" became "Dominican's most viral videos" and "Inter Miami CF"
+  // became "Inter's". Callers pass fullName for any archetype other than influencer.
+  const name = opts?.fullName ? influencerName : influencerName.split(' ')[0];
+  return template.replace(/\{name\}/g, name);
 }
 
 /**

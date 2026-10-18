@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
     const accountId = account.id;
     const influencerName = account.config?.display_name || account.config?.username || username;
     const archetype = account.config?.archetype;
+    const isOrganisation = !!archetype && archetype !== 'influencer';
     const isEn = (account as any).language === 'en'; // English accounts get the English category chrome
 
     // government_ministry archetype: discover feed is built from scraped pages
@@ -106,8 +107,8 @@ export async function GET(req: NextRequest) {
         if (available) {
           result.push({
             slug: cat.slug,
-            title: resolveCategoryTitle(isEn && cat.titleTemplateEn ? cat.titleTemplateEn : cat.titleTemplate, influencerName),
-            subtitle: resolveCategoryTitle(isEn && cat.subtitleEn ? cat.subtitleEn : cat.subtitle, influencerName),
+            title: resolveCategoryTitle(isEn && cat.titleTemplateEn ? cat.titleTemplateEn : cat.titleTemplate, influencerName, { fullName: isOrganisation }),
+            subtitle: resolveCategoryTitle(isEn && cat.subtitleEn ? cat.subtitleEn : cat.subtitle, influencerName, { fullName: isOrganisation }),
             icon: cat.icon,
             type: cat.type,
             color: cat.color,

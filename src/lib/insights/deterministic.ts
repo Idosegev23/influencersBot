@@ -38,12 +38,29 @@ const PLATFORM_LABEL: Record<string, string> = {
  * from anything measuring response. Their TEXT still counts everywhere else:
  * topic map, RAG, persona.
  *
+ * `youtube` is here because the channel-videos list carries views but no likes or
+ * comments, so its engagement is 0 by absence: "YouTube averages 0 interactions" was
+ * printed beside real TikTok numbers.
+ *
  * `x` is here for the opposite reason: its numbers are real, but the provider only
  * returns an account's ~100 MOST POPULAR tweets (2015-2023 for @GoDomRep). A
  * winners-only sample ranked beside every other channel's full archive would crown
  * X the best channel and invent a posting-day pattern from years-old tweets.
  */
-const NO_ENGAGEMENT_DATA = new Set(['linkedin', 'x']);
+const NO_ENGAGEMENT_DATA = new Set(['linkedin', 'x', 'youtube']);
+
+/**
+ * Platforms whose posts are not a timeline. X's provider returns only the ~100 most
+ * popular tweets, so a 2015 tweet sits beside last week's Instagram post. Counting them
+ * in publishing frequency turned "about 5 posts a week" into "0.9 a week across 4,152
+ * days of history" for @GoDomRep. They stay in the topic map, RAG and persona.
+ */
+const NOT_A_TIMELINE = new Set(['x']);
+
+/** Counts and averages for display: 3823.1 and 13986.3 read as false precision. */
+function fmt(n: number): string {
+  return n >= 100 ? Math.round(n).toLocaleString('en-US') : String(round(n));
+}
 
 /** Human label for a topic slug, e.g. 'membership' → 'Membership'. */
 export function topicLabel(topic: string): string {
@@ -202,7 +219,7 @@ export function generateTopPerformers(corpus: InsightCorpus): ContentInsight[] {
     title: 'Your strongest posts',
     summary:
       `Ranked against each platform's own median, your best post earned ` +
-      `${round(best.relativeEngagement)}× typical engagement on ${platformLabel(best.platform)}. ` +
+      `${fmt(best.relativeEngagement)}× typical engagement on ${platformLabel(best.platform)}. ` +
       `These five are the ones worth studying.`,
     rank: 0,
     metrics: {
@@ -233,7 +250,7 @@ export function generateTopPerformers(corpus: InsightCorpus): ContentInsight[] {
         title: `${platformLabel(stats[0].platform)} is where your audience actually responds`,
         summary:
           stats
-            .map((s) => `${platformLabel(s.platform)} averages ${s.avg} interactions across ${s.count} posts`)
+            .map((s) => `${platformLabel(s.platform)} averages ${fmt(s.avg)} interactions across ${s.count} posts`)
             .join('; ') + '.',
         rank: 1,
         metrics: { perPlatform: stats },
@@ -262,7 +279,9 @@ export function generateTopPerformers(corpus: InsightCorpus): ContentInsight[] {
  * MIN_BUCKET_SIZE. With eleven posts there is no such thing as a best day.
  */
 export function generateCadence(corpus: InsightCorpus): ContentInsight[] {
-  const posts = corpus.posts.filter((p) => Number.isFinite(Date.parse(p.postedAt)));
+  const posts = corpus.posts.filter(
+    (p) => Number.isFinite(Date.parse(p.postedAt)) && !NOT_A_TIMELINE.has(p.platform),
+  );
   if (posts.length < MIN_POSTS_FOR_PATTERN) return [];
 
   // Publishing FREQUENCY legitimately counts every platform — a LinkedIn post is
@@ -331,8 +350,8 @@ export function generateCadence(corpus: InsightCorpus): ContentInsight[] {
         type: 'cadence',
         title: `${best.name} is your strongest day`,
         summary:
-          `Posts published on ${best.name} average ${best.avg} interactions across ${best.count} posts, ` +
-          `against ${worst.avg} on ${worst.name}. Times are in ${corpus.timezone}.`,
+          `Posts published on ${best.name} average ${fmt(best.avg)} interactions across ${best.count} posts, ` +
+          `against ${fmt(worst.avg)} on ${worst.name}. Times are in ${corpus.timezone}.`,
         rank: 1,
         metrics: { byDay: dayStats, timezone: corpus.timezone },
         evidence: dayStats.map((d) => ({

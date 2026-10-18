@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Search, ChevronLeft } from 'lucide-react';
+import { Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { track } from '@/lib/analytics/track';
 import Image from 'next/image';
 import { getProxiedImageUrl } from '@/lib/image-utils';
@@ -81,9 +81,10 @@ export default function ContentBrowseTab({
   };
 
   const filteredItems = searchQuery
-    ? items.filter(item =>
-        item.title.includes(searchQuery) || item.excerpt.includes(searchQuery)
-      )
+    ? items.filter(item => {
+        const q = searchQuery.toLowerCase();
+        return item.title.toLowerCase().includes(q) || item.excerpt.toLowerCase().includes(q);
+      })
     : items;
 
   const handleCardClick = (item: ContentItem) => {
@@ -111,7 +112,7 @@ export default function ContentBrowseTab({
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 ${isEn ? 'left-3' : 'right-3'}`} />
           <input
             type="text"
             value={searchQuery}
@@ -144,7 +145,8 @@ export default function ContentBrowseTab({
                   transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.25 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => handleCardClick(item)}
-                  className="group text-right rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
+                  className={`group ${isEn ? 'text-left' : 'text-right'} rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow`}
+                  dir={isEn ? 'ltr' : 'rtl'}
                 >
                   {/* Thumbnail */}
                   <div className="aspect-[4/3] bg-gradient-to-br from-purple-50 to-pink-50 relative overflow-hidden">
@@ -183,7 +185,7 @@ export default function ContentBrowseTab({
 
                   {/* Action hint */}
                   <div className="px-2.5 pb-2 flex items-center gap-1 text-purple-500">
-                    <ChevronLeft className="w-3 h-3" />
+                    {isEn ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
                     <span className="text-[10px] font-medium">{ui.actions.askAboutThis}</span>
                   </div>
                 </motion.button>

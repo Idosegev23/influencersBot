@@ -46,6 +46,10 @@ const ASSOCIATION_TAB_IDS = ['membership', 'events', 'advocacy'];
 // The `destination` archetype's three content surfaces (same component, own topic filter).
 const DESTINATION_TAB_IDS = ['destinations', 'experiences', 'stay'];
 const TOPIC_BROWSE_TAB_IDS = [...ASSOCIATION_TAB_IDS, ...DESTINATION_TAB_IDS];
+// Destination tabs list the site's own pages (a hotel, a beach, an excursion), each with its
+// hero photo. Posts and videos live in Discover; mixing them in put Spanish video
+// transcripts and blank tiles between the hotels.
+const DESTINATION_BROWSE_ENTITY_TYPES = ['website'];
 const PlatformTab = dynamic(() => import('@/components/chat/PlatformTab'), { ssr: false });
 const CustomersTab = dynamic(() => import('@/components/chat/CustomersTab'), { ssr: false });
 const DemoTab = dynamic(() => import('@/components/chat/DemoTab'), { ssr: false });
@@ -3176,6 +3180,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   (influencer.tabs || []).find((t: { id: string; topic?: string }) => t.id === activeTab)?.topic
                     || activeTab,
                 ]}
+                entityTypes={DESTINATION_TAB_IDS.includes(activeTab) ? DESTINATION_BROWSE_ENTITY_TYPES : undefined}
                 language={(influencer as any).language === 'en' ? 'en' : 'he'}
                 onAskAbout={(question: string) => {
                   setActiveTab('chat');

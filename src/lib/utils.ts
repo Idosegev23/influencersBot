@@ -7,8 +7,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Format date for Hebrew display
-export function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('he-IL', {
+export function formatDate(dateString: string, lang?: 'he' | 'en'): string {
+  return new Date(dateString).toLocaleDateString(lang === 'en' ? 'en-US' : 'he-IL', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -43,7 +43,8 @@ export function formatRelativeTime(dateString: string, lang?: 'he' | 'en'): stri
     if (diffMinutes < 60) return diffMinutes === 1 ? '1 minute ago' : `${diffMinutes} minutes ago`;
     if (diffHours < 24) return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
     if (diffDays < 7) return diffDays === 1 ? 'yesterday' : `${diffDays} days ago`;
-    return formatDate(dateString);
+    // An English dashboard showed "9 באוק׳ 2026" for any post older than a week.
+    return formatDate(dateString, 'en');
   }
 
   if (diffSeconds < 60) return 'עכשיו';
