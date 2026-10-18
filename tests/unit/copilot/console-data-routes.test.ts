@@ -322,12 +322,25 @@ describe('PATCH associations/:id/settings', () => {
   });
 
   it.each(['queued', 'running'])('409 scan_in_progress while the latest scan is %s, nothing written', async (status) => {
-    h.jobs.push({ id: 'j', account_id: ACC1, status, created_at: '2026-10-18T00:00:00Z', step_logs: [] });
+    h.jobs.push({ id: 'j', account_id: ACC1, status, created_at: new Date().toISOString(), updated_at: new Date(Date.now() - 5 * 60_000).toISOString(), step_logs: [] });
     const before = JSON.stringify(db.tables.accounts);
     const res = await patch('owner', ACC1, { tone: 'x' });
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'scan_in_progress' });
     expect(JSON.stringify(db.tables.accounts)).toBe(before);
+  });
+
+  it('a running job not updated for 45+ minutes is stale and does not block the save', async () => {
+    h.jobs.push({ id: 'j', account_id: ACC1, status: 'running', created_at: '2026-10-01T00:00:00Z', updated_at: new Date(Date.now() - 46 * 60_000).toISOString(), step_logs: [] });
+    expect((await patch('owner', ACC1, { tone: 'stale ok' })).status).toBe(200);
+    expect(db.tables.accounts.find((a) => a.id === ACC1)!.config.copilot.tone).toBe('stale ok');
+  });
+
+  it('without updated_at, started_at decides staleness', async () => {
+    h.jobs.push({ id: 'j', account_id: ACC1, status: 'running', created_at: '2026-10-01T00:00:00Z', started_at: new Date(Date.now() - 10 * 60_000).toISOString(), step_logs: [] });
+    expect((await patch('owner', ACC1, { tone: 'x' })).status).toBe(409);
+    h.jobs[0].started_at = new Date(Date.now() - 60 * 60_000).toISOString();
+    expect((await patch('owner', ACC1, { tone: 'x' })).status).toBe(200);
   });
 
   it('saves once the latest scan has finished', async () => {

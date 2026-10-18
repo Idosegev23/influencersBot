@@ -419,6 +419,18 @@ export function buildSettingsPatch(body: any, current: Record<string, any>): Set
   return { ok: true, patch };
 }
 
+export const STALE_SCAN_MS = 45 * 60 * 1000;
+
+/**
+ * A queued/running job that has shown life in the last 45 minutes. A job stuck in
+ * "running" (a worker died) must not lock the settings forever.
+ */
+export function isLiveScan(job: any, now = Date.now()): boolean {
+  if (!job || (job.status !== 'queued' && job.status !== 'running')) return false;
+  const seen = Date.parse(job.updated_at ?? job.started_at ?? job.created_at ?? '');
+  return Number.isFinite(seen) && now - seen < STALE_SCAN_MS;
+}
+
 /** PATCH associations/:id/settings (the caller has checked canManage). */
 export async function updateSettings(acc: ConsoleAccount, body: any, db: any = supabase, latestJob: typeof latestScanJob = latestScanJob) {
   const current = (acc.config.copilot ?? {}) as Record<string, any>;
@@ -427,7 +439,7 @@ export async function updateSettings(acc: ConsoleAccount, body: any, db: any = s
   // A running scan rewrites accounts.config whole at several steps. Those writes carry
   // config->copilot over (preserve-copilot), but refusing here keeps the window shut.
   const job = await latestJob(acc.id);
-  if (job && (job.status === 'queued' || job.status === 'running')) return refuse(409, 'scan_in_progress');
+  if (isLiveScan(job)) return refuse(409, 'scan_in_progress');
   const { data, error } = await db.rpc('copilot_merge_config', { p_account_id: acc.id, p_patch: p.patch });
   if (error) { log('settings merge failed', acc.id, error.message); return refuse(503, 'unavailable'); }
   if (!data) return refuse(404, 'not_found');
