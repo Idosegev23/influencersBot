@@ -8,7 +8,8 @@
 import { config as loadEnv } from 'dotenv';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
-import { parseExtractedEvents, todayIn } from '../src/lib/copilot/events-store';
+// events-parse has no supabase import: importing events-store here would read env before loadEnv runs.
+import { parseExtractedEvents, todayIn, extractorInput } from '../src/lib/copilot/events-parse';
 
 loadEnv({ path: '.env.local' });
 const args = process.argv.slice(2);
@@ -70,7 +71,7 @@ async function main() {
     try {
       const body = parts.join('\n').slice(0, 12000);
       const res = await openai.responses.create({
-        model: 'gpt-6-luna', instructions: PROMPT, input: `URL: ${url}\n\n${body}`,
+        model: 'gpt-6-luna', instructions: PROMPT, input: extractorInput(url, body),
         reasoning: { effort: 'low' }, max_output_tokens: 3000, text: { format: { type: 'json_object' } },
       } as any);
       let parsed: any = null;
