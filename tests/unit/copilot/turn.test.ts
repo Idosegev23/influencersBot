@@ -665,3 +665,98 @@ describe('createLinkGuard', () => {
     expect(g.end()).toBe('friend');
   });
 });
+
+describe('final review fixes', () => {
+  // I4
+  it('awaits the cost write before done, exactly once, and survives a rejected write', async () => {
+    const usage = [{ model: 'gpt-6-luna', inputTokens: 10, cachedInputTokens: 0, outputTokens: 5 }];
+    let release!: () => void;
+    const order: string[] = [];
+    const recordCost = vi.fn(() => new Promise<void>((r) => { release = () => { order.push('cost'); r(); }; }));
+    const db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
+    const p = runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'q' }, (e) => { if (e.type === 'done') order.push('done'); emit(e); },
+      baseDeps(db, { model: modelSaying('Hi.', { usage }), recordCost }));
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    expect(emitted.find((e) => e.type === 'done')).toBeUndefined();
+    release();
+    await p;
+    expect(order).toEqual(['cost', 'done']);
+    expect(recordCost).toHaveBeenCalledTimes(1);
+
+    emitted = [];
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const rejecting = vi.fn(async () => { throw new Error('cost db down'); });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'q' }, emit,
+      baseDeps(makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 }), { model: modelSaying('Hi.', { usage }), recordCost: rejecting }));
+    expect(rejecting).toHaveBeenCalledTimes(1);
+    expect(emitted.at(-1)).toMatchObject({ type: 'done' });
+    err.mockRestore();
+  });
+
+  it('awaits the cost write on the model-failure path too', async () => {
+    const usage = [{ model: 'gpt-6-luna', inputTokens: 10, cachedInputTokens: 0, outputTokens: 0 }];
+    const order: string[] = [];
+    const recordCost = vi.fn(async () => { await new Promise((r) => setTimeout(r, 5)); order.push('cost'); });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'q' }, (e) => { if (e.type === 'error') order.push('error'); emit(e); },
+      baseDeps(makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 }), { model: vi.fn(async () => { throw new CopilotModelError('down', usage); }), recordCost }));
+    expect(order).toEqual(['cost', 'error']);
+    expect(recordCost).toHaveBeenCalledTimes(1);
+  });
+
+  // I5
+  it('escalates only after the answer and the session update are saved, with the verdict computed up front', async () => {
+    const db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
+    let seen: any = null;
+    const escalate = vi.fn(async (arg: any) => {
+      seen = { roles: db.inserted.map((i: any) => i.row.role), updates: db.updates.length, emittedEscalated: emitted.some((e) => e.type === 'escalated'), verdict: arg.verdict };
+      return { escalated: true, reason: 'Asked for a staff member', notified: 1, deduped: false };
+    });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'I want to speak to someone' }, emit,
+      baseDeps(db, { escalate, model: modelSaying('Sure.') }));
+    expect(seen.roles).toEqual(['user', 'assistant']);
+    expect(seen.updates).toBe(1);
+    expect(seen.emittedEscalated).toBe(false);
+    expect(seen.verdict).toMatchObject({ escalate: true, triggers: ['human_demand'] });
+    expect(emitted).toContainEqual({ type: 'escalated' });
+    // before_escalation (a default rule) asks for contact; decided from the verdict, before the save.
+    expect(emitted).toContainEqual({ type: 'contact_request' });
+    expect(db.inserted.find((i: any) => i.row.role === 'assistant').row.metadata.copilot.contact_requested).toBe(true);
+    expect(emitted.at(-1)).toMatchObject({ type: 'done', messageId: 'm2' });
+  });
+
+  it('a non-escalating message with the same answer does not ask for contact (absence check for the case above)', async () => {
+    const db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
+    const escalate = vi.fn(async (arg: any) => ({ escalated: !!arg.verdict?.escalate, reason: null, notified: 0, deduped: false }));
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'What are the dues?' }, emit,
+      baseDeps(db, { escalate, model: modelSaying('Sure.') }));
+    expect((escalate.mock.calls[0] as any)[0].verdict).toMatchObject({ escalate: false });
+    expect(emitted).not.toContainEqual({ type: 'contact_request' });
+  });
+
+  it('announces escalation only when escalated and not deduped', async () => {
+    for (const [r, shown] of [
+      [{ escalated: true, reason: 'r', notified: 0, deduped: true }, false],
+      [{ escalated: false, reason: null, notified: 0, deduped: false }, false],
+      [{ escalated: true, reason: 'r', notified: 0, deduped: false }, true],
+    ] as const) {
+      emitted = [];
+      await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'I want to speak to someone' }, emit,
+        baseDeps(makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 }), { escalate: vi.fn(async () => r) }));
+      expect(emitted.some((e) => e.type === 'escalated')).toBe(shown);
+    }
+  });
+
+  // M3
+  it('stores cited sources as titled objects in the assistant metadata, and recap builds titled links from it', async () => {
+    const { buildRecapEmail } = await import('@/lib/copilot/recap');
+    const db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor, sessionId: 's1', message: 'How do I join?' }, emit,
+      baseDeps(db, { model: modelSaying(`Join [1].\n${META}`) }));
+    const row = db.inserted.find((i: any) => i.row.role === 'assistant').row;
+    expect(row.metadata.copilot.cited).toEqual([1]);
+    expect(row.metadata.copilot.sources).toEqual([{ n: 1, title: 'Membership', url: 'https://buses.org/membership/' }]);
+    const { html } = buildRecapEmail({ associationName: 'ABA', messages: [{ role: 'user', content: 'How do I join?' }, row], sources: [] });
+    expect(html).toContain('https://buses.org/membership/');
+    expect(html).toContain('Membership');
+  });
+});

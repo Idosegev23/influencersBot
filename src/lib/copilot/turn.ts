@@ -2,6 +2,8 @@
  * One association chat turn: check the session belongs to this visitor, retrieve,
  * prompt, stream the answer through the META splitter and the link guard, check
  * every card against what was actually retrieved, then save, escalate, record.
+ * The escalation verdict is computed before the save (the contact decision needs
+ * it); the escalation itself (DB row + staff email) runs after the save.
  */
 import { supabase } from '@/lib/supabase';
 import { resolvePreviousResponseId } from '@/lib/chatbot/chain-ttl';
@@ -17,7 +19,7 @@ import { listUpcomingEvents, todayIn, type UpcomingEvent } from './events-store'
 import { buildInstructions, buildUserInput, promptEvents, ctaUrlSets, allowedCtaUrls, findUrlSpans, isSiteHost, type PromptContext } from './prompt';
 import { createVisibleTextSplitter, parseMeta, EMPTY_META, type CopilotMeta } from './protocol';
 import { streamCopilotModel } from './model';
-import { escalateIfNeeded, type EscalationResult } from './escalate';
+import { escalateIfNeeded, detectCopilotEscalation, type EscalationResult, type EscalationVerdict } from './escalate';
 import { readContactRules, shouldRequestContact } from './contact-trigger';
 import { recordEvents, type InteractionEventInput } from './events';
 import { isVerifiedIdentity } from './identity';
@@ -40,8 +42,11 @@ export interface TurnDeps {
   listEvents: (accountId: string, today: string) => Promise<UpcomingEvent[]>;
   model: typeof streamCopilotModel;
   escalate: (input: Parameters<typeof escalateIfNeeded>[0]) => Promise<EscalationResult>;
+  /** Pure escalation verdict for the visitor's message. */
+  detectEscalation: (message: string, priorUserMessages: string[]) => EscalationVerdict;
   recordEvents: typeof recordEvents;
-  recordCost: (p: { accountId: string; sessionId: string | null; usage: TokenUsage[] }) => void;
+  /** Awaited before the turn ends (a serverless instance may freeze right after the response). */
+  recordCost: (p: { accountId: string; sessionId: string | null; usage: TokenUsage[] }) => void | Promise<unknown>;
   now: () => Date;
 }
 
@@ -52,8 +57,9 @@ export function defaultTurnDeps(): TurnDeps {
     listEvents: listUpcomingEvents,
     model: streamCopilotModel,
     escalate: escalateIfNeeded,
+    detectEscalation: (m, prior) => detectCopilotEscalation(m, prior),
     recordEvents,
-    recordCost: (p) => { void recordTurnCost(p); },
+    recordCost: (p) => recordTurnCost(p),
     now: () => new Date(),
   };
 }
@@ -280,9 +286,11 @@ export async function runCopilotTurn(
   });
   let visible = '';
   const out = (t: string) => { if (t) { visible += t; emit({ type: 'delta', text: t }); } };
-  const recordCostOnce = (usage: unknown) => {
-    if (!Array.isArray(usage) || !usage.length) return;
-    try { d.recordCost({ accountId, sessionId, usage }); } catch (err) { log('cost failed', err); }
+  let costRecorded = false;
+  const recordCostOnce = async (usage: unknown) => {
+    if (costRecorded || !Array.isArray(usage) || !usage.length) return;
+    costRecorded = true;
+    try { await d.recordCost({ accountId, sessionId, usage }); } catch (err) { log('cost failed', err); }
   };
 
   let result: Awaited<ReturnType<typeof streamCopilotModel>>;
@@ -293,12 +301,13 @@ export async function runCopilotTurn(
     });
   } catch (e) {
     log('model failed', accountId, e instanceof Error ? e.message : e);
-    recordCostOnce((e as any)?.usage);
+    await recordCostOnce((e as any)?.usage);
     emit({ type: 'error', error: 'answer_unavailable' });
     return;
   }
-  // 13 (moved up). Cost is recorded exactly once, before anything below can throw.
-  recordCostOnce(result?.usage);
+  // 13 (moved up). Cost is recorded exactly once, started before anything below can throw,
+  // and awaited before done.
+  const costWrite = recordCostOnce(result?.usage);
 
   const { visible: lastVisible, rawMeta } = splitter.end();
   out(guard.push(lastVisible));
@@ -316,6 +325,8 @@ export async function runCopilotTurn(
   let related: { title: string; url: string } | null = null;
   let event: UpcomingEvent | null = null;
   let esc: EscalationResult = { escalated: false, reason: null, notified: 0, deduped: false };
+  let verdict: EscalationVerdict = { escalate: false, severity: null, triggers: [] };
+  const priorUserMessages = history.filter((m) => m.role === 'user').map((m) => m.content);
   let contactRequested = false;
   try {
     // 8. Cards, each checked against what was retrieved.
@@ -340,24 +351,12 @@ export async function runCopilotTurn(
     }
     if (meta.cta) emit({ type: 'cta', kind: meta.cta.kind, url: meta.cta.url });
 
-    // 9. Escalation.
-    const priorUserMessages = history.filter((m) => m.role === 'user').map((m) => m.content);
+    // 9. Escalation verdict only (pure); the escalation itself runs after the save.
     try {
-      esc = await d.escalate({
-        accountId, associationName, sessionId,
-        visitorLabel: str(visitor.name) ?? str(visitor.email) ?? 'Website visitor',
-        userMessage: message, priorUserMessages,
-        transcript: [
-          ...history.map((m) => ({ role: m.role, content: m.content })),
-          { role: 'user', content: message },
-          { role: 'assistant', content: answer },
-        ],
-        config: assoc.config,
-      }) ?? esc;
+      verdict = d.detectEscalation(message, priorUserMessages) ?? verdict;
     } catch (e) {
-      log('escalation failed', accountId, e);
+      log('escalation detect failed', accountId, e);
     }
-    if (esc.escalated && !esc.deduped) emit({ type: 'escalated' });
 
     // 10. Contact request. Counts come from the whole session, not the 10-row window.
     const alreadyRequested = contactAskedBefore || history.some((m) => m.role === 'assistant'
@@ -367,7 +366,7 @@ export async function runCopilotTurn(
       questionCount: Math.floor((session.message_count ?? 0) / 2) + 1,
       topic: meta.topic,
       modelAsked: meta.askContact,
-      escalating: esc.escalated,
+      escalating: verdict.escalate,
       alreadyHaveEmail: !!visitor.email,
       alreadyRequested,
     });
@@ -375,14 +374,18 @@ export async function runCopilotTurn(
   } catch (e) {
     log('cards or follow-up failed', accountId, e);
   }
-  const announceEscalation = esc.escalated && !esc.deduped;
 
   // 11. Save the answer and advance the session.
   let messageId: string | null = null;
   try {
     const { data, error } = await d.db.from('chat_messages').insert({
       session_id: sessionId, role: 'assistant', content: answer,
-      metadata: { copilot: { cited: meta.cited, related: meta.related, eventId: event ? event.id : null, cta: meta.cta, topic: meta.topic, contact_requested: contactRequested } },
+      metadata: { copilot: {
+        cited: meta.cited,
+        // Titled links (after the link guard: only sources with a URL), for the recap email.
+        sources: citedSources.map((s) => ({ n: s.n, title: s.title, url: s.url })),
+        related: meta.related, eventId: event ? event.id : null, cta: meta.cta, topic: meta.topic, contact_requested: contactRequested,
+      } },
     }).select('id').single();
     if (error) log('assistant message insert failed', accountId, error.message);
     messageId = data?.id ?? null;
@@ -401,6 +404,26 @@ export async function runCopilotTurn(
     log('session update threw', accountId, e);
   }
 
+  // 11b. Escalation, now that the answer and the session are saved. Its email is time-bounded.
+  try {
+    esc = await d.escalate({
+      accountId, associationName, sessionId,
+      visitorLabel: str(visitor.name) ?? str(visitor.email) ?? 'Website visitor',
+      userMessage: message, priorUserMessages,
+      transcript: [
+        ...history.map((m) => ({ role: m.role, content: m.content })),
+        { role: 'user', content: message },
+        { role: 'assistant', content: answer },
+      ],
+      config: assoc.config,
+      verdict,
+    }) ?? esc;
+  } catch (e) {
+    log('escalation failed', accountId, e);
+  }
+  const announceEscalation = esc.escalated && !esc.deduped;
+  if (announceEscalation) emit({ type: 'escalated' });
+
   // 12. Interaction events (never break the turn).
   const ev = (type: InteractionEventInput['type'], payload: Record<string, unknown> = {}): InteractionEventInput => ({ type, sessionId, messageId, payload });
   const records: InteractionEventInput[] = [ev('question', { length: message.length })];
@@ -418,7 +441,8 @@ export async function runCopilotTurn(
     log('interaction events failed', accountId, e);
   }
 
-  // 13. Cost was recorded right after the model returned.
+  // 13. The cost write started right after the model returned; finish it before done.
+  await costWrite;
 
   // 14. Done.
   emit({ type: 'done', messageId });
