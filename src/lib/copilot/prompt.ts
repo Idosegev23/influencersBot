@@ -71,16 +71,23 @@ export function allowedCtaUrls(ctx: PromptContext): string[] {
 
 const SCHEME_OR_WWW = /(?:https?:\/\/|www\.)[^\s<>"')\]]+/gi;
 const PROTOCOL_RELATIVE = /(?<![:\w])\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+[^\s<>"')\]]*/gi;
-// host.tld with an alphabetic TLD of 2+ letters, optionally followed by a path.
-// Leaves "e.g.", "i.e.", "U.S.", "3.5" and "v1.2" alone.
-const BARE_DOMAIN = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?![\w-])(?:\/[^\s<>"')\]]*)?/gi;
+// host.tld[/path], case-sensitive on purpose: the TLD must be lowercase letters and
+// must not run into more letters or digits (so "today.Benefits", "St.Louis" and
+// "ASP.NET" survive), and the match must not start inside a word, after "@" (an
+// e-mail address is not a link), "." or "-". "e.g.", "3.5" and "v1.2" never match.
+const BARE_DOMAIN = /(?<![@\w.-])[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[a-z]{2,}(?![A-Za-z0-9@-])(?:\/[^\s<>"')\]]*)?/g;
+// File and code extensions that look like a TLD but are not one worth masking.
+const NOT_A_TLD = new Set(['js', 'ts', 'jsx', 'tsx', 'json', 'css', 'xml', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'txt', 'csv', 'exe', 'mp3', 'mp4']);
+const REMOVED = '[link removed]';
+const MAX_TITLE = 200;
 
 /**
  * Untrusted crawled text: no links and no prompt delimiters. Delimiters are
  * removed first, to a fixed point, so that splicing (`ht<<x>>tps://`,
  * `<</SOU<</X>>RCES>>`) cannot rebuild a link or a marker; only then are URLs masked.
+ * Links to the association's own site (siteHosts) are left alone.
  */
-function sanitizeUntrusted(text: string): string {
+function sanitizeUntrusted(text: string, siteHosts: string[]): string {
   let t = text;
   for (let i = 0; i < 10; i++) {
     const next = t.replace(/<<[^<>]*>>/g, '');
@@ -89,10 +96,15 @@ function sanitizeUntrusted(text: string): string {
   }
   let prev: string;
   do { prev = t; t = t.replace(/<<|>>/g, ''); } while (t !== prev);
+  const mask = (prefix: string) => (m: string) => (onSite(prefix + m, siteHosts) ? m : REMOVED);
   return t
-    .replace(SCHEME_OR_WWW, '[link removed]')
-    .replace(PROTOCOL_RELATIVE, '[link removed]')
-    .replace(BARE_DOMAIN, '[link removed]');
+    .replace(SCHEME_OR_WWW, (m) => (onSite(/^www\./i.test(m) ? `https://${m}` : m, siteHosts) ? m : REMOVED))
+    .replace(PROTOCOL_RELATIVE, mask('https:'))
+    .replace(BARE_DOMAIN, (m) => {
+      const tld = m.split('/')[0].split('.').pop() ?? '';
+      if (NOT_A_TLD.has(tld)) return m;
+      return onSite(`https://${m}`, siteHosts) ? m : REMOVED;
+    });
 }
 
 function visitorBlock(ctx: PromptContext): string {
@@ -113,11 +125,11 @@ function visitorBlock(ctx: PromptContext): string {
 
 export function buildInstructions(ctx: PromptContext): string {
   const sources = ctx.sources.length
-    ? ctx.sources.map((s) => `[${s.n}] ${sanitizeUntrusted(s.title)}${s.url ? ` — ${s.url}` : ''}\n${sanitizeUntrusted(s.excerpt)}`).join('\n\n')
+    ? ctx.sources.map((s) => `[${s.n}] ${sanitizeUntrusted(s.title.slice(0, MAX_TITLE), ctx.siteHosts)}${s.url ? ` — ${s.url}` : ''}\n${sanitizeUntrusted(s.excerpt, ctx.siteHosts)}`).join('\n\n')
     : 'No sources matched this question.';
   const shownEvents = promptEvents(ctx);
   const events = shownEvents.length
-    ? shownEvents.map((e) => `- id=${e.id} | ${sanitizeUntrusted(e.title)} | ${e.startsOn}${e.endsOn && e.endsOn !== e.startsOn ? ` to ${e.endsOn}` : ''}${e.location ? ` | ${sanitizeUntrusted(e.location)}` : ''} | page ${e.url}${e.registrationUrl ? ` | register ${e.registrationUrl}` : ''}`).join('\n')
+    ? shownEvents.map((e) => `- id=${e.id} | ${sanitizeUntrusted(e.title.slice(0, MAX_TITLE), ctx.siteHosts)} | ${e.startsOn}${e.endsOn && e.endsOn !== e.startsOn ? ` to ${e.endsOn}` : ''}${e.location ? ` | ${sanitizeUntrusted(e.location.slice(0, MAX_TITLE), ctx.siteHosts)}` : ''} | page ${e.url}${e.registrationUrl ? ` | register ${e.registrationUrl}` : ''}`).join('\n')
     : 'No upcoming events are known. Do not mention specific event dates.';
   const links = [ctx.joinUrl && `Join: ${ctx.joinUrl}`, ctx.renewUrl && `Renew: ${ctx.renewUrl}`].filter(Boolean).join('\n') || 'None given.';
 

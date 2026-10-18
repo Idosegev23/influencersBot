@@ -72,6 +72,31 @@ describe('buildInstructions', () => {
     expect(p).toContain('Go to [link removed] or [link removed] or [link removed].');
     expect(p).toContain('Also e.g. dues of 3.5% for U.S. members on v1.2, i.e. fine.');
   });
+  it('keeps what answers need and still masks off-site links', () => {
+    const excerpt = 'Contact membership@buses.org or john.smith@buses.org. Visit buses.org/join today. Visit evil.com/x now. Join today.Benefits include travel.Membership. Node.js and ASP.NET and form.pdf in St.Louis. See https://evil.example/x.';
+    const p = buildInstructions({ ...base, sources: [{ ...base.sources[0], excerpt }] } as any);
+    expect(p).toContain('Contact membership@buses.org or john.smith@buses.org.');
+    expect(p).toContain('Visit buses.org/join today.');
+    expect(p).toContain('Visit [link removed] now.');
+    expect(p).toContain('Join today.Benefits include travel.Membership.');
+    expect(p).toContain('Node.js and ASP.NET and form.pdf in St.Louis.');
+    expect(p).toContain('See [link removed]');
+    expect(p).not.toContain('evil');
+  });
+  it('lets the association own site through in every pass, subdomains included, but not look-alikes', () => {
+    const excerpt = 'A https://www.buses.org/a B www.buses.org/b C //blog.buses.org/c D blog.buses.org/d E https://buses.org.evil.com/e F https://notbuses.org/f G https://buses.org@evil.com/g';
+    const p = buildInstructions({ ...base, sources: [{ ...base.sources[0], excerpt }] } as any);
+    for (const kept of ['A https://www.buses.org/a', 'B www.buses.org/b', 'C //blog.buses.org/c', 'D blog.buses.org/d']) expect(p).toContain(kept);
+    expect(p).toContain('E [link removed]');
+    expect(p).toContain('F [link removed]');
+    expect(p).toContain('G [link removed]');
+    expect(p).not.toContain('evil');
+  });
+  it('caps long titles', () => {
+    const p = buildInstructions({ ...base, sources: [{ ...base.sources[0], title: 'T'.repeat(5000) }] } as any);
+    expect(p).not.toContain('T'.repeat(201));
+    expect(p).toContain('T'.repeat(200));
+  });
   it('keeps event links on the association site only', () => {
     const ctx = {
       ...base,
