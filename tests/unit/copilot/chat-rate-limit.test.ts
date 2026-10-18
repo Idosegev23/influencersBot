@@ -19,6 +19,11 @@ describe('checkChatLimits', () => {
   it('refuses 429 when the anon bucket is full', async () => {
     const limiter = vi.fn(async (a: any) => (a.key.includes(':anon:') ? { ...ok, allowed: false, retryAfterMs: 4000 } : ok));
     expect(await checkChatLimits(ctx, { limiter, available: () => true })).toEqual({ allowed: false, status: 429, error: 'rate_limited', retryAfterMs: 4000 });
+    expect(limiter).toHaveBeenCalledTimes(1);
+  });
+  it('falls back to the window when the limiter returns a non-finite retryAfterMs', async () => {
+    const limiter = vi.fn(async (a: any) => (a.key.includes(':anon:') ? { ...ok, allowed: false, retryAfterMs: NaN } : ok));
+    expect(await checkChatLimits(ctx, { limiter, available: () => true })).toEqual({ allowed: false, status: 429, error: 'rate_limited', retryAfterMs: 60000 });
   });
   it('refuses 429 when the association bucket is full', async () => {
     const limiter = vi.fn(async (a: any) => (a.key.includes(':account:') ? { ...ok, allowed: false, retryAfterMs: 900 } : ok));

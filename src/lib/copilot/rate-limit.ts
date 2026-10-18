@@ -26,6 +26,8 @@ export async function checkChatLimits(
   const available = deps.available ?? isRedisAvailable;
   if (!available()) return UNAVAILABLE;
 
+  // Anon is checked first on purpose: a single flooder is refused before it can
+  // drain the association bucket that every visitor of the association shares.
   const buckets = [
     { key: `rl:copilot:chat:anon:${ctx.accountId}:${ctx.anonId}`, limit: ANON_LIMIT },
     { key: `rl:copilot:chat:account:${ctx.accountId}`, limit: ACCOUNT_LIMIT },
@@ -33,7 +35,11 @@ export async function checkChatLimits(
   for (const b of buckets) {
     const r = await limiter({ key: b.key, limit: b.limit, windowMs: WINDOW_MS, identifier: crypto.randomUUID() });
     if (!r) return UNAVAILABLE;
-    if (!r.allowed) return { allowed: false, status: 429, error: 'rate_limited', retryAfterMs: r.retryAfterMs };
+    if (!r.allowed) {
+      // The shared helper can return a non-finite retryAfterMs on refusal; fall back to the window.
+      const retryAfterMs = Number.isFinite(r.retryAfterMs) && r.retryAfterMs > 0 ? r.retryAfterMs : WINDOW_MS;
+      return { allowed: false, status: 429, error: 'rate_limited', retryAfterMs };
+    }
   }
   return { allowed: true };
 }
