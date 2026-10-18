@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { setCount } from '@/lib/pipeline/state';
 import { getTiktokProfile, getTiktokVideos, getTiktokTranscript } from '@/lib/scraping/tiktokScraper';
+import { persistPostMedia } from '@/lib/scraping/media-storage';
 import type { StepContext } from '../types';
 import { enrichSkips, type StepResult } from './index';
 
@@ -54,6 +55,10 @@ export async function tiktokScanStep(ctx: StepContext): Promise<StepResult> {
   let done = 0;
   for (const v of videos) {
     try {
+      // TikTok cover urls are signed and expire within days; persist the cover so the
+      // Discover grid still has a picture next week. Without it these posts rendered
+      // as a bare "video" tile.
+      const stored = v.cover ? await persistPostMedia(supabase, ctx.accountId, `tt_${v.id}`, [], v.cover) : null;
       const { data: postRow } = await supabase
         .from('instagram_posts')
         .upsert(
@@ -65,6 +70,11 @@ export async function tiktokScanStep(ctx: StepContext): Promise<StepResult> {
             type: 'video',
             caption: (v.desc || '').slice(0, 5000),
             media_urls: [v.shareUrl],
+            thumbnail_url: v.cover || null,
+            stored_thumbnail_url: stored?.stored_thumbnail_url ?? null,
+            media_stored_at: stored?.media_stored_at ?? null,
+            likes_count: capInt4(v.likes),
+            comments_count: capInt4(v.comments),
             views_count: capInt4(v.views),
             posted_at: toPostedAt(v.createTime),
           },

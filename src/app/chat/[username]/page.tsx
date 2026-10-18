@@ -43,6 +43,9 @@ const ContentBrowseTab = dynamic(() => import('@/components/chat/ContentBrowseTa
 // The `association` archetype's three content surfaces. Kept in sync with the tab
 // ids emitted by src/lib/chat-ui/generate-tab-config.ts.
 const ASSOCIATION_TAB_IDS = ['membership', 'events', 'advocacy'];
+// The `destination` archetype's three content surfaces (same component, own topic filter).
+const DESTINATION_TAB_IDS = ['destinations', 'experiences', 'stay'];
+const TOPIC_BROWSE_TAB_IDS = [...ASSOCIATION_TAB_IDS, ...DESTINATION_TAB_IDS];
 const PlatformTab = dynamic(() => import('@/components/chat/PlatformTab'), { ssr: false });
 const CustomersTab = dynamic(() => import('@/components/chat/CustomersTab'), { ssr: false });
 const DemoTab = dynamic(() => import('@/components/chat/DemoTab'), { ssr: false });
@@ -3157,7 +3160,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                   });
                 }}
               />
-            ) : ASSOCIATION_TAB_IDS.includes(activeTab) ? (
+            ) : TOPIC_BROWSE_TAB_IDS.includes(activeTab) ? (
               // Association tabs (Membership / Events / Advocacy) are one component
               // parameterised by the tab's own topic filter, not three components.
               // The topic comes from accounts.config.tabs so the vocabulary stays

@@ -463,6 +463,7 @@ export function verticalForArchetype(archetype: string | null | undefined): Vert
   switch (archetype) {
     case 'service_provider':
     case 'association':
+    case 'destination':
       // An association has no catalog at all; 'services' keeps the extractor from
       // hunting for retail products on membership and policy pages.
       return 'services';

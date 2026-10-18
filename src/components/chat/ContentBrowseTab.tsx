@@ -221,6 +221,9 @@ function getPlaceholderEmoji(topic: string): string {
     // association vocabulary (src/lib/rag/enrich.ts ASSOCIATION_TOPICS)
     membership: '\uD83E\uDD1D', events: '\uD83D\uDCC5', advocacy: '\uD83C\uDFDB\uFE0F',
     safety: '\uD83D\uDEE1\uFE0F', tourism: '\uD83D\uDE8C', industry: '\uD83D\uDCCA',
+    // destination vocabulary (DESTINATION_TOPICS)
+    destinations: '\uD83D\uDCCD', experiences: '\uD83E\uDDED', stay: '\uD83C\uDFE8',
+    dining: '\uD83C\uDF7D\uFE0F', culture: '\uD83C\uDFAD', plan: '\uD83D\uDDFA\uFE0F',
   };
   return map[topic] || '\uD83D\uDCCB';
 }

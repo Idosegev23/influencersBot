@@ -1,3 +1,4 @@
+import { SCAN_STEPS } from '@/lib/pipeline/progress';
 import { describe, it, expect, vi } from 'vitest';
 
 // Sends are channel-scoped now; unit tests must not perform real channel resolution.
@@ -93,7 +94,7 @@ describe('GET /api/admin/scans', () => {
     // progress fields present
     expect(typeof body.scans[0].percent).toBe('number');
     expect(typeof body.scans[0].completedSteps).toBe('number');
-    expect(body.scans[0].totalSteps).toBe(9);
+    expect(body.scans[0].totalSteps).toBe(SCAN_STEPS.length);
     expect(body.scans[0].currentStep).toBe('ig-scan');
     expect(typeof body.scans[0].elapsedMs).toBe('number');
     expect(typeof body.scans[0].lastUpdateMs).toBe('number');

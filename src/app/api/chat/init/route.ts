@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     // Coupon/price fillers make no sense for service orgs, public bodies,
     // membership associations or B2B platforms — none of them sell at a discount.
     const hasCommercialSuggestions =
-      !['service_provider', 'government_ministry', 'association', 'b2b_saas', 'saas_product'].includes(
+      !['service_provider', 'government_ministry', 'association', 'destination', 'b2b_saas', 'saas_product'].includes(
         config.archetype,
       ) && config.coupons_disabled !== true;
 

@@ -34,6 +34,13 @@ const LABEL_ICONS: Record<string, string> = {
   'Membership': 'nav/bonus-alt',
   'Events': 'nav/screen-play',
   'Advocacy': 'nav/bonus-alt',
+  // destination archetype
+  'Destinations': 'nav/map-pin',
+  'Things to Do': 'nav/compass',
+  'Stay': 'nav/bed',
+  'יעדים': 'nav/map-pin',
+  'חוויות': 'nav/compass',
+  'לינה': 'nav/bed',
   'Platform': 'nav/bonus-alt',
   'Customers': 'mozarim',
   // "Play a demo" semantics — the screen-with-play-button icon. Only

@@ -48,6 +48,7 @@ export default function AddAccountPage() {
   const [tiktok, setTiktok] = useState('');
   const [facebook, setFacebook] = useState('');
   const [linkedin, setLinkedin] = useState('');
+  const [xHandle, setXHandle] = useState('');
   const [archetype, setArchetype] = useState('brand');
   // Catalog market — drives the product taxonomy AND the extraction prompt.
   // Follows the archetype until the admin overrides it, then stays put.
@@ -239,6 +240,7 @@ export default function AddAccountPage() {
           tiktok: tiktok.trim() || undefined,
           facebook: facebook.trim() || undefined,
           linkedin: linkedin.trim() || undefined,
+          x: xHandle.trim() || undefined,
         }),
       });
 
@@ -545,6 +547,19 @@ export default function AddAccountPage() {
                 style={{ direction: 'ltr' }}
               />
             </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold mr-2" style={{ color: '#1f2937' }}>
+                X (Twitter) <span className="font-normal" style={{ color: '#817a6c' }}>(100 הציוצים הפופולריים, אופציונלי)</span>
+              </label>
+              <input
+                type="text"
+                value={xHandle}
+                onChange={(e) => setXHandle(e.target.value)}
+                placeholder="@handle"
+                className="neon-input w-full"
+                style={{ direction: 'ltr' }}
+              />
+            </div>
           </div>
 
           {/* Quote-mode discover + category table */}
@@ -650,6 +665,7 @@ export default function AddAccountPage() {
               <option value="local_business">עסק מקומי (local_business)</option>
               <option value="service_provider">נותן שירות (service_provider)</option>
               <option value="association">איגוד מקצועי (association)</option>
+              <option value="destination">מועצת תיירות / יעד (destination)</option>
               <option value="government_ministry">משרד ממשלתי (government_ministry)</option>
               <option value="media_news">מדיה/חדשות (media_news)</option>
               <option value="tech_creator">יוצר טק (tech_creator)</option>

@@ -153,6 +153,7 @@ function generateGreeting(displayName: string, personaIdentity: any): string {
  */
 const EN_QUESTIONS_BY_ARCHETYPE: Record<string, string[]> = {
   association: ['How do I become a member? 🤝', 'What events are coming up? 📅', 'Where do you stand on the issues? 🏛️'],
+  destination: ['Where should I go first? 🏝️', 'What are the best things to do? 🌴', 'Where should I stay? 🏨'],
   service_provider: ['What services do you offer? 💼', 'Can you show me your work? 📁', 'How do we get started? 🚀'],
   b2b_saas: ['What can the platform do? ⚡', 'How does pricing work? 💳', 'Can I see a demo? 🖥️'],
   government_ministry: ['What services do you provide? 📋', 'How do I apply? 📝', 'Who should I contact? 📞'],

@@ -207,6 +207,15 @@ export class SandwichBot {
       classification.confidence = 0.8;
     }
 
+    // destination accounts: a tourism board sits under the retail classifier's 'travel'
+    // bucket at best and 'food' / 'fitness' / 'beauty' at worst ("rum tasting",
+    // "surf lessons", "spa resorts"). All of it is destination business.
+    if (accountArchetype === 'destination' && classification.primaryArchetype !== 'general') {
+      console.log(`   → Override: ${classification.primaryArchetype} → general (destination account)`);
+      classification.primaryArchetype = 'general';
+      classification.confidence = 0.8;
+    }
+
     // ==========================================
     // Retrieve Knowledge Base (skip if cached)
     // ==========================================

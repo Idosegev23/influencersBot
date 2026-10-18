@@ -30,7 +30,7 @@ const RAG_TYPES: EntityType[] = [
 ];
 
 /** Archetypes with no product catalog behind them — the crawl is all they have. */
-const SITE_IS_THE_KNOWLEDGE_BASE = new Set(['association', 'government_ministry']);
+const SITE_IS_THE_KNOWLEDGE_BASE = new Set(['association', 'destination', 'government_ministry']);
 
 function contentBudgetsFor(archetype?: string): Partial<Record<EntityType, number>> {
   return { website: SITE_IS_THE_KNOWLEDGE_BASE.has(archetype ?? '') ? 2000 : 200 };

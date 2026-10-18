@@ -21,6 +21,7 @@ export type AccountArchetype =
   | 'brand'
   | 'service_provider'
   | 'association'
+  | 'destination'
   | 'government_ministry'
   | 'media_news'
   | 'local_business'
@@ -167,6 +168,45 @@ export const ARCHETYPE_CONFIGS: Record<AccountArchetype, ArchetypeConfig> = {
     },
     docCap: 4,
     recencyMultiplier: 1.4,
+  },
+
+  /**
+   * Tourism board / destination marketing organisation (e.g. Go Dominican Republic)
+   * The website IS the product: one page per place, experience and property, so it
+   * outranks everything. Social posts matter more than for an association — a
+   * destination sells a feeling, and its reels, creators and campaign photography
+   * are the inspiration half of the trip. Recency is only mildly raised: an event
+   * date goes stale, a beach does not.
+   *
+   * No coupons and no partnerships: a board promotes places, not discount codes, and a
+   * resort or airline partner is not an influencer partnership. Both are pushed down
+   * hard so a stray chunk can never surface as an offer.
+   */
+  destination: {
+    typeWeights: {
+      website: +0.10,
+      post: +0.08,
+      transcription: +0.05,
+      knowledge_base: +0.06,
+      document: +0.04,
+      highlight: +0.02,
+      partnership: -0.10,
+      coupon: -0.20,
+      product: -0.20,
+    },
+    typeCaps: {
+      website: 10,
+      post: 6,
+      transcription: 4,
+      knowledge_base: 4,
+      document: 3,
+      highlight: 3,
+      partnership: 0,
+      coupon: 0,
+      product: 0,
+    },
+    docCap: 4,
+    recencyMultiplier: 1.2,
   },
 
   /**

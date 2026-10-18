@@ -35,6 +35,7 @@ export type MenuItem =
 const NON_COMMERCE_ARCHETYPES = new Set([
   'service_provider',
   'association',
+  'destination',
   'government_ministry',
   'media_news',
   'saas_product',

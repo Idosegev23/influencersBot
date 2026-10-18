@@ -74,6 +74,11 @@ const buildArchetypeTabs = (t: any, isEn: boolean): Record<string, TabSpec[]> =>
       { id: 'content', label: t.tabContent, icon: FileText },
       { id: 'settings', label: t.tabChatSettings, icon: Settings },
     ],
+    // Same shape as an association: a tourism board has content and a bot, no shop.
+    destination: [
+      { id: 'content', label: t.tabContent, icon: FileText },
+      { id: 'settings', label: t.tabChatSettings, icon: Settings },
+    ],
     government_ministry: [
       { id: 'content', label: t.tabContentPublications, icon: FileText },
       { id: 'settings', label: t.tabChatSettings, icon: Settings },
@@ -112,6 +117,7 @@ const buildArchetypeLabels = (t: any, isEn: boolean): Record<string, { brandsTit
     brand: { brandsTitle: t.abBrandsTitlePartners, brandsEmpty: t.abBrandsEmptyPartners, couponsTitle: t.tabOffersPromos },
     service_provider: { brandsTitle: t.tabClients, brandsEmpty: t.abBrandsEmptyClients, couponsTitle: t.tabPromotions },
     association: { brandsTitle: t.abBrandsTitlePartners, brandsEmpty: t.abBrandsEmptyPartners, couponsTitle: t.emDash },
+    destination: { brandsTitle: t.abBrandsTitlePartners, brandsEmpty: t.abBrandsEmptyPartners, couponsTitle: t.emDash },
     government_ministry: { brandsTitle: t.abBrandsTitleUnits, brandsEmpty: t.abBrandsEmptyUnits, couponsTitle: t.emDash },
     media_news: { brandsTitle: t.abBrandsTitlePartners, brandsEmpty: t.abBrandsEmptyPartners, couponsTitle: t.tabPromotions },
     local_business: { brandsTitle: t.abBrandsTitlePartners, brandsEmpty: t.abBrandsEmptyPartners, couponsTitle: t.tabPerksPromos },

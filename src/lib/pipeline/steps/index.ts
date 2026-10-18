@@ -6,6 +6,7 @@ import { fbScanStep } from './fb-scan';
 import { linkedinScanStep } from './linkedin-scan';
 import { youtubeScanStep } from './youtube-scan';
 import { tiktokScanStep } from './tiktok-scan';
+import { xScanStep } from './x-scan';
 import { siteDiscoverStep } from './site-discover';
 import { siteCrawlStep } from './site-crawl';
 import { ragIngestStep } from './rag-ingest';
@@ -34,7 +35,7 @@ export type StepHandler = (ctx: StepContext) => Promise<StepResult>;
  */
 export function enrichSkips(
   ctx: StepContext,
-  source: 'instagram' | 'website' | 'youtube' | 'tiktok' | 'facebook' | 'linkedin',
+  source: 'instagram' | 'website' | 'youtube' | 'tiktok' | 'facebook' | 'linkedin' | 'x',
 ): boolean {
   const enrich = ctx.state.options?.enrichSources;
   if (!enrich || enrich.length === 0) return false;
@@ -59,6 +60,7 @@ export const STEP_HANDLERS: Record<PipelineStep, StepHandler> = {
   'linkedin-scan': linkedinScanStep,
   'youtube-scan': youtubeScanStep,
   'tiktok-scan': tiktokScanStep,
+  'x-scan': xScanStep,
   'site-discover': siteDiscoverStep,
   'site-crawl': siteCrawlStep,
   'rag-ingest': ragIngestStep,

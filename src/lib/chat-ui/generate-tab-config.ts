@@ -10,6 +10,7 @@
  *   media_news:          צ׳אט | גלו | [קופונים]
  *   service_provider:    צ׳אט | גלו | שירותים
  *   association:         Chat  | Discover | Membership | Events | Advocacy
+ *   destination:         Chat  | Discover | Destinations | Things to Do | Stay
  *   government_ministry: צ׳אט | גלו | שירותים ומידע
  *   local_business:      צ׳אט | גלו | מוצרים | [הטבות] | [בעיה במוצר]
  *   tech_creator:        צ׳אט | גלו | סקירות
@@ -89,6 +90,11 @@ const STATIC_LABELS = {
   membership: L('חברות', 'Membership'),
   events: L('אירועים', 'Events'),
   advocacy: L('רגולציה', 'Advocacy'),
+  // destination-specific — the three decisions a traveller makes in order:
+  // where, what to do there, where to sleep.
+  destinations: L('יעדים', 'Destinations'),
+  thingsToDo: L('חוויות', 'Things to Do'),
+  stay: L('לינה', 'Stay'),
 };
 
 // Support tab — only for influencer, brand, local_business, b2b_saas.
@@ -120,6 +126,7 @@ const SUBTITLE_TEMPLATES: Record<Lang, Record<string, Record<string, string>>> =
     media_news: { _default: 'אני כאן לעזור עם חדשות, עדכונים ובידור' },
     service_provider: { _default: 'אני כאן לעזור בכל עניין ונושא מקצועי' },
     association: { _default: 'אני כאן לעזור עם חברות, אירועים ורגולציה' },
+    destination: { _default: 'אני כאן לעזור לתכנן את הטיול: יעדים, חוויות ולינה' },
     government_ministry: { _default: 'אני כאן לעזור עם מידע, שירותים ופרסומים' },
     local_business: {
       food: 'אני כאן לעזור עם מוצרים, הזמנות ומידע',
@@ -151,6 +158,7 @@ const SUBTITLE_TEMPLATES: Record<Lang, Record<string, Record<string, string>>> =
     media_news: { _default: 'Here to help with news, updates, and entertainment' },
     service_provider: { _default: 'Here to help with anything about our services' },
     association: { _default: 'Here to help with membership, events, and advocacy' },
+    destination: { _default: 'Here to help you plan your trip: places, things to do, and where to stay' },
     government_ministry: { _default: 'Here to help with information, services, and publications' },
     local_business: {
       food: 'Here to help with menu, orders, and info',
@@ -172,6 +180,7 @@ const HEADER_LABELS: Record<Lang, Record<string, Record<string, string>>> = {
     media_news: { _default: 'חדשות ומדיה' },
     service_provider: { _default: 'Assistant' },
     association: { _default: 'האיגוד' },
+    destination: { _default: 'מדריך טיולים' },
     government_ministry: { _default: 'שירותים ומידע' },
     local_business: { food: 'אוכל ומעדנייה', _default: 'עסק מקומי' },
     tech_creator: { _default: 'טכנולוגיה וסקירות' },
@@ -187,6 +196,7 @@ const HEADER_LABELS: Record<Lang, Record<string, Record<string, string>>> = {
     media_news: { _default: 'News & Media' },
     service_provider: { _default: 'Assistant' },
     association: { _default: 'The Association' },
+    destination: { _default: 'Travel Guide' },
     government_ministry: { _default: 'Services & Info' },
     local_business: { food: 'Food & Deli', _default: 'Local Business' },
     tech_creator: { _default: 'Tech & Reviews' },
@@ -219,6 +229,8 @@ function generateGreeting(displayName: string, archetype: string, lang: Lang): s
         return `Hi, I'm the ${firstName} assistant. Ask me about our services, work, and team.`;
       case 'association':
         return `Hi, I'm the ${displayName} assistant. Ask me about membership, our events, and where we stand on the issues.`;
+      case 'destination':
+        return `Hi, I'm your ${displayName} travel guide. Ask me where to go, what to do, and where to stay.`;
       case 'government_ministry':
         return `Hello, I'm the ${displayName} assistant. Ask me about services, publications, and procedures.`;
       case 'local_business':
@@ -238,6 +250,8 @@ function generateGreeting(displayName: string, archetype: string, lang: Lang): s
       return `היי, אני העוזר של ${firstName}. שאלו אותי על השירותים, הפרויקטים והניסיון שלנו`;
     case 'association':
       return `שלום, אני העוזר של ${displayName}. שאלו אותי על חברות, אירועים ורגולציה`;
+    case 'destination':
+      return `היי, אני מדריך הטיולים של ${displayName}. שאלו אותי לאן לנסוע, מה לעשות ואיפה לישון`;
     case 'government_ministry':
       return `שלום, אני העוזר החכם של ${displayName}. שאלו אותי על שירותים, פרסומים ונהלים`;
     case 'local_business':
@@ -315,6 +329,14 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
     tabs.push({ id: 'membership', label: STATIC_LABELS.membership[lang], type: 'topics', topic: 'membership' });
     tabs.push({ id: 'events', label: STATIC_LABELS.events[lang], type: 'topics', topic: 'events' });
     tabs.push({ id: 'advocacy', label: STATIC_LABELS.advocacy[lang], type: 'topics', topic: 'advocacy' });
+  } else if (archetype === 'destination') {
+    // Three surfaces in the order a traveller decides: where, what to do, where to
+    // sleep. Each filters on its own topic from the destination vocabulary
+    // (src/lib/rag/enrich.ts DESTINATION_TOPICS). The tab ids are mirrored by
+    // DESTINATION_TAB_IDS in src/app/chat/[username]/page.tsx.
+    tabs.push({ id: 'destinations', label: STATIC_LABELS.destinations[lang], type: 'topics', topic: 'destinations' });
+    tabs.push({ id: 'experiences', label: STATIC_LABELS.thingsToDo[lang], type: 'topics', topic: 'experiences' });
+    tabs.push({ id: 'stay', label: STATIC_LABELS.stay[lang], type: 'topics', topic: 'stay' });
   } else if (archetype === 'government_ministry') {
     tabs.push({ id: 'topics', label: STATIC_LABELS.govServices[lang], type: 'topics' });
   } else if (archetype === 'tech_creator') {

@@ -679,9 +679,28 @@ export const ASSOCIATION_TOPICS = [
   'business',   // Operations, hiring, running a member company
 ] as const;
 
+/**
+ * A tourism board's content divides by what a traveller is deciding, not by retail
+ * category. Forced through the retail list every page of a destination site collapses
+ * into 'lifestyle' (the retail fallback), and the Destinations / Things to Do / Stay
+ * surfaces would all render the same list.
+ */
+export const DESTINATION_TOPICS = [
+  'destinations', // Regions, cities, towns, beaches, islands, "where to go"
+  'experiences',  // Things to do: adventure, nature, tours, nightlife, wellness, golf
+  'stay',         // Hotels, all-inclusive resorts, villas, boutique and eco stays
+  'dining',       // Food, drink, rum, cacao, coffee, cigars, restaurants
+  'culture',      // History, music, art, baseball, traditions, colonial zone
+  'events',       // Festivals, carnival, tournaments, weddings, press and announcements
+  'plan',         // Entry requirements, flights, getting around, weather, safety, money
+] as const;
+
 export const VALID_TOPICS = [
   ...RETAIL_TOPICS,
   ...ASSOCIATION_TOPICS.filter((t) => !(RETAIL_TOPICS as readonly string[]).includes(t)),
+  ...DESTINATION_TOPICS.filter(
+    (t) => !(RETAIL_TOPICS as readonly string[]).includes(t) && !(ASSOCIATION_TOPICS as readonly string[]).includes(t),
+  ),
 ] as const;
 
 export type ChunkTopic = (typeof VALID_TOPICS)[number];
@@ -703,12 +722,19 @@ const TOPIC_RULES: Record<string, string> = {
   safety: 'safety standards, compliance, inspections, driver and vehicle rules',
   tourism: 'group travel, tour operators, destinations, itineraries, passenger experience',
   industry: 'industry research, statistics, news, awards, suppliers and manufacturers',
+  destinations: 'regions, cities, towns, beaches, islands, neighbourhoods, "where to go", what a place is like',
+  experiences: 'things to do: adventure, nature, tours, excursions, nightlife, wellness, golf, water sports, family activities',
+  stay: 'hotels, all-inclusive resorts, villas, boutique and eco lodges, where to sleep, amenities',
+  dining: 'restaurants, local food and drink, rum, cacao, coffee, cigars, culinary experiences',
+  culture: 'history, music, dance, art, baseball, traditions, colonial heritage, museums, local people',
+  plan: 'entry requirements, visas, flights and airports, getting around, weather and seasons, safety, money, travel tips, FAQs',
 };
 
 /** Where an unparseable classification lands, per topic set. */
 const TOPIC_FALLBACK: Record<string, string> = {
   retail: 'lifestyle',
   association: 'industry',
+  destination: 'destinations',
 };
 
 /**
@@ -721,6 +747,9 @@ export function topicsForArchetype(archetype: string | null | undefined): {
 } {
   if (archetype === 'association') {
     return { topics: ASSOCIATION_TOPICS, fallback: TOPIC_FALLBACK.association };
+  }
+  if (archetype === 'destination') {
+    return { topics: DESTINATION_TOPICS, fallback: TOPIC_FALLBACK.destination };
   }
   return { topics: RETAIL_TOPICS, fallback: TOPIC_FALLBACK.retail };
 }

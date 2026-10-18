@@ -25,6 +25,7 @@ const PLATFORM_LABEL: Record<string, string> = {
   tiktok: 'TikTok',
   youtube: 'YouTube',
   linkedin: 'LinkedIn',
+  x: 'X',
 };
 
 /**
@@ -36,8 +37,13 @@ const PLATFORM_LABEL: Record<string, string> = {
  * truth is that we cannot see them. Silence is not zero, so they are excluded
  * from anything measuring response. Their TEXT still counts everywhere else:
  * topic map, RAG, persona.
+ *
+ * `x` is here for the opposite reason: its numbers are real, but the provider only
+ * returns an account's ~100 MOST POPULAR tweets (2015-2023 for @GoDomRep). A
+ * winners-only sample ranked beside every other channel's full archive would crown
+ * X the best channel and invent a posting-day pattern from years-old tweets.
  */
-const NO_ENGAGEMENT_DATA = new Set(['linkedin']);
+const NO_ENGAGEMENT_DATA = new Set(['linkedin', 'x']);
 
 /** Human label for a topic slug, e.g. 'membership' → 'Membership'. */
 export function topicLabel(topic: string): string {

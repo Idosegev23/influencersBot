@@ -23,7 +23,11 @@ export interface TiktokVideo {
   shareUrl: string;
   desc?: string;
   views?: number;
+  likes?: number;
+  comments?: number;
   createTime?: number;
+  /** A browser-displayable (jpeg) cover; the first url_list entries are heic. */
+  cover?: string;
 }
 
 function client(): AxiosInstance {
@@ -63,6 +67,16 @@ export async function getTiktokProfile(handle: string): Promise<TiktokProfile | 
   }
 }
 
+/** TikTok lists heic first; Chrome and Firefox cannot render it. Prefer a jpeg variant. */
+export function pickJpegCover(video: any): string | undefined {
+  for (const key of ['cover', 'origin_cover', 'dynamic_cover']) {
+    const urls: string[] = video?.[key]?.url_list || [];
+    const jpeg = urls.find((u) => /\.jpe?g(\?|$)/i.test(u));
+    if (jpeg) return jpeg;
+  }
+  return undefined;
+}
+
 export async function getTiktokVideos(handle: string, limit = 20): Promise<TiktokVideo[]> {
   try {
     const { data } = await client().get('/v3/tiktok/profile/videos', { params: { handle: normalizeTiktokHandle(handle) } });
@@ -74,7 +88,10 @@ export async function getTiktokVideos(handle: string, limit = 20): Promise<Tikto
         shareUrl: v.share_url,
         desc: v.desc,
         views: v.statistics?.play_count,
+        likes: v.statistics?.digg_count,
+        comments: v.statistics?.comment_count,
         createTime: v.create_time,
+        cover: pickJpegCover(v.video),
       }))
       .filter((v) => v.id && v.shareUrl);
   } catch {
