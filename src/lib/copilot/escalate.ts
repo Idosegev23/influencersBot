@@ -54,7 +54,24 @@ export function detectEnglishEscalation(message: string, priorUserMessages: stri
   return { escalate: triggers.length > 0, severity: triggers.length ? 'high' : null, reason: triggers.map((t) => REASONS[t]).join(' + '), triggers };
 }
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+/** HTML-escapes text for staff and visitor emails. */
+export const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const esc = escapeHtml;
+
+/** Valid staff recipients from config.copilot.escalation.recipients. */
+export function staffRecipients(config: unknown): string[] {
+  const list = (config as any)?.copilot?.escalation?.recipients;
+  return Array.isArray(list) ? list.filter((r: unknown): r is string => typeof r === 'string' && EMAIL_RE.test(r)) : [];
+}
+
+/** `From` header in the association's name, or undefined when no sender mailbox is configured. */
+export function assistantFrom(associationName: string): string | undefined {
+  const sendFrom = process.env.GMAIL_SEND_FROM?.trim();
+  if (!sendFrom) return undefined;
+  // Display name only: strip characters that could break or inject into the From header.
+  const displayName = associationName.replace(/[\r\n<>"]/g, ' ').replace(/\s+/g, ' ').trim();
+  return `${displayName} Assistant <${sendFrom}>`;
+}
 
 export async function escalateIfNeeded(
   input: {
@@ -95,19 +112,17 @@ export async function escalateIfNeeded(
   });
   if (error) console.error('[copilot/escalate]', 'insert failed', input.accountId, error.message);
 
-  const recipients: string[] = ((input.config as any)?.copilot?.escalation?.recipients ?? []).filter((r: unknown) => typeof r === 'string' && EMAIL_RE.test(r));
+  const recipients = staffRecipients(input.config);
   if (!recipients.length) return { escalated: true, reason, notified: 0, deduped: false };
 
   const lines = input.transcript.slice(-12).map((m) => `<p><b>${m.role === 'user' ? 'Visitor' : 'Assistant'}:</b> ${esc(m.content)}</p>`).join('');
   const html = `<div style="font-family:Arial,sans-serif;font-size:14px"><p>A visitor on the ${esc(input.associationName)} website needs a staff member.</p><p><b>Reason:</b> ${esc(reason)}<br><b>Visitor:</b> ${esc(input.visitorLabel)}</p><hr>${lines}</div>`;
-  const sendFrom = process.env.GMAIL_SEND_FROM?.trim();
-  // Display name only: strip characters that could break or inject into the From header.
-  const displayName = input.associationName.replace(/[\r\n<>"]/g, ' ').replace(/\s+/g, ' ').trim();
+  const from = assistantFrom(input.associationName);
   const r = await send({
     to: recipients,
     subject: `[${input.associationName}] Visitor needs a staff member: ${reason}`,
     html,
-    ...(sendFrom ? { from: `${displayName} Assistant <${sendFrom}>` } : {}),
+    ...(from ? { from } : {}),
   });
   if (!r?.success) console.error('[copilot/escalate]', 'email failed', input.accountId, r?.error);
   return { escalated: true, reason, notified: r?.success ? recipients.length : 0, deduped: false };

@@ -1,0 +1,158 @@
+// @vitest-environment node
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { makeDb, hasOp, type Chain } from './copilot-db-mock';
+
+const T = { partnerId: 'pA', accountId: 'acc', host: 'aba.copilot.test' };
+const VID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+const SID = '11111111-2222-4333-8444-555555555555';
+const baseVisitor = { id: VID, account_id: 'acc', partner_id: 'pA', anon_id: 'anon_aaaaaaaaaaaaaaaa', identity_source: null, member_ref: null, email: null, name: null, company: null, company_domain: null, membership: null, merged_into: null };
+const ENABLED: any = { display_name: 'ABA', copilot: { recap: { enabled: true } } };
+
+vi.mock('@/lib/copilot/auth', () => ({ requireTenant: async () => T }));
+const loadAssociation = vi.fn();
+vi.mock('@/lib/copilot/association', () => ({ loadAssociation: (...a: any[]) => loadAssociation(...a) }));
+const getVisitor = vi.fn();
+vi.mock('@/lib/copilot/visitors', async (orig) => ({ ...(await orig<any>()), getVisitor: (...a: any[]) => getVisitor(...a) }));
+const recordEvents = vi.fn();
+vi.mock('@/lib/copilot/events', () => ({ recordEvents: (...a: any[]) => recordEvents(...a) }));
+const checkChatLimits = vi.fn();
+vi.mock('@/lib/copilot/rate-limit', () => ({ checkChatLimits: (...a: any[]) => checkChatLimits(...a) }));
+const sendEmail = vi.fn();
+vi.mock('@/lib/email', () => ({ sendEmail: (...a: any[]) => sendEmail(...a) }));
+
+let session: any = null;
+let messages: any[] = [];
+let shown: any[] = [];
+const mock = makeDb((c: Chain) => {
+  if (c.table === 'chat_sessions') return { data: session, error: null };
+  if (c.table === 'chat_messages') return { data: messages, error: null };
+  if (c.table === 'interaction_events') return { data: shown, error: null };
+  return { data: null, error: null };
+});
+vi.mock('@/lib/supabase', () => ({ supabase: { from: (t: string) => mock.db.from(t) } }));
+
+import { buildRecapEmail } from '@/lib/copilot/recap';
+import { POST } from '@/app/api/partner/v1/recap/route';
+
+const req = (b: any) => new Request('http://x/api/partner/v1/recap', { method: 'POST', body: JSON.stringify(b) }) as any;
+const HEBREW = /[֐-׿]/;
+const VENDOR = /bestie|influencerbot|ldrs|imai/i;
+
+describe('buildRecapEmail', () => {
+  const p = {
+    associationName: 'ABA',
+    messages: [
+      { role: 'user', content: 'Is <script>alert(1)</script> allowed?' },
+      { role: 'assistant', content: 'See the safety page.', metadata: { copilot: { cited: [1], sources: [{ title: 'Fleet rules', url: 'https://aba.org/fleet' }] } } },
+    ],
+    sources: [{ title: 'Safety <guide>', url: 'https://aba.org/safety?a=1&b=2' }, { title: 'Bad', url: 'javascript:alert(1)' }, { title: 'Mail', url: 'mailto:x@y.z' }],
+  };
+
+  it('subject names the association assistant', () => {
+    expect(buildRecapEmail(p).subject).toBe('Your conversation with the ABA assistant');
+  });
+  it('escapes the conversation and the links', () => {
+    const { html } = buildRecapEmail(p);
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('Safety &lt;guide&gt;');
+    expect(html).toContain('href="https://aba.org/safety?a=1&amp;b=2"');
+    expect(html).toContain('See the safety page.');
+  });
+  it('lists cited links, http(s) only, including those in assistant metadata', () => {
+    const { html } = buildRecapEmail(p);
+    expect(html).toContain('https://aba.org/fleet');
+    expect(html).toContain('Fleet rules');
+    expect(html).not.toContain('javascript:');
+    expect(html).not.toContain('mailto:');
+  });
+  it('has no Hebrew characters and no vendor names', () => {
+    const r = buildRecapEmail(p);
+    expect(r.subject + r.html).not.toMatch(HEBREW);
+    expect(r.subject + r.html).not.toMatch(VENDOR);
+  });
+});
+
+describe('POST /recap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mock.calls.length = 0;
+    session = { id: SID, account_id: 'acc', visitor_id: VID };
+    messages = [{ role: 'assistant', content: 'Dues are $500.', metadata: { copilot: { cited: [1] } } }, { role: 'user', content: 'What are the dues?' }];
+    shown = [{ payload: { urls: ['https://aba.org/dues', 'ftp://aba.org/x'] } }];
+    loadAssociation.mockResolvedValue({ accountId: 'acc', partnerId: 'pA', industry: 'motorcoach', branding: {}, openingQuestions: [], config: ENABLED });
+    getVisitor.mockResolvedValue({ ...baseVisitor });
+    checkChatLimits.mockResolvedValue({ allowed: true });
+    sendEmail.mockResolvedValue({ success: true });
+    process.env.GMAIL_SEND_FROM = 'assistant@mail.test';
+  });
+
+  it('409 recap_not_configured unless enabled, without sending', async () => {
+    loadAssociation.mockResolvedValueOnce({ accountId: 'acc', partnerId: 'pA', industry: null, branding: {}, openingQuestions: [], config: { copilot: { recap: { enabled: 'true' } } } });
+    const res = await POST(req({ visitorId: VID, sessionId: SID, email: 'sam@gmail.com' }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('recap_not_configured');
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(recordEvents).not.toHaveBeenCalled();
+  });
+
+  it('400 email_required when neither the body nor the visitor has an email', async () => {
+    const res = await POST(req({ visitorId: VID, sessionId: SID }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('email_required');
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('sends the recap to the visitor email and records recap_sent', async () => {
+    getVisitor.mockResolvedValueOnce({ ...baseVisitor, email: 'jane@acme.com' });
+    const res = await POST(req({ visitorId: VID, sessionId: SID }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const mail = sendEmail.mock.calls[0][0];
+    expect(mail.to).toBe('jane@acme.com');
+    expect(mail.from).toBe('ABA Assistant <assistant@mail.test>');
+    expect(mail.subject).toBe('Your conversation with the ABA assistant');
+    expect(mail.html.indexOf('What are the dues?')).toBeLessThan(mail.html.indexOf('Dues are'));
+    expect(mail.html).toContain('https://aba.org/dues');
+    expect(mail.html).not.toContain('ftp://');
+    expect(recordEvents).toHaveBeenCalledWith(expect.objectContaining({ visitorId: VID }), [expect.objectContaining({ type: 'recap_sent', sessionId: SID })]);
+    const ev = mock.calls.find((c) => c.table === 'interaction_events')!;
+    expect(hasOp(ev, 'eq', 'session_id', SID) && hasOp(ev, 'eq', 'account_id', 'acc') && hasOp(ev, 'eq', 'type', 'resource_shown')).toBe(true);
+  });
+
+  it('a body email wins and is normalized', async () => {
+    getVisitor.mockResolvedValueOnce({ ...baseVisitor, email: 'jane@acme.com' });
+    await POST(req({ visitorId: VID, sessionId: SID, email: ' Sam@Gmail.com ' }));
+    expect(sendEmail.mock.calls[0][0].to).toBe('sam@gmail.com');
+  });
+
+  it('validates ids before any lookup; refuses a foreign session before sending', async () => {
+    expect((await POST(req({ visitorId: VID }))).status).toBe(400);
+    expect((await POST(req({ visitorId: 'v1', sessionId: SID }))).status).toBe(400);
+    expect((await POST(req({ visitorId: VID, sessionId: SID, email: 'nope' }))).status).toBe(400);
+    expect(getVisitor).not.toHaveBeenCalled();
+    session = { id: SID, account_id: 'acc', visitor_id: 'ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee' };
+    const res = await POST(req({ visitorId: VID, sessionId: SID, email: 'sam@gmail.com' }));
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe('unknown_session');
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(mock.calls.filter((c) => c.table !== 'chat_sessions')).toHaveLength(0);
+  });
+
+  it('a failed send is a neutral error and records nothing', async () => {
+    sendEmail.mockResolvedValueOnce({ success: false, error: 'Gmail quota' });
+    const res = await POST(req({ visitorId: VID, sessionId: SID, email: 'sam@gmail.com' }));
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toBe('recap_unavailable');
+    expect(JSON.stringify(body)).not.toMatch(/gmail/i);
+    expect(recordEvents).not.toHaveBeenCalled();
+  });
+
+  it('limiter refusals pass through', async () => {
+    checkChatLimits.mockResolvedValueOnce({ allowed: false, status: 503, error: 'rate_limiter_unavailable', retryAfterMs: 5000 });
+    const res = await POST(req({ visitorId: VID, sessionId: SID, email: 'sam@gmail.com' }));
+    expect(res.status).toBe(503);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+});
