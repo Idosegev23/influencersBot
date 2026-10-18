@@ -2,12 +2,16 @@
  * The visitor's copy of their conversation with the association assistant.
  * English only; every value from the conversation is escaped.
  */
+import crypto from 'node:crypto';
 import { escapeHtml as esc } from './escalate';
 
 export interface RecapLink { title: string; url: string }
 export interface RecapMessage { role: string; content: string; metadata?: any }
 
 const MAX_LINKS = 20;
+
+/** Recipient fingerprint stored on recap_sent events instead of the address. */
+export const recipientHash = (email: string) => crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
 
 function httpUrl(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;

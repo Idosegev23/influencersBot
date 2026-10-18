@@ -6,6 +6,8 @@ import { getAmsAdapter } from '@/lib/copilot/ams';
 import { recordEvents, type InteractionEventInput } from '@/lib/copilot/events';
 import { checkChatLimits } from '@/lib/copilot/rate-limit';
 import { escapeHtml as esc, staffRecipients, assistantFrom } from '@/lib/copilot/escalate';
+import { bad, isUuid, readJsonBody, limited, associationNameOf } from '@/lib/copilot/http';
+import type { IdentityUpdate } from '@/lib/copilot/identity';
 import type { AssociationTenant } from '@/lib/copilot/tenant';
 import { normalizeEmail } from '@/lib/support/email-deliverability';
 import { sendEmail } from '@/lib/email';
@@ -13,12 +15,12 @@ import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_BODY_BYTES = 16_384;
 const MAX_NAME = 100;
 const MAX_COMPANY = 200;
 const TRANSCRIPT_LIMIT = 12;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const bad = (status: number, error: string, headers?: Record<string, string>) => Response.json({ error }, { status, headers });
+// Visitors with a verified identity are never touched by what someone types into the chat.
+const VERIFIED = new Set(['ams_login', 'newsletter']);
+const UNVERIFIED = '(entered by the visitor, not verified)';
 const log = (...a: unknown[]) => console.error('[copilot/contact]', ...a);
 
 /** Optional free-text field: undefined when absent or blank, null when invalid, else single-line text. */
@@ -30,28 +32,21 @@ function field(v: unknown, max: number): string | undefined | null {
   return s.length > max ? null : s;
 }
 
-const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
-
 export async function POST(req: Request) {
   const t = await requireTenant(req, { association: true });
   if (t instanceof Response) return t;
   const tenant = t as AssociationTenant;
 
-  const declared = Number(req.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return bad(413, 'request_too_large');
-  const raw = await req.text().catch(() => '');
-  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) return bad(413, 'request_too_large');
-  let body: any = null;
-  try { body = JSON.parse(raw); } catch { body = null; }
+  const read = await readJsonBody(req);
+  if (read instanceof Response) return read;
+  const body = read.body;
 
   const email = normalizeEmail(body?.email)?.toLowerCase() ?? null;
   const name = field(body?.name, MAX_NAME);
   const company = field(body?.company, MAX_COMPANY);
   const hasSession = body?.sessionId !== undefined && body?.sessionId !== null;
   if (
-    !body || typeof body !== 'object' ||
-    typeof body.visitorId !== 'string' || !UUID.test(body.visitorId) ||
-    (hasSession && (typeof body.sessionId !== 'string' || !UUID.test(body.sessionId))) ||
+    !body || !isUuid(body.visitorId) || (hasSession && !isUuid(body.sessionId)) ||
     body.consent !== true || !email || name === null || company === null
   ) {
     return bad(400, 'invalid_request');
@@ -63,7 +58,7 @@ export async function POST(req: Request) {
 
   // Contact writes to the visitor and emails staff, so it shares the chat limits.
   const limit = await checkChatLimits({ accountId: tenant.accountId, anonId: visitor.anon_id });
-  if (limit.allowed === false) return bad(limit.status, limit.error, { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) });
+  if (limit.allowed === false) return limited(limit);
 
   const assoc = await loadAssociation(tenant);
   if (!assoc) return bad(404, 'association_unavailable');
@@ -76,32 +71,41 @@ export async function POST(req: Request) {
   }
 
   const { update, amsUnavailable } = await identityFromEmail(email, getAmsAdapter(assoc.config));
-  let identity: 'member' | 'company' | 'email_only' | 'conflict';
+  // A typed email is never a verified identity: an AMS match contributes only the email and company,
+  // never the member reference or membership, so it cannot merge into or speak as the member's profile.
+  let applied: IdentityUpdate | null = null;
+  if (update?.source === 'ams_email') {
+    applied = { source: 'ams_email', email, company: update.company ?? company ?? null, ...(name ? { name } : {}) };
+  } else if (update) {
+    applied = { ...update, name: name ?? update.name, company: update.company ?? company };
+  }
+  let identity: 'company' | 'email_only' | 'conflict';
   let current = visitor;
-  if (update) {
+  if (applied) {
     try {
-      const r = await applyIdentity(tenant, visitor, { ...update, name: name ?? update.name, company: update.company ?? company });
+      const r = await applyIdentity(tenant, visitor, applied);
       current = r.visitor;
-      identity = update.source === 'ams_email' ? 'member' : 'company';
+      identity = applied.company ? 'company' : 'email_only';
     } catch (e) {
       if (!(e instanceof IdentityConflictError)) throw e;
       identity = 'conflict';
     }
   } else {
     identity = 'email_only';
-    // Fill only what the visitor profile does not have yet; never overwrite a stronger identity.
-    const fills: Array<[string, string | undefined]> = [['email', email], ['name', name], ['company', company]];
-    for (const [col, val] of fills) {
-      if (!val) continue;
-      const { error } = await supabase.from('visitors').update({ [col]: val }).eq('id', visitor.id).is(col, null);
-      if (error) log('visitor fill failed', tenant.accountId, col, error.message);
+    // Fill only what the profile does not have yet, and never on a verified identity.
+    if (!VERIFIED.has(visitor.identity_source ?? '')) {
+      const fills: Array<[string, string | undefined]> = [['email', email], ['name', name], ['company', company]];
+      for (const [col, val] of fills) {
+        if (!val) continue;
+        const { error } = await supabase.from('visitors').update({ [col]: val }).eq('id', visitor.id).is(col, null);
+        if (error) log('visitor fill failed', tenant.accountId, col, error.message);
+      }
     }
   }
 
   const recipients = staffRecipients(assoc.config);
   if (recipients.length) {
-    const config = (assoc.config ?? {}) as any;
-    const associationName = str(config.display_name) ?? str(config.username) ?? 'association';
+    const associationName = associationNameOf(assoc.config);
     let transcript: Array<{ role: string; content: string }> = [];
     if (sessionId) {
       const { data, error } = await supabase.from('chat_messages').select('role, content')
@@ -110,10 +114,10 @@ export async function POST(req: Request) {
       transcript = ((data ?? []) as any[]).filter((m) => m && typeof m.content === 'string').reverse();
     }
     const lines = transcript.map((m) => `<p><b>${m.role === 'user' ? 'Visitor' : 'Assistant'}:</b> ${esc(m.content)}</p>`).join('');
-    const who = name ?? str(current.name) ?? 'Not given';
-    const org = company ?? str(current.company) ?? 'Not given';
+    const matched = applied?.company && applied.company !== company ? applied.company : null;
     const html = `<div style="font-family:Arial,sans-serif;font-size:14px"><p>A visitor on the ${esc(associationName)} website left their contact details with the assistant.</p>`
-      + `<p><b>Name:</b> ${esc(who)}<br><b>Email:</b> ${esc(email)}<br><b>Company:</b> ${esc(org)}</p>`
+      + `<p><b>Name ${UNVERIFIED}:</b> ${esc(name ?? 'Not given')}<br><b>Email ${UNVERIFIED}:</b> ${esc(email)}<br><b>Company ${UNVERIFIED}:</b> ${esc(company ?? 'Not given')}`
+      + (matched ? `<br><b>Company matched from the email address:</b> ${esc(matched)}` : '') + '</p>'
       + (lines ? `<hr><p><b>Recent conversation</b></p>${lines}` : '') + '</div>';
     const from = assistantFrom(associationName);
     try {

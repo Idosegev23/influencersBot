@@ -23,15 +23,22 @@ vi.mock('@/lib/email', () => ({ sendEmail: (...a: any[]) => sendEmail(...a) }));
 let session: any = null;
 let messages: any[] = [];
 let shown: any[] = [];
+let sessionRecaps: any[] = [];
+let addressRecaps: any[] = [];
+let limitReadError: any = null;
 const mock = makeDb((c: Chain) => {
   if (c.table === 'chat_sessions') return { data: session, error: null };
   if (c.table === 'chat_messages') return { data: messages, error: null };
-  if (c.table === 'interaction_events') return { data: shown, error: null };
+  if (c.table === 'interaction_events') {
+    if (hasOp(c, 'eq', 'type', 'resource_shown')) return { data: shown, error: null };
+    if (c.ops.some((o) => o[0] === 'eq' && o[1] === 'payload->>to_hash')) return { data: addressRecaps, error: limitReadError };
+    return { data: sessionRecaps, error: null };
+  }
   return { data: null, error: null };
 });
 vi.mock('@/lib/supabase', () => ({ supabase: { from: (t: string) => mock.db.from(t) } }));
 
-import { buildRecapEmail } from '@/lib/copilot/recap';
+import { buildRecapEmail, recipientHash } from '@/lib/copilot/recap';
 import { POST } from '@/app/api/partner/v1/recap/route';
 
 const req = (b: any) => new Request('http://x/api/partner/v1/recap', { method: 'POST', body: JSON.stringify(b) }) as any;
@@ -80,6 +87,9 @@ describe('POST /recap', () => {
     session = { id: SID, account_id: 'acc', visitor_id: VID };
     messages = [{ role: 'assistant', content: 'Dues are $500.', metadata: { copilot: { cited: [1] } } }, { role: 'user', content: 'What are the dues?' }];
     shown = [{ payload: { urls: ['https://aba.org/dues', 'ftp://aba.org/x'] } }];
+    sessionRecaps = [];
+    addressRecaps = [];
+    limitReadError = null;
     loadAssociation.mockResolvedValue({ accountId: 'acc', partnerId: 'pA', industry: 'motorcoach', branding: {}, openingQuestions: [], config: ENABLED });
     getVisitor.mockResolvedValue({ ...baseVisitor });
     checkChatLimits.mockResolvedValue({ allowed: true });
@@ -96,8 +106,8 @@ describe('POST /recap', () => {
     expect(recordEvents).not.toHaveBeenCalled();
   });
 
-  it('400 email_required when neither the body nor the visitor has an email', async () => {
-    const res = await POST(req({ visitorId: VID, sessionId: SID }));
+  it('400 email_required when the visitor has no email, even if the body carries one', async () => {
+    const res = await POST(req({ visitorId: VID, sessionId: SID, email: 'victim@example.com' }));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe('email_required');
     expect(sendEmail).not.toHaveBeenCalled();
@@ -115,24 +125,62 @@ describe('POST /recap', () => {
     expect(mail.html.indexOf('What are the dues?')).toBeLessThan(mail.html.indexOf('Dues are'));
     expect(mail.html).toContain('https://aba.org/dues');
     expect(mail.html).not.toContain('ftp://');
-    expect(recordEvents).toHaveBeenCalledWith(expect.objectContaining({ visitorId: VID }), [expect.objectContaining({ type: 'recap_sent', sessionId: SID })]);
-    const ev = mock.calls.find((c) => c.table === 'interaction_events')!;
-    expect(hasOp(ev, 'eq', 'session_id', SID) && hasOp(ev, 'eq', 'account_id', 'acc') && hasOp(ev, 'eq', 'type', 'resource_shown')).toBe(true);
+    expect(recordEvents).toHaveBeenCalledWith(expect.objectContaining({ visitorId: VID }), [expect.objectContaining({ type: 'recap_sent', sessionId: SID, payload: expect.objectContaining({ to_hash: recipientHash('jane@acme.com') }) })]);
+    expect(JSON.stringify(recordEvents.mock.calls)).not.toContain('jane@acme.com');
+    expect(recipientHash('Jane@Acme.com ')).toMatch(/^[0-9a-f]{64}$/);
+    expect(recipientHash('Jane@Acme.com ')).toBe(recipientHash('jane@acme.com'));
+    const perAddress = mock.calls.find((c) => c.table === 'interaction_events' && hasOp(c, 'eq', 'payload->>to_hash', recipientHash('jane@acme.com')))!;
+    expect(hasOp(perAddress, 'eq', 'account_id', 'acc') && hasOp(perAddress, 'eq', 'type', 'recap_sent') && perAddress.ops.some((o) => o[0] === 'gte' && o[1] === 'occurred_at')).toBe(true);
+    const ev = mock.calls.find((c) => c.table === 'interaction_events' && hasOp(c, 'eq', 'type', 'resource_shown'))!;
+    expect(hasOp(ev, 'eq', 'session_id', SID) && hasOp(ev, 'eq', 'account_id', 'acc')).toBe(true);
   });
 
-  it('a body email wins and is normalized', async () => {
+  it('ignores a body email: sends only to the visitor profile address', async () => {
+    getVisitor.mockResolvedValueOnce({ ...baseVisitor, email: 'Jane@Acme.com' });
+    await POST(req({ visitorId: VID, sessionId: SID, email: 'victim@example.com' }));
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail.mock.calls[0][0].to).toBe('jane@acme.com');
+  });
+
+  it('409 recap_already_sent when the session already had a recap', async () => {
     getVisitor.mockResolvedValueOnce({ ...baseVisitor, email: 'jane@acme.com' });
-    await POST(req({ visitorId: VID, sessionId: SID, email: ' Sam@Gmail.com ' }));
-    expect(sendEmail.mock.calls[0][0].to).toBe('sam@gmail.com');
+    sessionRecaps = [{ id: 'e1' }];
+    const res = await POST(req({ visitorId: VID, sessionId: SID }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('recap_already_sent');
+    expect(sendEmail).not.toHaveBeenCalled();
+    const q = mock.calls.find((c) => c.table === 'interaction_events' && hasOp(c, 'eq', 'session_id', SID) && hasOp(c, 'eq', 'type', 'recap_sent'))!;
+    expect(hasOp(q, 'eq', 'account_id', 'acc')).toBe(true);
+  });
+
+  it('429 recap_limit_reached after 3 recaps to the same address in a day; 2 is still allowed', async () => {
+    getVisitor.mockResolvedValue({ ...baseVisitor, email: 'jane@acme.com' });
+    addressRecaps = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const res = await POST(req({ visitorId: VID, sessionId: SID }));
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe('recap_limit_reached');
+    expect(sendEmail).not.toHaveBeenCalled();
+    addressRecaps = [{ id: 'a' }, { id: 'b' }];
+    expect((await POST(req({ visitorId: VID, sessionId: SID }))).status).toBe(200);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed limit read refuses the send', async () => {
+    getVisitor.mockResolvedValueOnce({ ...baseVisitor, email: 'jane@acme.com' });
+    limitReadError = { message: 'db down' };
+    const res = await POST(req({ visitorId: VID, sessionId: SID }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe('recap_unavailable');
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 
   it('validates ids before any lookup; refuses a foreign session before sending', async () => {
     expect((await POST(req({ visitorId: VID }))).status).toBe(400);
     expect((await POST(req({ visitorId: 'v1', sessionId: SID }))).status).toBe(400);
-    expect((await POST(req({ visitorId: VID, sessionId: SID, email: 'nope' }))).status).toBe(400);
     expect(getVisitor).not.toHaveBeenCalled();
+    getVisitor.mockResolvedValueOnce({ ...baseVisitor, email: 'jane@acme.com' });
     session = { id: SID, account_id: 'acc', visitor_id: 'ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee' };
-    const res = await POST(req({ visitorId: VID, sessionId: SID, email: 'sam@gmail.com' }));
+    const res = await POST(req({ visitorId: VID, sessionId: SID }));
     expect(res.status).toBe(404);
     expect((await res.json()).error).toBe('unknown_session');
     expect(sendEmail).not.toHaveBeenCalled();
@@ -141,7 +189,8 @@ describe('POST /recap', () => {
 
   it('a failed send is a neutral error and records nothing', async () => {
     sendEmail.mockResolvedValueOnce({ success: false, error: 'Gmail quota' });
-    const res = await POST(req({ visitorId: VID, sessionId: SID, email: 'sam@gmail.com' }));
+    getVisitor.mockResolvedValueOnce({ ...baseVisitor, email: 'sam@gmail.com' });
+    const res = await POST(req({ visitorId: VID, sessionId: SID }));
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.error).toBe('recap_unavailable');

@@ -4,7 +4,8 @@ import { getVisitor } from '@/lib/copilot/visitors';
 import { recordEvents } from '@/lib/copilot/events';
 import { checkChatLimits } from '@/lib/copilot/rate-limit';
 import { assistantFrom } from '@/lib/copilot/escalate';
-import { buildRecapEmail, type RecapLink } from '@/lib/copilot/recap';
+import { buildRecapEmail, recipientHash, type RecapLink } from '@/lib/copilot/recap';
+import { bad, isUuid, readJsonBody, limited, associationNameOf } from '@/lib/copilot/http';
 import type { AssociationTenant } from '@/lib/copilot/tenant';
 import { normalizeEmail } from '@/lib/support/email-deliverability';
 import { sendEmail } from '@/lib/email';
@@ -13,42 +14,30 @@ import { supabase } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 
 // Gated off by default: visitor-facing mail must not go out until the association's sender domain is set up.
-const MAX_BODY_BYTES = 16_384;
 const MAX_MESSAGES = 60;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const bad = (status: number, error: string, headers?: Record<string, string>) => Response.json({ error }, { status, headers });
+// One recap per session; at most this many per recipient address per day across the association.
+const PER_ADDRESS_LIMIT = 3;
+const PER_ADDRESS_WINDOW_MS = 24 * 60 * 60 * 1000;
 const log = (...a: unknown[]) => console.error('[copilot/recap]', ...a);
-const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
 export async function POST(req: Request) {
   const t = await requireTenant(req, { association: true });
   if (t instanceof Response) return t;
   const tenant = t as AssociationTenant;
 
-  const declared = Number(req.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return bad(413, 'request_too_large');
-  const raw = await req.text().catch(() => '');
-  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) return bad(413, 'request_too_large');
-  let body: any = null;
-  try { body = JSON.parse(raw); } catch { body = null; }
-
-  const hasEmail = body?.email !== undefined && body?.email !== null && body?.email !== '';
-  const bodyEmail = hasEmail ? normalizeEmail(body.email)?.toLowerCase() ?? null : null;
-  if (
-    !body || typeof body !== 'object' ||
-    typeof body.visitorId !== 'string' || !UUID.test(body.visitorId) ||
-    typeof body.sessionId !== 'string' || !UUID.test(body.sessionId) ||
-    (hasEmail && !bodyEmail)
-  ) {
-    return bad(400, 'invalid_request');
-  }
+  const read = await readJsonBody(req);
+  if (read instanceof Response) return read;
+  const body = read.body;
+  // Any email in the body is ignored: a recap goes only to the address on the visitor's profile,
+  // so this route cannot be used to mail arbitrary people.
+  if (!body || !isUuid(body.visitorId) || !isUuid(body.sessionId)) return bad(400, 'invalid_request');
   const sessionId: string = body.sessionId;
 
   const visitor = await getVisitor(tenant, body.visitorId);
   if (!visitor) return bad(404, 'unknown_visitor');
 
   const limit = await checkChatLimits({ accountId: tenant.accountId, anonId: visitor.anon_id });
-  if (limit.allowed === false) return bad(limit.status, limit.error, { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) });
+  if (limit.allowed === false) return limited(limit);
 
   const assoc = await loadAssociation(tenant);
   if (!assoc) return bad(404, 'association_unavailable');
@@ -59,8 +48,25 @@ export async function POST(req: Request) {
   if (sErr) log('session read failed', tenant.accountId, sErr.message);
   if (!s || s.id !== sessionId || s.account_id !== tenant.accountId || s.visitor_id !== visitor.id) return bad(404, 'unknown_session');
 
-  const to = bodyEmail ?? normalizeEmail(visitor.email)?.toLowerCase() ?? null;
+  const to = normalizeEmail(visitor.email)?.toLowerCase() ?? null;
   if (!to) return bad(400, 'email_required');
+  const toHash = recipientHash(to);
+
+  // Abuse limits. A read failure refuses the send: these guard visitor-facing mail.
+  const since = new Date(Date.now() - PER_ADDRESS_WINDOW_MS).toISOString();
+  const [already, recent] = await Promise.all([
+    supabase.from('interaction_events').select('id')
+      .eq('account_id', tenant.accountId).eq('session_id', sessionId).eq('type', 'recap_sent').limit(1),
+    supabase.from('interaction_events').select('id')
+      .eq('account_id', tenant.accountId).eq('type', 'recap_sent').eq('payload->>to_hash', toHash)
+      .gte('occurred_at', since).limit(PER_ADDRESS_LIMIT),
+  ]);
+  if (already.error || recent.error) {
+    log('recap limit read failed', tenant.accountId, already.error?.message ?? recent.error?.message);
+    return bad(503, 'recap_unavailable');
+  }
+  if (Array.isArray(already.data) && already.data.length > 0) return bad(409, 'recap_already_sent');
+  if (Array.isArray(recent.data) && recent.data.length >= PER_ADDRESS_LIMIT) return bad(429, 'recap_limit_reached');
 
   const [msgs, shown] = await Promise.all([
     supabase.from('chat_messages').select('role, content, metadata')
@@ -75,7 +81,7 @@ export async function POST(req: Request) {
   const sources: RecapLink[] = ((shown.data ?? []) as any[]).flatMap((r) =>
     Array.isArray(r?.payload?.urls) ? r.payload.urls.filter((u: unknown) => typeof u === 'string').map((u: string) => ({ title: u, url: u })) : []);
 
-  const associationName = str(config.display_name) ?? str(config.username) ?? 'association';
+  const associationName = associationNameOf(config);
   const { subject, html } = buildRecapEmail({ associationName, messages, sources });
   const from = assistantFrom(associationName);
   let sent = false;
@@ -90,7 +96,7 @@ export async function POST(req: Request) {
 
   await recordEvents(
     { partnerId: tenant.partnerId, accountId: tenant.accountId, visitorId: visitor.id, industry: assoc.industry ?? null },
-    [{ type: 'recap_sent', sessionId, payload: { messages: messages.length, links: sources.length } }],
+    [{ type: 'recap_sent', sessionId, payload: { to_hash: toHash, messages: messages.length, links: sources.length } }],
   );
   return Response.json({ ok: true });
 }

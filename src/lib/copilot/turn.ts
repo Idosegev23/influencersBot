@@ -60,7 +60,8 @@ export function defaultTurnDeps(): TurnDeps {
 const HISTORY_LIMIT = 10;
 export const EMPTY_ANSWER = "I'm sorry, I don't have a good answer to that. Would you like me to connect you with a member of staff?";
 const DEFAULT_TZ = 'America/New_York';
-const TRUSTED_IDENTITY = new Set(['ams_login', 'newsletter', 'ams_email']);
+// Only a verified identity puts member data in the prompt. A typed email (ams_email) is never verified.
+const TRUSTED_IDENTITY = new Set(['ams_login', 'newsletter']);
 const SESSION_COLS = 'id, account_id, visitor_id, message_count, last_response_id, last_turn_at, created_at';
 
 const log = (...a: unknown[]) => console.error('[copilot/turn]', ...a);

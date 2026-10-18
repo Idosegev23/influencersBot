@@ -433,13 +433,27 @@ describe('runCopilotTurn', () => {
 
   it('gives the model member data only for a trusted identity source', async () => {
     const membership = { memberRef: 'M1', email: null, name: 'Pat', company: 'Acme Coaches', status: 'lapsed', type: null, renewalDate: null, registrations: [], fetchedAt: 'x' };
-    for (const [source, shown] of [['ams_login', true], ['newsletter', true], ['ams_email', true], ['email_domain', false], ['external', false], [null, false]] as const) {
+    for (const [source, shown] of [['ams_login', true], ['newsletter', true], ['ams_email', false], ['email_domain', false], ['external', false], [null, false]] as const) {
       const db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
       const deps = baseDeps(db);
       await runCopilotTurn({ tenant, assoc: assoc as any, visitor: { ...visitor, identity_source: source, membership }, sessionId: 's1', message: 'q' }, emit, deps);
       const instructions: string = (deps.model as any).mock.calls[0][0].instructions;
       expect(instructions.includes('Acme Coaches')).toBe(shown);
     }
+  });
+
+  it('a typed-email identity (ams_email) with a membership snapshot puts no member data in the prompt', async () => {
+    const membership = { memberRef: 'M1', email: 'pat@acme.com', name: 'Pat Quill', company: 'Acme Coaches', status: 'lapsed', type: 'Operator', renewalDate: '2026-11-15', registrations: [], fetchedAt: 'x' };
+    const db = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
+    const deps = baseDeps(db);
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor: { ...visitor, identity_source: 'ams_email', membership, name: 'Pat Quill', email: 'pat@acme.com' }, sessionId: 's1', message: 'q' }, emit, deps);
+    const instructions: string = (deps.model as any).mock.calls[0][0].instructions;
+    for (const leak of ['Pat Quill', 'Acme Coaches', 'lapsed', '2026-11-15']) expect(instructions).not.toContain(leak);
+    // Presence check: the same snapshot IS shown for a verified login, so the absence above is real.
+    const db2 = makeDb({ id: 's1', account_id: 'acc', visitor_id: 'v1', message_count: 0 });
+    const deps2 = baseDeps(db2);
+    await runCopilotTurn({ tenant, assoc: assoc as any, visitor: { ...visitor, identity_source: 'ams_login', membership }, sessionId: 's1', message: 'q' }, emit, deps2);
+    expect((deps2.model as any).mock.calls[0][0].instructions).toContain('Acme Coaches');
   });
 
   // ---- events: past, off-site, excluded ----
