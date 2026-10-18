@@ -22,29 +22,46 @@ const MAX_EXCERPT = 1200;
 interface Canonical {
   host: string;
   path: string;
-}
-
-/** Lowercase, percent-decode, collapse repeated slashes, strip trailing slashes. */
-function normalizePath(raw: string): string {
-  let s = raw;
-  try { s = decodeURIComponent(s); } catch { /* keep encoded form */ }
-  s = s.toLowerCase().replace(/\/{2,}/g, '/');
-  if (s.length > 1) s = s.replace(/\/+$/, '');
-  if (s === '') s = '/';
-  return s;
+  search: string;
+  /** True when a path segment has a malformed percent-escape. */
+  malformed: boolean;
 }
 
 /**
- * Canonical host and path for a URL. Returns null when the string cannot be
- * parsed. A bare path ("/archive") is accepted with an empty host.
+ * Decode each path segment on its own. A segment that fails to decode stays
+ * as-is and marks the path malformed. Then lowercase, collapse repeated
+ * slashes, and strip trailing slashes.
+ */
+function normalizePath(raw: string): { path: string; malformed: boolean } {
+  let malformed = false;
+  const decoded = raw.split('/').map((seg) => {
+    try { return decodeURIComponent(seg); } catch { malformed = true; return seg; }
+  });
+  let s = decoded.join('/').toLowerCase().replace(/\/{2,}/g, '/');
+  if (s.length > 1) s = s.replace(/\/+$/, '');
+  if (s === '') s = '/';
+  return { path: s, malformed };
+}
+
+/**
+ * Canonical host, path and query for a URL. Returns null when the string
+ * cannot be parsed. A bare path ("/archive") is accepted with an empty host.
  */
 function canonical(url: string): Canonical | null {
   try {
     const u = new URL(url);
-    return { host: u.hostname.toLowerCase().replace(/^www\./, ''), path: normalizePath(u.pathname) };
+    return {
+      host: u.hostname.toLowerCase().replace(/^www\./, ''),
+      ...normalizePath(u.pathname),
+      search: u.search.toLowerCase(),
+    };
   } catch {
-    if (url.startsWith('/')) return { host: '', path: normalizePath(url.split(/[?#]/)[0]) };
-    return null;
+    if (!url.startsWith('/')) return null;
+    const hashless = url.split('#')[0];
+    const qi = hashless.indexOf('?');
+    const pathPart = qi >= 0 ? hashless.slice(0, qi) : hashless;
+    const search = qi >= 0 ? hashless.slice(qi).toLowerCase() : '';
+    return { host: '', ...normalizePath(pathPart), search };
   }
 }
 
@@ -58,7 +75,7 @@ function canonical(url: string): Canonical | null {
 export function isExcluded(url: string | null, rules: string[]): boolean {
   if (!url) return false;
   const page = canonical(url);
-  if (!page) return rules.length > 0;
+  if (!page || page.malformed) return rules.length > 0;
   return rules.some((raw) => {
     if (typeof raw !== 'string') return false;
     const rule = raw.trim();
@@ -88,7 +105,7 @@ export function toCopilotSources(raw: RetrievedSource[], rules: string[], max = 
     if (s.entityType === 'website' && !url) continue;
     if (isExcluded(url, rules)) continue;
     const c = url ? canonical(url) : null;
-    const key = c ? `${c.host}|${c.path}` : `doc:${s.documentId}`;
+    const key = c ? `${c.host}|${c.path}|${c.search}` : `doc:${s.documentId}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ n: out.length + 1, id: s.sourceId, title: s.title || url || 'Untitled', url, excerpt: (s.excerpt || '').slice(0, MAX_EXCERPT), entityType: s.entityType });

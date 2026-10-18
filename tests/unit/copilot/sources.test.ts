@@ -79,3 +79,29 @@ describe('toCopilotSources canonical dedupe', () => {
     expect(out.map((s) => s.id)).toEqual(['a', 'c']);
   });
 });
+
+describe('isExcluded fails closed on malformed percent-escapes', () => {
+  it('excludes a page with a bad segment even when a decoded rule would match the good segment', () => {
+    expect(isExcluded('https://buses.org/%D7%9E%D7%99%D7%93%D7%A2/%zz', ['/מידע'])).toBe(true);
+    expect(isExcluded('https://buses.org/%D7%90%D7%97%D7%A8/%zz', ['/מידע'])).toBe(true);
+  });
+  it('excludes a malformed page under any rule set, keeps it with no rules', () => {
+    expect(isExcluded('https://buses.org/events/%zz', ['/archive'])).toBe(true);
+    expect(isExcluded('https://buses.org/events/%zz', ['https://other.org/x'])).toBe(true);
+    expect(isExcluded('https://buses.org/events/%zz', [])).toBe(false);
+  });
+  it('still keeps a well-formed page under a non-matching rule', () => {
+    expect(isExcluded('https://buses.org/events/', ['/archive'])).toBe(false);
+  });
+});
+
+describe('toCopilotSources keeps distinct query strings apart', () => {
+  it('does not collapse index.php?id=1 and ?id=2, but still collapses identical queries', () => {
+    const out = toCopilotSources([
+      src('a', 'https://buses.org/index.php?id=1'),
+      src('b', 'https://buses.org/index.php?id=2'),
+      src('c', 'https://buses.org/index.php?id=1'),
+    ] as any, []);
+    expect(out.map((s) => s.id)).toEqual(['a', 'b']);
+  });
+});
