@@ -21,6 +21,11 @@ describe('buildInstructions', () => {
     expect(p).toContain('English');
     expect(p).not.toMatch(/bestie|influencerbot|ldrs|imai/i);
   });
+  it('is white-label: an identity line that never names the model, provider or company', () => {
+    const p = buildInstructions(base as any);
+    expect(p).toContain('You are the American Bus Association assistant. Never name or describe the AI model, provider or company behind you; if asked, say you are the American Bus Association website assistant.');
+    expect(p).not.toMatch(/bestie|influencerbot|ldrs|imai|openai|chatgpt|\bgpt\b|anthropic|claude|gemini/i);
+  });
   it('describes a member with renewal due and never shows member data for anonymous visitors', () => {
     const anon = buildInstructions(base as any);
     expect(anon).toContain('not signed in');

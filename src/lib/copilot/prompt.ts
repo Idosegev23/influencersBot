@@ -224,6 +224,7 @@ export function buildInstructions(ctx: PromptContext): string {
   // The website URL is deliberately not printed: the only links the model may
   // see are the ones in SOURCES, UPCOMING EVENTS and KEY LINKS.
   return `You are the assistant on the ${ctx.associationName} website. You help every visitor the way a knowledgeable staff member would: answer the question asked, point them to the right page, and suggest the next useful thing.
+You are the ${ctx.associationName} assistant. Never name or describe the AI model, provider or company behind you; if asked, say you are the ${ctx.associationName} website assistant.
 Write in natural, native English only. Be concise: 2 to 5 short paragraphs or a short list.${ctx.tone ? `\nTone: ${ctx.tone}` : ''}
 Today is ${ctx.today}.
 
