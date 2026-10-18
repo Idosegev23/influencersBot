@@ -4,15 +4,22 @@ import type { TokenUsage } from '@/lib/chatbot/archetypes/types';
 export const COPILOT_MODEL = 'gpt-6-luna';
 export const COPILOT_FALLBACK_MODEL = 'gpt-5.6-terra';
 const MAX_OUTPUT_TOKENS = 1200;
-const PRIMARY_TIMEOUT_MS = 20_000;
-const IDLE_TIMEOUT_MS = 15_000;
-const FALLBACK_TIMEOUT_MS = 20_000;
+/**
+ * Turn budget (the route allows ~50s): the primary must show text within 15s and
+ * never go 15s between stream events, and is cut at 35s overall. The fallback
+ * (20s) runs only when the primary produced no text, so a slow but steady answer
+ * is never cut at the first-token mark.
+ */
+export const COPILOT_TIMEOUTS = { firstTokenMs: 15_000, idleMs: 15_000, primaryMs: 35_000, fallbackMs: 20_000 } as const;
 
 export interface ModelClient {
   responses: { create(params: any, options?: { signal?: AbortSignal }): Promise<any> };
 }
 
 export interface StreamTimeouts {
+  /** Abort the primary if no text delta arrives within this time. */
+  firstTokenTimeoutMs?: number;
+  /** Overall cap on the primary call. */
   primaryTimeoutMs?: number;
   idleTimeoutMs?: number;
   fallbackTimeoutMs?: number;
@@ -75,9 +82,10 @@ export async function streamCopilotModel(
   c: ModelClient = client(),
   opts: StreamTimeouts = {},
 ): Promise<{ text: string; responseId: string | null; usage: TokenUsage[]; incomplete: boolean; fellBack: boolean }> {
-  const primaryTimeoutMs = opts.primaryTimeoutMs ?? PRIMARY_TIMEOUT_MS;
-  const idleTimeoutMs = opts.idleTimeoutMs ?? IDLE_TIMEOUT_MS;
-  const fallbackTimeoutMs = opts.fallbackTimeoutMs ?? FALLBACK_TIMEOUT_MS;
+  const firstTokenTimeoutMs = opts.firstTokenTimeoutMs ?? COPILOT_TIMEOUTS.firstTokenMs;
+  const primaryTimeoutMs = opts.primaryTimeoutMs ?? COPILOT_TIMEOUTS.primaryMs;
+  const idleTimeoutMs = opts.idleTimeoutMs ?? COPILOT_TIMEOUTS.idleMs;
+  const fallbackTimeoutMs = opts.fallbackTimeoutMs ?? COPILOT_TIMEOUTS.fallbackMs;
 
   const usage: TokenUsage[] = [];
   let text = '';
@@ -88,10 +96,12 @@ export async function streamCopilotModel(
     if (u) usage.push(u);
   };
 
-  // Primary: bounded overall by primaryTimeoutMs and by idleTimeoutMs between stream events.
+  // Primary: bounded by time to first text, by idleTimeoutMs between stream events, and overall.
   const idleAc = new AbortController();
-  const primarySignal = AbortSignal.any([AbortSignal.timeout(primaryTimeoutMs), idleAc.signal]);
+  const firstTokenAc = new AbortController();
+  const primarySignal = AbortSignal.any([AbortSignal.timeout(primaryTimeoutMs), idleAc.signal, firstTokenAc.signal]);
   let idle: ReturnType<typeof setTimeout> | undefined;
+  let firstToken: ReturnType<typeof setTimeout> | undefined;
   const bumpIdle = () => {
     clearTimeout(idle);
     idle = setTimeout(() => idleAc.abort(new Error('primary idle timeout')), idleTimeoutMs);
@@ -99,6 +109,7 @@ export async function streamCopilotModel(
 
   const runPrimary = async () => {
     bumpIdle();
+    firstToken = setTimeout(() => firstTokenAc.abort(new Error('primary first-token timeout')), firstTokenTimeoutMs);
     try {
       const stream: any = await untilAborted(
         c.responses.create({
@@ -115,6 +126,7 @@ export async function streamCopilotModel(
         bumpIdle();
         const ev = r.value;
         if (ev?.type === 'response.output_text.delta' && typeof ev.delta === 'string') {
+          if (ev.delta) clearTimeout(firstToken);
           text += ev.delta;
           p.onDelta(ev.delta);
         } else if (ev?.type === 'response.completed' || ev?.type === 'response.incomplete') {
@@ -131,6 +143,7 @@ export async function streamCopilotModel(
       }
     } finally {
       clearTimeout(idle);
+      clearTimeout(firstToken);
     }
   };
 

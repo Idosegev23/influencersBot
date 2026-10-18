@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
-import { streamCopilotModel, CopilotModelError, COPILOT_MODEL, COPILOT_FALLBACK_MODEL } from '@/lib/copilot/model';
+import { streamCopilotModel, CopilotModelError, COPILOT_MODEL, COPILOT_FALLBACK_MODEL, COPILOT_TIMEOUTS } from '@/lib/copilot/model';
 
 function streamOf(events: any[]) {
   return { async *[Symbol.asyncIterator]() { for (const e of events) yield e; } };
@@ -123,5 +123,57 @@ describe('streamCopilotModel timeouts, terminal events and usage', () => {
     const r = await streamCopilotModel(req(), { responses: { create } });
     expect(r.text).toBe('Fallback');
     expect(r.usage.map((u) => u.model)).toEqual([COPILOT_MODEL, COPILOT_FALLBACK_MODEL]);
+  });
+});
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** A stream that yields `events` with `gapMs` between them (each item: an event, or a delta string). */
+function timedStream(items: Array<string | any>, gapMs: number) {
+  return { async *[Symbol.asyncIterator]() {
+    for (const it of items) { await sleep(gapMs); yield typeof it === 'string' ? { type: 'response.output_text.delta', delta: it } : it; }
+  } };
+}
+
+describe('streamCopilotModel budget (time to first token, idle, overall)', () => {
+  it('defaults: 15s to first token, 15s idle, 35s primary overall, 20s fallback', () => {
+    expect(COPILOT_TIMEOUTS).toEqual({ firstTokenMs: 15_000, idleMs: 15_000, primaryMs: 35_000, fallbackMs: 20_000 });
+  });
+
+  it('aborts and falls back when no text arrives within the first-token cap, even with keep-alive events', async () => {
+    const keepAlive = Array.from({ length: 30 }, () => ({ type: 'response.in_progress' }));
+    const create = vi.fn()
+      .mockResolvedValueOnce(timedStream(keepAlive, 10))
+      .mockResolvedValueOnce({ id: 'resp_fb', output_text: 'Fallback', usage: fbUsage });
+    const deltas: string[] = [];
+    const t0 = Date.now();
+    const r = await streamCopilotModel(req({ onDelta: (d) => deltas.push(d) }), { responses: { create } }, { firstTokenTimeoutMs: 60, idleTimeoutMs: 1000, primaryTimeoutMs: 5000 });
+    expect(Date.now() - t0).toBeLessThan(250);
+    expect(deltas).toEqual(['Fallback']);
+    expect(r.fellBack).toBe(true);
+  });
+
+  it('a slow but steady answer longer than the first-token cap is not cut', async () => {
+    const parts = Array.from({ length: 10 }, (_, i) => `p${i} `);
+    const create = vi.fn().mockResolvedValueOnce(timedStream([...parts, { type: 'response.completed', response: { id: 'r1', usage } }], 20));
+    const r = await streamCopilotModel(req(), { responses: { create } }, { firstTokenTimeoutMs: 50, idleTimeoutMs: 100, primaryTimeoutMs: 5000 });
+    expect(r.text).toBe(parts.join(''));
+    expect(r.fellBack).toBe(false);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('the overall primary cap still ends a stream that never finishes; no fallback once text was shown', async () => {
+    const endless = { async *[Symbol.asyncIterator]() { for (;;) { await sleep(10); yield { type: 'response.output_text.delta', delta: 'x' }; } } };
+    const create = vi.fn().mockResolvedValueOnce(endless);
+    const t0 = Date.now();
+    await expect(streamCopilotModel(req(), { responses: { create } }, { firstTokenTimeoutMs: 50, idleTimeoutMs: 50, primaryTimeoutMs: 120 })).rejects.toBeInstanceOf(CopilotModelError);
+    expect(Date.now() - t0).toBeLessThan(400);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('the idle guard still applies between events after the first token', async () => {
+    const stall = { [Symbol.asyncIterator]() { let n = 0; return { next: () => (n++ === 0 ? Promise.resolve({ done: false, value: { type: 'response.output_text.delta', delta: 'Hi' } }) : new Promise<never>(() => {})) }; } };
+    const create = vi.fn().mockResolvedValueOnce(stall);
+    await expect(streamCopilotModel(req(), { responses: { create } }, { firstTokenTimeoutMs: 1000, idleTimeoutMs: 40, primaryTimeoutMs: 5000 })).rejects.toThrow(/idle/);
+    expect(create).toHaveBeenCalledTimes(1);
   });
 });
