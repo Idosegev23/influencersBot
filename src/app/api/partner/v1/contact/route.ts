@@ -1,7 +1,7 @@
 import { requireTenant } from '@/lib/copilot/auth';
 import { loadAssociation } from '@/lib/copilot/association';
-import { getVisitor, applyIdentity, IdentityConflictError } from '@/lib/copilot/visitors';
-import { identityFromEmail } from '@/lib/copilot/identity';
+import { getVisitor, applyIdentity } from '@/lib/copilot/visitors';
+import { identityFromEmail, companyFromEmail } from '@/lib/copilot/identity';
 import { getAmsAdapter } from '@/lib/copilot/ams';
 import { recordEvents, type InteractionEventInput } from '@/lib/copilot/events';
 import { checkChatLimits } from '@/lib/copilot/rate-limit';
@@ -71,29 +71,26 @@ export async function POST(req: Request) {
   }
 
   const { update, amsUnavailable } = await identityFromEmail(email, getAmsAdapter(assoc.config));
-  // A typed email is never a verified identity: an AMS match contributes only the email and company,
-  // never the member reference or membership, so it cannot merge into or speak as the member's profile.
-  let applied: IdentityUpdate | null = null;
-  if (update?.source === 'ams_email') {
-    applied = { source: 'ams_email', email, company: update.company ?? company ?? null, ...(name ? { name } : {}) };
-  } else if (update) {
-    applied = { ...update, name: name ?? update.name, company: update.company ?? company };
-  }
-  let identity: 'company' | 'email_only' | 'conflict';
+  // A typed email is never a verified identity. Rules:
+  // - a verified visitor (login, newsletter) is never changed by what is typed here;
+  // - an AMS match contributes no member reference, membership, name or company: the only
+  //   company ever stored is the one derived from the email domain or typed by the visitor;
+  // - the response is the same for members and non-members, so it cannot be used to probe the AMS.
   let current = visitor;
-  if (applied) {
-    try {
-      const r = await applyIdentity(tenant, visitor, applied);
-      current = r.visitor;
-      identity = applied.company ? 'company' : 'email_only';
-    } catch (e) {
-      if (!(e instanceof IdentityConflictError)) throw e;
-      identity = 'conflict';
-    }
-  } else {
-    identity = 'email_only';
-    // Fill only what the profile does not have yet, and never on a verified identity.
-    if (!VERIFIED.has(visitor.identity_source ?? '')) {
+  let storedCompany: string | null = null;
+  if (!VERIFIED.has(visitor.identity_source ?? '')) {
+    const domain = companyFromEmail(email);
+    storedCompany = domain?.company ?? company ?? null;
+    if (update) {
+      const applied: IdentityUpdate = {
+        source: update.source, email,
+        ...(storedCompany ? { company: storedCompany } : {}),
+        ...(domain ? { companyDomain: domain.domain } : {}),
+        ...(name ? { name } : {}),
+      };
+      current = (await applyIdentity(tenant, visitor, applied)).visitor;
+    } else {
+      // Fill only what the profile does not have yet.
       const fills: Array<[string, string | undefined]> = [['email', email], ['name', name], ['company', company]];
       for (const [col, val] of fills) {
         if (!val) continue;
@@ -114,7 +111,7 @@ export async function POST(req: Request) {
       transcript = ((data ?? []) as any[]).filter((m) => m && typeof m.content === 'string').reverse();
     }
     const lines = transcript.map((m) => `<p><b>${m.role === 'user' ? 'Visitor' : 'Assistant'}:</b> ${esc(m.content)}</p>`).join('');
-    const matched = applied?.company && applied.company !== company ? applied.company : null;
+    const matched = storedCompany && storedCompany !== company ? storedCompany : null;
     const html = `<div style="font-family:Arial,sans-serif;font-size:14px"><p>A visitor on the ${esc(associationName)} website left their contact details with the assistant.</p>`
       + `<p><b>Name ${UNVERIFIED}:</b> ${esc(name ?? 'Not given')}<br><b>Email ${UNVERIFIED}:</b> ${esc(email)}<br><b>Company ${UNVERIFIED}:</b> ${esc(company ?? 'Not given')}`
       + (matched ? `<br><b>Company matched from the email address:</b> ${esc(matched)}` : '') + '</p>'
@@ -138,5 +135,5 @@ export async function POST(req: Request) {
   events.push({ type: 'contact_captured', sessionId, payload: { source: update?.source ?? 'email_only' } });
   await recordEvents({ partnerId: tenant.partnerId, accountId: tenant.accountId, visitorId: current.id, industry: assoc.industry ?? null }, events);
 
-  return Response.json({ ok: true, identity });
+  return Response.json({ ok: true });
 }

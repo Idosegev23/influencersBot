@@ -10,7 +10,7 @@ const CONFIG: any = {
   display_name: 'ABA',
   copilot: {
     escalation: { recipients: ['staff@aba.org', 'bad address'] },
-    ams: { provider: 'stub', stub_members: [{ memberRef: 'M1', email: 'jane@acme.com', name: 'Jane', company: 'Acme Coaches', status: 'active', type: 'Operator', renewalDate: '2026-11-15', registrations: [] }] },
+    ams: { provider: 'stub', stub_members: [{ memberRef: 'M1', email: 'jane@acme.com', name: 'Jane', company: 'Acme Coaches', status: 'active', type: 'Operator', renewalDate: '2026-11-15', registrations: [] }, { memberRef: 'M2', email: 'pat@gmail.com', name: 'Pat Quill', company: 'Acme Coaches', status: 'active', type: 'Operator', renewalDate: null, registrations: [] }] },
   },
 };
 
@@ -42,7 +42,6 @@ const mock = makeDb((c: Chain) => {
 });
 vi.mock('@/lib/supabase', () => ({ supabase: { from: (t: string) => mock.db.from(t) } }));
 
-import { IdentityConflictError } from '@/lib/copilot/visitors';
 import { POST } from '@/app/api/partner/v1/contact/route';
 
 const req = (b: any) => new Request('http://x/api/partner/v1/contact', { method: 'POST', body: JSON.stringify(b) }) as any;
@@ -63,15 +62,13 @@ beforeEach(() => {
 });
 
 describe('POST /contact', () => {
-  it('a typed member email is never a verified identity: no memberRef, no membership, response does not reveal membership', async () => {
+  it('a typed member email is never a verified identity: no memberRef, membership or AMS company; only the domain company', async () => {
     const res = await POST(req({ visitorId: VID, sessionId: SID, email: 'Jane@Acme.com', name: 'Jane D', consent: true }));
     expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json).toEqual({ ok: true, identity: 'company' });
-    expect(JSON.stringify(json)).not.toMatch(/member/i);
+    expect(await res.json()).toEqual({ ok: true });
     expect(applyIdentity).toHaveBeenCalledTimes(1);
     const upd = applyIdentity.mock.calls[0][2];
-    expect(upd).toEqual({ source: 'ams_email', email: 'jane@acme.com', company: 'Acme Coaches', name: 'Jane D' });
+    expect(upd).toEqual({ source: 'ams_email', email: 'jane@acme.com', company: 'Acme', companyDomain: 'acme.com', name: 'Jane D' });
     expect(upd).not.toHaveProperty('memberRef');
     expect(upd).not.toHaveProperty('membership');
     expect(recordEvents).toHaveBeenCalledWith(expect.objectContaining({ visitorId: VID, accountId: 'acc' }), [expect.objectContaining({ type: 'contact_captured', sessionId: SID, payload: { source: 'ams_email' } })]);
@@ -81,33 +78,61 @@ describe('POST /contact', () => {
   it('a typed member email without a typed name does not take the member record name', async () => {
     await POST(req({ visitorId: VID, email: 'jane@acme.com', consent: true }));
     const upd = applyIdentity.mock.calls[0][2];
-    expect(upd).toEqual({ source: 'ams_email', email: 'jane@acme.com', company: 'Acme Coaches' });
+    expect(upd).toEqual({ source: 'ams_email', email: 'jane@acme.com', company: 'Acme', companyDomain: 'acme.com' });
   });
 
-  it('never fills profile columns on a verified (login or newsletter) visitor', async () => {
-    for (const source of ['ams_login', 'newsletter']) {
-      mock.calls.length = 0;
-      getVisitor.mockResolvedValueOnce({ ...baseVisitor, identity_source: source, member_ref: 'M7' });
-      const res = await POST(req({ visitorId: VID, email: 'sam@gmail.com', name: 'Sam', company: 'Sam Co', consent: true }));
-      expect(await res.json()).toEqual({ ok: true, identity: 'email_only' });
-      expect(mock.calls.filter((c) => c.table === 'visitors')).toHaveLength(0);
+  it('an AMS match on a consumer domain writes no company unless the visitor typed one', async () => {
+    await POST(req({ visitorId: VID, email: 'pat@gmail.com', consent: true }));
+    expect(applyIdentity.mock.calls[0][2]).toEqual({ source: 'ams_email', email: 'pat@gmail.com' });
+    await POST(req({ visitorId: VID, email: 'pat@gmail.com', company: 'Quill Bus Co', consent: true }));
+    expect(applyIdentity.mock.calls[1][2]).toEqual({ source: 'ams_email', email: 'pat@gmail.com', company: 'Quill Bus Co' });
+    expect(JSON.stringify(applyIdentity.mock.calls)).not.toContain('Acme Coaches');
+    expect(JSON.stringify(applyIdentity.mock.calls)).not.toContain('Pat Quill');
+  });
+
+  it('the response is identical for members and non-members (no AMS oracle)', async () => {
+    const bodies: string[] = [];
+    for (const email of ['pat@gmail.com', 'sam@gmail.com', 'jane@acme.com', 'bob@greyline-tours.com']) {
+      const res = await POST(req({ visitorId: VID, email, consent: true }));
+      expect(res.status).toBe(200);
+      bodies.push(await res.text());
     }
-    // Presence check: the same request on an anonymous visitor does fill.
+    expect(new Set(bodies).size).toBe(1);
+    expect(JSON.parse(bodies[0])).toEqual({ ok: true });
+  });
+
+  it('never changes a verified (login or newsletter) visitor, but still records the contact', async () => {
+    for (const source of ['ams_login', 'newsletter']) {
+      for (const email of ['sam@gmail.com', 'bob@greyline-tours.com', 'jane@acme.com']) {
+        vi.clearAllMocks();
+        mock.calls.length = 0;
+        getVisitor.mockResolvedValueOnce({ ...baseVisitor, identity_source: source, member_ref: 'M7' });
+        const res = await POST(req({ visitorId: VID, email, name: 'Sam', company: 'Sam Co', consent: true }));
+        expect(await res.json()).toEqual({ ok: true });
+        expect(applyIdentity).not.toHaveBeenCalled();
+        expect(mock.calls.filter((c) => c.table === 'visitors')).toHaveLength(0);
+        expect(recordEvents).toHaveBeenCalledWith(expect.anything(), expect.arrayContaining([expect.objectContaining({ type: 'contact_captured' })]));
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+      }
+    }
+    // Presence check: the same requests on an anonymous visitor do write.
     mock.calls.length = 0;
     await POST(req({ visitorId: VID, email: 'sam@gmail.com', name: 'Sam', consent: true }));
     expect(mock.calls.filter((c) => c.table === 'visitors').length).toBeGreaterThan(0);
+    await POST(req({ visitorId: VID, email: 'bob@greyline-tours.com', consent: true }));
+    expect(applyIdentity).toHaveBeenCalled();
   });
 
   it('a business domain resolves to the company', async () => {
     const res = await POST(req({ visitorId: VID, email: 'bob@greyline-tours.com', company: 'Greyline', consent: true }));
-    expect(await res.json()).toEqual({ ok: true, identity: 'company' });
+    expect(await res.json()).toEqual({ ok: true });
     expect(applyIdentity).toHaveBeenCalledWith(T, expect.anything(), expect.objectContaining({ source: 'email_domain', company: 'Greyline Tours', companyDomain: 'greyline-tours.com' }));
     expect(visitorUpdates()).toHaveLength(0);
   });
 
   it('a consumer email is stored only where the visitor columns are empty', async () => {
     const res = await POST(req({ visitorId: VID, email: 'sam@gmail.com', name: 'Sam\r\nBcc: x', company: 'Sam Co', consent: true }));
-    expect(await res.json()).toEqual({ ok: true, identity: 'email_only' });
+    expect(await res.json()).toEqual({ ok: true });
     expect(applyIdentity).not.toHaveBeenCalled();
     const ups = visitorUpdates();
     const emailUp = ups.find((c) => hasOp(c, 'update', { email: 'sam@gmail.com' }));
@@ -159,20 +184,10 @@ describe('POST /contact', () => {
     expect(getVisitor).not.toHaveBeenCalled();
   });
 
-  it('an identity conflict still records the contact and reports conflict', async () => {
-    applyIdentity.mockRejectedValueOnce(new IdentityConflictError('shared device'));
-    const res = await POST(req({ visitorId: VID, sessionId: SID, email: 'jane@acme.com', consent: true }));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, identity: 'conflict' });
-    expect(recordEvents).toHaveBeenCalledWith(expect.anything(), [expect.objectContaining({ type: 'contact_captured' })]);
-    expect(sendEmail).toHaveBeenCalledTimes(1);
-    expect(visitorUpdates()).toHaveLength(0);
-  });
-
   it('records ams_unavailable when the AMS is down and falls back to the domain', async () => {
     amsDown = true;
     const res = await POST(req({ visitorId: VID, email: 'jane@acme.com', consent: true }));
-    expect(await res.json()).toEqual({ ok: true, identity: 'company' });
+    expect(await res.json()).toEqual({ ok: true });
     expect(recordEvents).toHaveBeenCalledWith(expect.anything(), [
       expect.objectContaining({ type: 'ams_unavailable', payload: { during: 'contact' } }),
       expect.objectContaining({ type: 'contact_captured', payload: { source: 'email_domain' } }),
@@ -207,7 +222,7 @@ describe('POST /contact', () => {
   it('no recipients configured: no email, contact still recorded', async () => {
     loadAssociation.mockResolvedValueOnce({ accountId: 'acc', partnerId: 'pA', industry: null, branding: {}, openingQuestions: [], config: { copilot: {} } });
     const res = await POST(req({ visitorId: VID, email: 'sam@gmail.com', consent: true }));
-    expect(await res.json()).toEqual({ ok: true, identity: 'email_only' });
+    expect(await res.json()).toEqual({ ok: true });
     expect(sendEmail).not.toHaveBeenCalled();
     expect(recordEvents).toHaveBeenCalled();
   });
