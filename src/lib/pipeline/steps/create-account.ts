@@ -11,9 +11,21 @@ export async function createAccountStep(ctx: StepContext): Promise<StepResult> {
     .eq('id', ctx.accountId)
     .single();
   const baseConfig = existing?.config ?? {};
+  if (!existing) {
+    // A partner console creates the account before starting the scan and deletes it
+    // again when the create fails. A job that outlived that rollback must not
+    // resurrect a half-made account outside the partner's control.
+    const { data: job } = await supabase.from('scan_jobs').select('requested_by').eq('id', ctx.jobId).maybeSingle();
+    if (typeof job?.requested_by === 'string' && job.requested_by.startsWith('partner:')) {
+      return { status: 'failed', error: 'account_missing' };
+    }
+  }
   const mergedConfig = {
     ...baseConfig,
-    username: ctx.username,
+    // Never replace an existing username: it is the account's public slug (a partner
+    // console sets it before the scan), and ctx.username is only the scan anchor (the
+    // website host when there is no Instagram handle), which may be another account's.
+    username: baseConfig.username || ctx.username,
     display_name: baseConfig.display_name || ctx.username,
     isDemo: ctx.state.options.isDemo,
   };
