@@ -150,6 +150,16 @@ describe('POST /chat', () => {
     expect(ok.headers.get('cache-control')).toBe('no-store, no-transform');
     await readNdjson(ok);
   });
+  it('413 for an oversized chunked body with no Content-Length', async () => {
+    const payload = new TextEncoder().encode(JSON.stringify({ visitorId: VID, sessionId: SID, message: 'x', pad: 'y'.repeat(20_000) }));
+    const body = new ReadableStream({ start(c) { for (let i = 0; i < payload.length; i += 4096) c.enqueue(payload.slice(i, i + 4096)); c.close(); } });
+    const chunked = new Request('http://x/api/partner/v1/chat', { method: 'POST', body, duplex: 'half' } as any) as any;
+    expect(chunked.headers.get('content-length')).toBeNull();
+    const res = await POST(chunked);
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: 'message_too_long' });
+    expect(getVisitor).not.toHaveBeenCalled();
+  });
   it('404 association_unavailable, and the limiter runs before loadAssociation', async () => {
     loadAssociation.mockResolvedValueOnce(null);
     const res = await POST(req({ visitorId: VID, sessionId: SID, message: 'x' }));

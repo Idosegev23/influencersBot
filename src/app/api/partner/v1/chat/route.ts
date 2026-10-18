@@ -5,6 +5,7 @@ import { getVisitor } from '@/lib/copilot/visitors';
 import { checkChatLimits, MAX_MESSAGE_CHARS } from '@/lib/copilot/rate-limit';
 import { runCopilotTurn, type TurnEvent } from '@/lib/copilot/turn';
 import type { AssociationTenant } from '@/lib/copilot/tenant';
+import { readJsonBody } from '@/lib/copilot/http';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -22,10 +23,10 @@ export async function POST(req: Request) {
   if (t instanceof Response) return t;
   const tenant = t as AssociationTenant;
 
-  const declared = Number(req.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return bad(413, 'message_too_long');
-
-  const body = await req.json().catch(() => null);
+  // Capped on the declared Content-Length and on the bytes actually read (chunked bodies have no length).
+  const read = await readJsonBody(req, MAX_BODY_BYTES);
+  if (read instanceof Response) return bad(413, 'message_too_long');
+  const body = read.body;
   const message = typeof body?.message === 'string' ? body.message.trim() : '';
   if (
     !body ||
