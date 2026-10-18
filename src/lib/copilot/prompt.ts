@@ -71,11 +71,17 @@ export function allowedCtaUrls(ctx: PromptContext): string[] {
 
 const SCHEME_OR_WWW = /(?:https?:\/\/|www\.)[^\s<>"')\]]+/gi;
 const PROTOCOL_RELATIVE = /(?<![:\w])\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+[^\s<>"')\]]*/gi;
-// host.tld[/path], case-sensitive on purpose: the TLD must be lowercase letters and
-// must not run into more letters or digits (so "today.Benefits", "St.Louis" and
-// "ASP.NET" survive), and the match must not start inside a word, after "@" (an
-// e-mail address is not a link), "." or "-". "e.g.", "3.5" and "v1.2" never match.
-const BARE_DOMAIN = /(?<![@\w.-])[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[a-z]{2,}(?![A-Za-z0-9@-])(?:\/[^\s<>"')\]]*)?/g;
+// host.tld[/path]. The TLD is matched in any case (domains are case-insensitive) and
+// must not run into more letters or digits; the match must not start inside a word,
+// after "@" (an e-mail address is not a link), "." or "-". "e.g.", "3.5" and "v1.2"
+// never match. How a match is treated depends on the TLD as written: see
+// sanitizeUntrusted.
+const BARE_DOMAIN = /(?<![@\w.-])[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}(?![A-Za-z0-9@-])(?:\/[^\s<>"')\]]*)?/g;
+// A TLD written with any capital letter is masked only when it is one of these, so
+// "today.Benefits", "travel.Membership" and "St.Louis" survive while "EVIL.COM" does not.
+const KNOWN_TLD = new Set(['com', 'org', 'net', 'edu', 'gov', 'io', 'co', 'us', 'uk', 'ca', 'au', 'de', 'fr', 'info', 'biz', 'app', 'dev', 'ai', 'me', 'tv', 'xyz', 'online', 'site', 'shop', 'store', 'club', 'live', 'news']);
+// Technology names spelt like a domain, kept exactly as written.
+const TECH_NAMES = new Set(['ASP.NET', 'VB.NET', 'ADO.NET']);
 // File and code extensions that look like a TLD but are not one worth masking.
 const NOT_A_TLD = new Set(['js', 'ts', 'jsx', 'tsx', 'json', 'css', 'xml', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'txt', 'csv', 'exe', 'mp3', 'mp4']);
 const REMOVED = '[link removed]';
@@ -101,8 +107,11 @@ function sanitizeUntrusted(text: string, siteHosts: string[]): string {
     .replace(SCHEME_OR_WWW, (m) => (onSite(/^www\./i.test(m) ? `https://${m}` : m, siteHosts) ? m : REMOVED))
     .replace(PROTOCOL_RELATIVE, mask('https:'))
     .replace(BARE_DOMAIN, (m) => {
-      const tld = m.split('/')[0].split('.').pop() ?? '';
-      if (NOT_A_TLD.has(tld)) return m;
+      const host = m.split('/')[0];
+      const tld = host.split('.').pop() ?? '';
+      if (tld !== tld.toLowerCase()) {
+        if (TECH_NAMES.has(host) || !KNOWN_TLD.has(tld.toLowerCase())) return m;
+      } else if (NOT_A_TLD.has(tld)) return m;
       return onSite(`https://${m}`, siteHosts) ? m : REMOVED;
     });
 }

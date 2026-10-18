@@ -92,6 +92,18 @@ describe('buildInstructions', () => {
     expect(p).toContain('G [link removed]');
     expect(p).not.toContain('evil');
   });
+  it('masks domains whatever their case, but keeps capitalised words that are not a known TLD', () => {
+    const masked = ['EVIL.COM', 'evil.COM/pay', 'evil.Com', 'Evil.Com/x', 'Evil.com', 'evil.com', 'buses.org.evil.com', 'notbuses.org', 'https://buses.org@evil.com', '//EVIL.COM/a', 'sub.EVIL.CO.UK', 'Evil.Shop/x'];
+    for (const m of masked) {
+      const p = buildInstructions({ ...base, sources: [{ ...base.sources[0], excerpt: `Pay at ${m} today.` }] } as any);
+      expect(p).toContain('Pay at [link removed] today.');
+      expect(p.toLowerCase()).not.toContain('evil');
+    }
+    const kept = 'Built on ASP.NET and .NET with Node.js; see form.pdf. Join today.Benefits include travel.Membership in St.Louis. Mail membership@buses.org or john.smith@buses.org. Visit buses.org/join, BUSES.ORG/a, www.Buses.Org/b and Blog.Buses.org/c.';
+    const p = buildInstructions({ ...base, sources: [{ ...base.sources[0], excerpt: kept }] } as any);
+    expect(p).toContain(kept);
+    expect(p).not.toContain('[link removed]');
+  });
   it('caps long titles', () => {
     const p = buildInstructions({ ...base, sources: [{ ...base.sources[0], title: 'T'.repeat(5000) }] } as any);
     expect(p).not.toContain('T'.repeat(201));
