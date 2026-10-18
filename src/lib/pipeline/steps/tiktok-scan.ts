@@ -4,6 +4,7 @@ import { getTiktokProfile, getTiktokVideos, getTiktokTranscript } from '@/lib/sc
 import { persistPostMedia } from '@/lib/scraping/media-storage';
 import type { StepContext } from '../types';
 import { enrichSkips, type StepResult } from './index';
+import { withFreshCopilot } from '@/lib/copilot/preserve-copilot';
 
 const QUOTE_VIDEO_CAP = 10;
 const FULL_VIDEO_CAP = 40;
@@ -45,7 +46,7 @@ export async function tiktokScanStep(ctx: StepContext): Promise<StepResult> {
       followers: profile.followers,
       videoCount: profile.videoCount,
     };
-    await supabase.from('accounts').update({ config: cfg }).eq('id', ctx.accountId);
+    await supabase.from('accounts').update({ config: await withFreshCopilot(supabase, ctx.accountId, cfg) }).eq('id', ctx.accountId);
   }
 
   const cap = ctx.state.options?.scanMode === 'quote' ? QUOTE_VIDEO_CAP : FULL_VIDEO_CAP;

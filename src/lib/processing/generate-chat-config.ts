@@ -6,6 +6,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { themePresets } from '@/lib/theme';
 import type { InfluencerType } from '@/types';
+import { withFreshCopilot } from '@/lib/copilot/preserve-copilot';
 
 // ============================================
 // Type Detection from Persona
@@ -336,7 +337,7 @@ export async function generateAndSaveChatConfig(accountId: string): Promise<{
   // Save to accounts
   const { error: updateError } = await supabase
     .from('accounts')
-    .update({ config: updatedConfig })
+    .update({ config: await withFreshCopilot(supabase, accountId, updatedConfig) })
     .eq('id', accountId);
 
   if (updateError) {

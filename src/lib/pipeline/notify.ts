@@ -4,6 +4,7 @@ import { sendDemoReady, sendAccountReady, sendInfluencerWelcome } from '@/lib/wh
 import type { WhatsAppSendResult } from '@/lib/whatsapp-cloud/client';
 import { sendEmail, sendAdminAlert } from '@/lib/email';
 import { parseRecipients, resolveBrandName } from '@/lib/pipeline/notify-helpers';
+import { withFreshCopilot } from '@/lib/copilot/preserve-copilot';
 
 const APP = (process.env.NEXT_PUBLIC_APP_URL || 'https://bestie.ldrsgroup.com').replace(/\/$/, '');
 
@@ -66,7 +67,7 @@ export async function notifyScanComplete(args: {
     if (ob?.status === 'scanning') {
       await supabase
         .from('accounts')
-        .update({ config: { ...config, onboarding: { ...ob, status: 'ready', token: undefined } } })
+        .update({ config: await withFreshCopilot(supabase, job.account_id!, { ...config, onboarding: { ...ob, status: 'ready', token: undefined } }) })
         .eq('id', job.account_id);
 
       const dashUrl = `${APP}/influencer/${slug}/dashboard`;

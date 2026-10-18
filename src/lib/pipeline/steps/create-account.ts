@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { hashPassword } from '@/lib/utils';
 import type { StepContext } from '../types';
 import type { StepResult } from './index';
+import { withFreshCopilot } from '@/lib/copilot/preserve-copilot';
 
 export async function createAccountStep(ctx: StepContext): Promise<StepResult> {
   const supabase = await createClient();
@@ -40,7 +41,7 @@ export async function createAccountStep(ctx: StepContext): Promise<StepResult> {
   } else {
     await supabase
       .from('accounts')
-      .update({ config: mergedConfig, ...(lang ? { language: lang } : {}) })
+      .update({ config: await withFreshCopilot(supabase, ctx.accountId, mergedConfig), ...(lang ? { language: lang } : {}) })
       .eq('id', ctx.accountId); // merge, never overwrite
   }
   if (!existing?.security_config?.admin_password_hash) {

@@ -4,6 +4,7 @@ import { getTwitterProfile, getTwitterTweets } from '@/lib/scraping/twitterScrap
 import { persistPostMedia } from '@/lib/scraping/media-storage';
 import type { StepContext } from '../types';
 import { enrichSkips, type StepResult } from './index';
+import { withFreshCopilot } from '@/lib/copilot/preserve-copilot';
 
 const QUOTE_TWEET_CAP = 30;
 const FULL_TWEET_CAP = 100;
@@ -46,7 +47,7 @@ export async function xScanStep(ctx: StepContext): Promise<StepResult> {
       tweetCount: profile.tweetCount,
       createdAt: profile.createdAt,
     };
-    await supabase.from('accounts').update({ config: cfg }).eq('id', ctx.accountId);
+    await supabase.from('accounts').update({ config: await withFreshCopilot(supabase, ctx.accountId, cfg) }).eq('id', ctx.accountId);
   }
 
   const cap = ctx.state.options?.scanMode === 'quote' ? QUOTE_TWEET_CAP : FULL_TWEET_CAP;

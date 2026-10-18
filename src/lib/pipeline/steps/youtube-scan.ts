@@ -3,6 +3,7 @@ import { setCount } from '@/lib/pipeline/state';
 import { getYoutubeChannel, getYoutubeVideos, getYoutubeTranscript } from '@/lib/scraping/youtubeScraper';
 import type { StepContext } from '../types';
 import { enrichSkips, type StepResult } from './index';
+import { withFreshCopilot } from '@/lib/copilot/preserve-copilot';
 
 // Quote (demo) scans grab fewer videos to stay fast; full scans grab more.
 const QUOTE_VIDEO_CAP = 10;
@@ -50,7 +51,7 @@ export async function youtubeScanStep(ctx: StepContext): Promise<StepResult> {
       videoCount: channel.videoCount,
       views: channel.viewCount,
     };
-    await supabase.from('accounts').update({ config: cfg }).eq('id', ctx.accountId);
+    await supabase.from('accounts').update({ config: await withFreshCopilot(supabase, ctx.accountId, cfg) }).eq('id', ctx.accountId);
   }
 
   const cap = ctx.state.options?.scanMode === 'quote' ? QUOTE_VIDEO_CAP : FULL_VIDEO_CAP;

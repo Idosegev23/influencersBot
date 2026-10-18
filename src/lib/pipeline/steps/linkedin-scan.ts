@@ -3,6 +3,7 @@ import { setCount } from '@/lib/pipeline/state';
 import { getLinkedInCompany, getLinkedInPosts } from '@/lib/scraping/linkedinScraper';
 import type { StepContext } from '../types';
 import { enrichSkips, type StepResult } from './index';
+import { withFreshCopilot } from '@/lib/copilot/preserve-copilot';
 
 // posted_at is NOT NULL with no default.
 function toPostedAt(iso?: string): string {
@@ -51,7 +52,7 @@ export async function linkedinScanStep(ctx: StepContext): Promise<StepResult> {
       employeeCount: company.employeeCount,
       specialties: company.specialties,
     };
-    await supabase.from('accounts').update({ config: cfg }).eq('id', ctx.accountId);
+    await supabase.from('accounts').update({ config: await withFreshCopilot(supabase, ctx.accountId, cfg) }).eq('id', ctx.accountId);
   }
 
   const posts = await getLinkedInPosts(page);

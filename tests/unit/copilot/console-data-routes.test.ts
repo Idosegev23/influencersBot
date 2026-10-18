@@ -282,6 +282,22 @@ describe('PATCH associations/:id/settings', () => {
     expect(db.tables.accounts.find((a) => a.id === ACC1)!.config.username).toBe('aba');
   });
 
+  it.each(['queued', 'running'])('409 scan_in_progress while the latest scan is %s, nothing written', async (status) => {
+    h.jobs.push({ id: 'j', account_id: ACC1, status, created_at: '2026-10-18T00:00:00Z', step_logs: [] });
+    const before = JSON.stringify(db.tables.accounts);
+    const res = await patch('owner', ACC1, { tone: 'x' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'scan_in_progress' });
+    expect(JSON.stringify(db.tables.accounts)).toBe(before);
+  });
+
+  it('saves once the latest scan has finished', async () => {
+    h.jobs.push({ id: 'j', account_id: ACC1, status: 'succeeded', created_at: '2026-10-18T00:00:00Z', step_logs: [] });
+    const res = await patch('owner', ACC1, { tone: 'after scan' });
+    expect(res.status).toBe(200);
+    expect(db.tables.accounts.find((a) => a.id === ACC1)!.config.copilot.tone).toBe('after scan');
+  });
+
   it('clears a link with null', async () => {
     const { settings } = await (await patch('owner', ACC1, { links: { join: null } })).json();
     expect(settings.links.join).toBeNull();

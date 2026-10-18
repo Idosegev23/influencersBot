@@ -5,6 +5,7 @@ import { buildDemoConfig } from '@/lib/demo/access';
 import type { StepContext } from '../types';
 import type { StepResult } from './index';
 import { fetchPublic } from '@/lib/copilot/public-url';
+import { withFreshCopilot } from '@/lib/copilot/preserve-copilot';
 
 /**
  * Final pipeline step.
@@ -66,7 +67,7 @@ export async function finalizeStep(ctx: StepContext): Promise<StepResult> {
   // src/lib/demo/access.ts.
   if (cfg.isDemo && !cfg.demo) cfg.demo = buildDemoConfig();
 
-  await supabase.from('accounts').update({ config: cfg }).eq('id', ctx.accountId);
+  await supabase.from('accounts').update({ config: await withFreshCopilot(supabase, ctx.accountId, cfg) }).eq('id', ctx.accountId);
 
   // Clean display_name from IG full_name + theme/greeting (reuse local step-7).
   // Optional — a failure here must not fail the whole pipeline.
@@ -140,7 +141,7 @@ export async function finalizeStep(ctx: StepContext): Promise<StepResult> {
       } catch { /* cover is best-effort; domain registration below still persists */ }
       if (widgetChanged) {
         bcfg.widget = widget;
-        await supabase.from('accounts').update({ config: bcfg }).eq('id', ctx.accountId);
+        await supabase.from('accounts').update({ config: await withFreshCopilot(supabase, ctx.accountId, bcfg) }).eq('id', ctx.accountId);
       }
     }
   } catch {

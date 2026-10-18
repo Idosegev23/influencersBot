@@ -4,6 +4,7 @@ import { getFacebookProfile, getFacebookPosts, getFacebookPostImage } from '@/li
 import { persistPostMedia } from '@/lib/scraping/media-storage';
 import type { StepContext } from '../types';
 import { enrichSkips, type StepResult } from './index';
+import { withFreshCopilot } from '@/lib/copilot/preserve-copilot';
 
 /** Posts whose media is enriched + persisted per invocation. */
 const MEDIA_BATCH = 25;
@@ -71,7 +72,7 @@ export async function fbScanStep(ctx: StepContext): Promise<StepResult> {
       rating: profile.rating,
       ratingCount: profile.ratingCount,
     };
-    await supabase.from('accounts').update({ config: cfg }).eq('id', ctx.accountId);
+    await supabase.from('accounts').update({ config: await withFreshCopilot(supabase, ctx.accountId, cfg) }).eq('id', ctx.accountId);
   }
 
   const cap = ctx.state.options?.scanMode === 'quote' ? QUOTE_POST_CAP : FULL_POST_CAP;

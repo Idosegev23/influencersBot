@@ -387,10 +387,14 @@ export function buildSettingsPatch(body: any, current: Record<string, any>): Set
 }
 
 /** PATCH associations/:id/settings (the caller has checked canManage). */
-export async function updateSettings(acc: ConsoleAccount, body: any, db: any = supabase) {
+export async function updateSettings(acc: ConsoleAccount, body: any, db: any = supabase, latestJob: typeof latestScanJob = latestScanJob) {
   const current = (acc.config.copilot ?? {}) as Record<string, any>;
   const p = buildSettingsPatch(body, current);
   if (p.ok === false) return refuse(400, 'invalid_settings', { field: p.field });
+  // A running scan rewrites accounts.config whole at several steps. Those writes carry
+  // config->copilot over (preserve-copilot), but refusing here keeps the window shut.
+  const job = await latestJob(acc.id);
+  if (job && (job.status === 'queued' || job.status === 'running')) return refuse(409, 'scan_in_progress');
   const { data, error } = await db.rpc('copilot_merge_config', { p_account_id: acc.id, p_patch: p.patch });
   if (error) { log('settings merge failed', acc.id, error.message); return refuse(503, 'unavailable'); }
   if (!data) return refuse(404, 'not_found');

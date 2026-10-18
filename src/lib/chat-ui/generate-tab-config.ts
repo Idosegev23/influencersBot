@@ -18,6 +18,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { applyActiveCouponFilter } from '@/lib/coupons/active-filter';
+import { withFreshCopilot } from '@/lib/copilot/preserve-copilot';
 
 interface TabConfig {
   id: string;
@@ -372,7 +373,7 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
       header_label: header,
       greeting_message: greet,
     };
-    const { error: e2 } = await supabase.from('accounts').update({ config: next }).eq('id', accountId);
+    const { error: e2 } = await supabase.from('accounts').update({ config: await withFreshCopilot(supabase, accountId, next) }).eq('id', accountId);
     if (e2) throw new Error(`Failed to save config: ${e2.message}`);
     return { tabs: tabsForB2B, chat_subtitle: subtitle, header_label: header, greeting_message: greet };
   }
@@ -407,7 +408,7 @@ export async function generateTabConfig(accountId: string): Promise<TabGeneratio
 
   const { error: updateErr } = await supabase
     .from('accounts')
-    .update({ config: newConfig })
+    .update({ config: await withFreshCopilot(supabase, accountId, newConfig) })
     .eq('id', accountId);
 
   if (updateErr) {
