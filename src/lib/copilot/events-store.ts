@@ -11,6 +11,12 @@ export function todayIn(tz: string, now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 
+function isoDate(v: unknown): string | null {
+  if (typeof v !== 'string' || !ISO_DATE.test(v)) return null;
+  const d = new Date(v + 'T00:00:00Z');
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : null;
+}
+
 function httpUrl(v: unknown): string | null {
   if (typeof v !== 'string') return null;
   try { const u = new URL(v); return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : null; } catch { return null; }
@@ -25,9 +31,10 @@ export function parseExtractedEvents(raw: unknown, sourceUrl: string, today: str
   const out: Array<Omit<UpcomingEvent, 'id'> & { sourceUrl: string }> = [];
   for (const e of list) {
     const title = text(e?.title, 200);
-    const startsOn = typeof e?.starts_on === 'string' && ISO_DATE.test(e.starts_on) ? e.starts_on : null;
+    const startsOn = isoDate(e?.starts_on);
     if (!title || !startsOn) continue;
-    const endsOn = typeof e?.ends_on === 'string' && ISO_DATE.test(e.ends_on) ? e.ends_on : null;
+    const rawEnd = isoDate(e?.ends_on);
+    const endsOn = rawEnd && rawEnd >= startsOn ? rawEnd : null;
     if ((endsOn ?? startsOn) < today) continue;
     out.push({
       title, startsOn, endsOn,

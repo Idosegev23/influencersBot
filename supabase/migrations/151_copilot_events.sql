@@ -18,7 +18,7 @@ create table public.copilot_events (
   summary           text,
   source_url        text,
   extracted_at      timestamptz not null default now(),
-  unique (account_id, url, starts_on)
+  unique (account_id, url, starts_on, title)
 );
 create index copilot_events_upcoming_idx on public.copilot_events(account_id, starts_on);
 alter table public.copilot_events enable row level security;
