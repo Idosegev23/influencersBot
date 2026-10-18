@@ -14,6 +14,7 @@ import { normalizeWebsiteUrl } from '@/lib/pipeline/website-url';
 import { computeScanProgress, SCAN_STEPS } from '@/lib/pipeline/progress';
 import type { ConsoleContext } from './console-auth';
 import { refuse, ok, latestScanJob, type ConsoleAccount } from './console-data';
+import { checkPublicUrl } from './public-url';
 
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
 export const RESERVED_SLUGS = new Set(['api', 'admin', 'console', 'login', 'embed', 'assets', '_next', 'static']);
@@ -54,6 +55,11 @@ export async function createAssociation(ctx: ConsoleContext, body: any, deps: Pa
   if (parsed.ok === false) return refuse(400, parsed.error);
   const { name, websiteUrl, slug } = parsed.value;
   const host = `${slug}.${ctx.baseHost}`;
+
+  // The scan fetches this URL from our servers: it must be a public name, never an
+  // IP literal, an internal name, or a name that resolves into a private network.
+  const pub = await checkPublicUrl(websiteUrl);
+  if (pub.ok === false) { log('website refused', pub.reason); return refuse(400, 'invalid_website'); }
 
   // Conflicts: the tenant host (any partner) or an account already using the slug as its username.
   const [{ data: dom, error: domErr }, { data: named, error: namedErr }] = await Promise.all([

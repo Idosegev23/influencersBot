@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { fetchPublic } from '@/lib/copilot/public-url';
 
 async function fetchXml(url: string, timeoutMs: number): Promise<string | null> {
   const ctrl = new AbortController();
@@ -7,7 +8,7 @@ async function fetchXml(url: string, timeoutMs: number): Promise<string | null> 
     // Use a realistic browser UA: many corporate sites (Akamai/Cloudflare bot
     // protection, e.g. lenovo.com) return 403 to bot-marker UAs, which silently
     // zeroes out sitemap discovery. Public, robots-allowed pages only.
-    const r = await fetch(url, {
+    const r = await fetchPublic(url, {
       headers: {
         'user-agent':
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',

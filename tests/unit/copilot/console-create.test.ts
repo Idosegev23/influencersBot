@@ -9,6 +9,10 @@ vi.mock('@/lib/db/repositories/scanJobsRepo', () => ({
 const startPipeline = vi.fn();
 vi.mock('@/lib/pipeline/start', () => ({ startPipeline: (...a: any[]) => startPipeline(...a) }));
 vi.mock('@/lib/utils', () => ({ hashPassword: async (p: string) => `hashed:${p.length}` }));
+const DNS: Record<string, string[]> = { 'uma.org': ['104.18.2.3'], 'intranet-site.org': ['10.0.0.8'], 'meta-site.org': ['169.254.169.254'], 'v6-site.org': ['fd12::1'] };
+vi.mock('node:dns/promises', () => ({
+  default: { lookup: async (h: string) => { const a = DNS[h]; if (!a) throw new Error('ENOTFOUND'); return a.map((address) => ({ address, family: address.includes(':') ? 6 : 4 })); } },
+}));
 const requireTenant = vi.fn();
 vi.mock('@/lib/copilot/auth', () => ({ requireTenant: (...a: any[]) => requireTenant(...a) }));
 
@@ -128,6 +132,13 @@ describe('POST console/associations', () => {
     [{ ...GOOD, websiteUrl: 'javascript:alert(1)' }, 'invalid_website'],
     [{ ...GOOD, websiteUrl: 'not a site' }, 'invalid_website'],
     [{ ...GOOD, websiteUrl: '' }, 'invalid_website'],
+    [{ ...GOOD, websiteUrl: 'http://127.0.0.1/' }, 'invalid_website'],
+    [{ ...GOOD, websiteUrl: 'http://[::1]/' }, 'invalid_website'],
+    [{ ...GOOD, websiteUrl: 'http://localhost:3000/' }, 'invalid_website'],
+    [{ ...GOOD, websiteUrl: 'https://intranet-site.org' }, 'invalid_website'],
+    [{ ...GOOD, websiteUrl: 'https://meta-site.org' }, 'invalid_website'],
+    [{ ...GOOD, websiteUrl: 'https://v6-site.org' }, 'invalid_website'],
+    [{ ...GOOD, websiteUrl: 'https://does-not-resolve.org' }, 'invalid_website'],
     [{ ...GOOD, name: '' }, 'invalid_name'],
     [{ ...GOOD, name: '<script>' }, 'invalid_name'],
   ])('400 for %j (%s), nothing written', async (body, error) => {

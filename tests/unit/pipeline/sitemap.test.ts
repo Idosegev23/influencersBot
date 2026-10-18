@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
+
+// Sitemap fetches go through the SSRF guard, which resolves the host: keep DNS offline and public.
+vi.mock('node:dns/promises', () => ({ default: { lookup: async () => [{ address: '93.184.216.34', family: 4 }] } }));
 describe('discoverSitemapUrls', () => {
   it('parses a urlset and returns same-host locs', async () => {
     const xml = `<?xml version="1.0"?><urlset><url><loc>https://site.com/a</loc></url><url><loc>https://site.com/b</loc></url></urlset>`;

@@ -4,6 +4,7 @@ import { verticalForArchetype } from '@/lib/catalog/verticals';
 import { buildDemoConfig } from '@/lib/demo/access';
 import type { StepContext } from '../types';
 import type { StepResult } from './index';
+import { fetchPublic } from '@/lib/copilot/public-url';
 
 /**
  * Final pipeline step.
@@ -115,7 +116,7 @@ export async function finalizeStep(ctx: StepContext): Promise<StepResult> {
       // registration above.
       try {
       if (!widget.coverImage) {
-        const res = await fetch(ctx.state.websiteUrl, {
+        const res = await fetchPublic(ctx.state.websiteUrl, {
           signal: AbortSignal.timeout(4000),
           // Realistic browser UA so Akamai/Cloudflare-protected sites return the
           // real HTML (for og:image cover extraction) instead of a 403 challenge.

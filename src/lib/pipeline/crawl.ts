@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { createClient } from '@/lib/supabase/server';
+import { fetchPublic } from '@/lib/copilot/public-url';
 
 // Ported from scripts/deep-scrape-website.mjs (extractProductData) — keep persistence
 // column shape identical to that script's savePageToDB (instagram_bio_websites).
@@ -385,7 +386,7 @@ export async function crawlPageBatch(
 
   for (const url of urls) {
     try {
-      const res = await fetch(url, {
+      const res = await fetchPublic(url, {
         headers: {
           // Realistic browser UA — bot-marker UAs get 403'd by Akamai/Cloudflare
           // protected sites (e.g. lenovo.com), silently zeroing the crawl.

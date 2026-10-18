@@ -15,6 +15,8 @@
  * run of any real site exceeds the 600-second step ceiling.
  */
 
+import { fetchPublic } from '@/lib/copilot/public-url';
+
 const APIFY_TOKEN = process.env.APIFY_TOKEN;
 const ACTOR_ID = 'apify~website-content-crawler';
 const API = 'https://api.apify.com/v2';
@@ -85,7 +87,7 @@ function requireToken(): string {
  */
 export async function isSiteChallenged(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, {
+    const res = await fetchPublic(url, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
