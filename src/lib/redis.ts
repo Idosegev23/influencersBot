@@ -175,6 +175,8 @@ export async function redisSlidingWindowRateLimit(args: {
   limit: number;
   windowMs: number;
   identifier: string; // unique ID for this request
+  /** false = a refused request is removed from the window again (default true: every request counts). */
+  recordRejected?: boolean;
 }): Promise<{
   allowed: boolean;
   remaining: number;
@@ -214,6 +216,9 @@ export async function redisSlidingWindowRateLimit(args: {
     
     // If not allowed, calculate retry time
     let retryAfterMs = 0;
+    if (!allowed && args.recordRejected === false) {
+      await client.zrem(key, `${identifier}:${now}`);
+    }
     if (!allowed) {
       // Get oldest entry in window
       const oldest = await client.zrange(key, 0, 0, { withScores: true });

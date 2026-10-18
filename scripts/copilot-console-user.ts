@@ -1,11 +1,13 @@
 /**
  * Create or update a Co-Pilot console user (idempotent upsert on partner + email).
  *
- *   npx tsx scripts/copilot-console-user.ts --partner multiview --email ido@example.com --name "Ido" --role owner
+ *   npx tsx scripts/copilot-console-user.ts --partner multiview --email ido@example.com --name "Ido" --role owner --partner-staff
  *   npx tsx scripts/copilot-console-user.ts --partner multiview --email staff@aba.test --name "Sam" --role admin --account <uuid>
- *   ... --disable   (sets status disabled)
+ *   npx tsx scripts/copilot-console-user.ts --partner multiview --email staff@aba.test --disable
  *
- * Without --account the user is partner staff (sees every association of the partner).
+ * Create/update needs --role and exactly one scope: --partner-staff (every association of
+ * the partner) or --account <uuid> (that association only), so a typo can never widen a
+ * user to the whole partner. --disable changes only the status of an existing user.
  * Node 22. Loads .env.local before anything else.
  */
 import { config as loadEnv } from 'dotenv';
@@ -26,18 +28,29 @@ async function main() {
 
   const slug = flag('partner');
   const email = flag('email')?.trim().toLowerCase();
-  const name = flag('name') ?? '';
-  const role = flag('role') ?? 'viewer';
-  const accountId = flag('account') || null;
   const disable = flag('disable') !== null;
   if (!slug || !email) throw new Error('--partner and --email are required');
   if (!EMAIL_RE.test(email)) throw new Error('invalid --email');
-  if (!['owner', 'admin', 'viewer'].includes(role)) throw new Error('--role must be owner, admin or viewer');
-  if (accountId && !UUID_RE.test(accountId)) throw new Error('--account must be a uuid');
 
   const { data: partner, error: pErr } = await sb.from('partners').select('id').eq('slug', slug).maybeSingle();
   if (pErr) throw new Error(`partner: ${pErr.message}`);
   if (!partner) throw new Error(`partner ${slug} not found`);
+
+  if (disable) {
+    const { data, error } = await sb.from('console_users').update({ status: 'disabled' })
+      .eq('partner_id', partner.id).eq('email', email).select('id');
+    if (error) throw new Error(`console user: ${error.message}`);
+    if (!data?.length) throw new Error('no such console user');
+    console.log('console user disabled', data[0].id);
+    return;
+  }
+
+  const role = flag('role');
+  const accountId = flag('account') || null;
+  const partnerStaff = flag('partner-staff') !== null;
+  if (!role || !['owner', 'admin', 'viewer'].includes(role)) throw new Error('--role owner|admin|viewer is required');
+  if (partnerStaff === !!accountId) throw new Error('give exactly one of --partner-staff or --account <uuid>');
+  if (accountId && !UUID_RE.test(accountId)) throw new Error('--account must be a uuid');
 
   if (accountId) {
     const { data: acc, error } = await sb.from('accounts').select('id, partner_id').eq('id', accountId).maybeSingle();
@@ -46,7 +59,8 @@ async function main() {
     if (acc.partner_id !== partner.id) throw new Error('account does not belong to this partner');
   }
 
-  const row = { partner_id: partner.id, email, name, role, account_id: accountId, status: disable ? 'disabled' : 'active' };
+  const name = flag('name');
+  const row = { partner_id: partner.id, email, role, account_id: accountId, status: 'active', ...(name !== null ? { name } : {}) };
   const { data: user, error } = await sb.from('console_users').upsert(row, { onConflict: 'partner_id,email' })
     .select('id, email, role, account_id, status').single();
   if (error || !user) throw new Error(`console user: ${error?.message}`);

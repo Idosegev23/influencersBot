@@ -125,10 +125,11 @@ export function defaultConsoleAuthDeps(): ConsoleAuthDeps {
 }
 
 /**
- * Creates a code for an active console user of this partner and returns the
- * delivery to run after the response, or null when nothing is to be sent
- * (unknown email, rate limited, limiter down, DB failure). The caller answers
- * the same in every case.
+ * Rate-limits the request and returns the delivery to run after the response, or
+ * null when nothing is to be done (capped, limiter down). The delivery does all
+ * the address-dependent work (lookup, retiring the old code, the new code, the
+ * email), so the response path is the same for every address: validation, the
+ * limiter, and the caller's fixed floor.
  */
 export async function requestLoginCode(
   input: { partnerId: string; email: string },
@@ -138,12 +139,14 @@ export async function requestLoginCode(
   const { partnerId, email } = input;
 
   // Rate limit every address alike (known or not), so the limiter reveals nothing either.
+  // Refused requests are not recorded: a flood cannot keep the owner locked out longer.
   let rl: Awaited<ReturnType<typeof redisSlidingWindowRateLimit>> = null;
   try {
     if (d.available()) {
       rl = await d.limiter({
         key: `rl:copilot:console:code:${partnerId}:${crypto.createHash('sha256').update(email).digest('hex')}`,
         limit: CODE_REQUESTS_PER_WINDOW, windowMs: CODE_REQUEST_WINDOW_MS, identifier: crypto.randomUUID(),
+        recordRejected: false,
       });
     }
   } catch (e) {
@@ -152,37 +155,43 @@ export async function requestLoginCode(
   if (!rl) { log('code limiter unavailable, not sending'); return null; }
   if (!rl.allowed) { log('code requests capped for an address'); return null; }
 
-  const { data: user, error: uErr } = await d.db.from('console_users').select('id, partner_id, status')
-    .eq('partner_id', partnerId).eq('email', email).maybeSingle();
-  if (uErr) { log('user lookup failed', uErr.message); return null; }
-  if (!user || user.status !== 'active' || user.partner_id !== partnerId) return null;
+  return () => issueLoginCode({ partnerId, email }, d);
+}
 
-  const nowIso = new Date(d.now()).toISOString();
-  // One live code per user: a new request retires every unused earlier code.
-  const { error: invErr } = await d.db.from('console_login_codes').update({ used_at: nowIso })
-    .eq('console_user_id', user.id).is('used_at', null);
-  if (invErr) { log('code invalidate failed', invErr.message); return null; }
+/** Lookup, retire, create, send. Never throws; does nothing for an unknown or inactive address. */
+export async function issueLoginCode(input: { partnerId: string; email: string }, d: ConsoleAuthDeps): Promise<void> {
+  const { partnerId, email } = input;
+  try {
+    const { data: user, error: uErr } = await d.db.from('console_users').select('id, partner_id, status')
+      .eq('partner_id', partnerId).eq('email', email).maybeSingle();
+    if (uErr) { log('user lookup failed', uErr.message); return; }
+    if (!user || user.status !== 'active' || user.partner_id !== partnerId) return;
 
-  const code = generateLoginCode();
-  const { error: insErr } = await d.db.from('console_login_codes').insert({
-    console_user_id: user.id,
-    code_hash: hashLoginCode(user.id, code),
-    expires_at: new Date(d.now() + CODE_TTL_MS).toISOString(),
-    attempts: 0,
-  });
-  if (insErr) { log('code insert failed', insErr.message); return null; }
-
-  return async () => {
     const sender = partnerSender();
     // Without the white-label mailbox the mail would go out from the platform's: never.
+    // Checked before retiring the live code, so a misconfiguration does not lock anyone out.
     if (!sender) { log('COPILOT_SEND_FROM not set, sign-in code not sent'); return; }
-    try {
-      const r = await d.send({ to: email, ...sender, ...loginCodeEmail(code) });
-      if (!r?.success) log('sign-in code email failed', r?.error);
-    } catch (e) {
-      log('sign-in code email threw', e);
-    }
-  };
+
+    const nowIso = new Date(d.now()).toISOString();
+    // One live code per user: a new request retires every unused earlier code.
+    const { error: invErr } = await d.db.from('console_login_codes').update({ used_at: nowIso })
+      .eq('console_user_id', user.id).is('used_at', null);
+    if (invErr) { log('code invalidate failed', invErr.message); return; }
+
+    const code = generateLoginCode();
+    const { error: insErr } = await d.db.from('console_login_codes').insert({
+      console_user_id: user.id,
+      code_hash: hashLoginCode(user.id, code),
+      expires_at: new Date(d.now() + CODE_TTL_MS).toISOString(),
+      attempts: 0,
+    });
+    if (insErr) { log('code insert failed', insErr.message); return; }
+
+    const r = await d.send({ to: email, ...sender, ...loginCodeEmail(code) });
+    if (!r?.success) log('sign-in code email failed', r?.error);
+  } catch (e) {
+    log('sign-in code delivery threw', e);
+  }
 }
 
 export type VerifyResult =
@@ -211,15 +220,22 @@ export async function verifyLoginCode(
   const row = Array.isArray(rows) ? rows[0] : null;
   const now = d.now();
   if (!row || row.used_at || Date.parse(row.expires_at) <= now) return INVALID;
-  const attempts = Number(row.attempts) || 0;
-  if (attempts >= MAX_CODE_ATTEMPTS) return INVALID;
-
-  // Count the attempt before comparing, with a compare-and-set on the counter: parallel
-  // guesses cannot share one attempt, so at most MAX_CODE_ATTEMPTS guesses are ever evaluated.
-  const { data: counted, error: aErr } = await d.db.from('console_login_codes').update({ attempts: attempts + 1 })
-    .eq('id', row.id).eq('attempts', attempts).is('used_at', null).select('id');
-  if (aErr) { log('attempt count failed', aErr.message); return INVALID; }
-  if (!Array.isArray(counted) || counted.length !== 1) return INVALID;
+  // Count the attempt before comparing, with a compare-and-set on the counter. A guess
+  // that loses the race re-reads and tries again, so every guess is counted exactly once
+  // and no more than MAX_CODE_ATTEMPTS guesses are ever compared.
+  let attempts = Number(row.attempts) || 0;
+  for (let tries = 0; ; tries++) {
+    if (attempts >= MAX_CODE_ATTEMPTS) return INVALID;
+    const { data: counted, error: aErr } = await d.db.from('console_login_codes').update({ attempts: attempts + 1 })
+      .eq('id', row.id).eq('attempts', attempts).is('used_at', null).select('id');
+    if (aErr) { log('attempt count failed', aErr.message); return INVALID; }
+    if (Array.isArray(counted) && counted.length === 1) break;
+    if (tries >= MAX_CODE_ATTEMPTS * 4) return INVALID;
+    const { data: again, error: rErr } = await d.db.from('console_login_codes').select('attempts, used_at')
+      .eq('id', row.id).maybeSingle();
+    if (rErr || !again || again.used_at) return INVALID;
+    attempts = Number(again.attempts) || 0;
+  }
 
   const expected = Buffer.from(String(row.code_hash), 'hex');
   const given = Buffer.from(hashLoginCode(user.id, input.code), 'hex');
@@ -239,12 +255,20 @@ export async function verifyLoginCode(
   return { ok: true, token, user: { id: user.id, email: user.email, name: user.name ?? '', role: user.role, accountId } };
 }
 
-const refuse = (status: number, error: string) => Response.json({ error }, { status });
+const NO_STORE = { 'Cache-Control': 'no-store' };
+const refuse = (status: number, error: string) => Response.json({ error }, { status, headers: NO_STORE });
+
+/** The same response, marked uncacheable (tenant refusals come from the shared helper without it). */
+export function noStore(res: Response): Response {
+  const headers = new Headers(res.headers);
+  headers.set('Cache-Control', 'no-store');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
 
 /** Partner key + partner-level host (never an association host). */
 export async function requirePartnerHost(req: Request): Promise<Tenant | Response> {
   const t = await requireTenant(req, { association: false });
-  if (t instanceof Response) return t;
+  if (t instanceof Response) return noStore(t);
   if (t.accountId !== null) return refuse(400, 'partner_host_required');
   return t;
 }

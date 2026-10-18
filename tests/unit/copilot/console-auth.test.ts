@@ -77,16 +77,32 @@ describe('requestLoginCode', () => {
     expect(JSON.stringify(sent[0]).toLowerCase()).not.toMatch(/bestie|influencerbot|ldrs|imai/);
   });
 
-  it('returns nothing to deliver for unknown, disabled or other-partner addresses, and writes no code', async () => {
-    expect(await requestLoginCode({ partnerId: P, email: 'nobody@mv.test' }, deps())).toBeNull();
-    expect(await requestLoginCode({ partnerId: P, email: 'off@mv.test' }, deps())).toBeNull();
-    expect(await requestLoginCode({ partnerId: 'partner-C', email: 'owner@mv.test' }, deps())).toBeNull();
+  it('does no database work before the response: the deferred delivery does it all', async () => {
+    const deliver = await requestLoginCode({ partnerId: P, email: 'owner@mv.test' }, deps());
+    expect(deliver).toBeTypeOf('function');
+    expect(db.log).toHaveLength(0);
     expect(db.tables.console_login_codes).toHaveLength(0);
+    await deliver!();
+    expect(db.tables.console_login_codes).toHaveLength(1);
+    expect(sent).toHaveLength(1);
   });
 
-  it('rate-limits unknown addresses too (the limiter runs before the lookup)', async () => {
+  it('unknown, disabled or other-partner addresses get the same deferred delivery, which writes and sends nothing', async () => {
+    for (const [partnerId, email] of [[P, 'nobody@mv.test'], [P, 'off@mv.test'], ['partner-C', 'owner@mv.test']]) {
+      const deliver = await requestLoginCode({ partnerId, email }, deps());
+      expect(deliver).toBeTypeOf('function');
+      await deliver!();
+    }
+    expect(db.tables.console_login_codes).toHaveLength(0);
+    expect(sent).toHaveLength(0);
+    // presence: the known address does get one
+    await codeFor('owner@mv.test');
+    expect(db.tables.console_login_codes).toHaveLength(1);
+  });
+
+  it('rate-limits unknown addresses too, and asks the limiter not to record refusals', async () => {
     await requestLoginCode({ partnerId: P, email: 'nobody@mv.test' }, deps());
-    expect(limiter).toHaveBeenCalledWith(expect.objectContaining({ limit: 5, windowMs: 15 * 60 * 1000 }));
+    expect(limiter).toHaveBeenCalledWith(expect.objectContaining({ limit: 5, windowMs: 15 * 60 * 1000, recordRejected: false }));
     // the key never carries the raw address
     expect((limiter.mock.calls[0] as any)[0].key).not.toContain('nobody');
   });
@@ -96,6 +112,14 @@ describe('requestLoginCode', () => {
     expect(await requestLoginCode({ partnerId: P, email: 'owner@mv.test' }, deps())).toBeNull();
     expect(await requestLoginCode({ partnerId: P, email: 'owner@mv.test' }, { ...deps(), available: () => false })).toBeNull();
     expect(db.tables.console_login_codes).toHaveLength(0);
+  });
+
+  it('a capped request does not retire the live code', async () => {
+    const code = await codeFor('owner@mv.test');
+    allowed = false;
+    expect(await requestLoginCode({ partnerId: P, email: 'owner@mv.test' }, deps())).toBeNull();
+    expect(db.tables.console_login_codes[0].used_at ?? null).toBeNull();
+    expect((await verifyLoginCode({ partnerId: P, email: 'owner@mv.test', code }, { ...deps(), secret: SECRET })).ok).toBe(true);
   });
 
   it('a new request retires the previous unused code', async () => {
@@ -150,11 +174,13 @@ describe('verifyLoginCode', () => {
     expect((await verify(code)).ok).toBe(true);
   });
 
-  it('parallel guesses cannot share an attempt', async () => {
+  it('parallel guesses cannot share an attempt: exactly 5 are counted, then the right code fails too', async () => {
     const code = await codeFor('owner@mv.test');
     const wrong = code === '000000' ? '111111' : '000000';
-    await Promise.all(Array.from({ length: 20 }, () => verify(wrong)));
-    expect(db.tables.console_login_codes[0].attempts).toBeLessThanOrEqual(MAX_CODE_ATTEMPTS);
+    const results = await Promise.all(Array.from({ length: 20 }, () => verify(wrong)));
+    expect(results.every((r) => r.ok === false)).toBe(true);
+    expect(db.tables.console_login_codes[0].attempts).toBe(MAX_CODE_ATTEMPTS);
+    expect(await verify(code)).toEqual({ ok: false, status: 401, error: 'invalid_code' });
   });
 
   it('an expired code fails with the same error', async () => {
@@ -226,9 +252,12 @@ describe('requireConsole', () => {
     expect((await r.json()).error).toBe('partner_host_required');
   });
 
-  it('passes through a tenant refusal', async () => {
+  it('passes through a tenant refusal, uncacheable', async () => {
     requireTenant.mockResolvedValue(Response.json({ error: 'invalid_key' }, { status: 401 }));
-    expect(((await run(tok())) as Response).status).toBe(401);
+    const r = (await run(tok())) as Response;
+    expect(r.status).toBe(401);
+    expect((await r.json()).error).toBe('invalid_key');
+    expect(r.headers.get('cache-control')).toBe('no-store');
   });
 
   it.each([
@@ -238,6 +267,7 @@ describe('requireConsole', () => {
     const r = (await run(t)) as Response;
     expect(r.status).toBe(401);
     expect((await r.json()).error).toBe(err);
+    expect(r.headers.get('cache-control')).toBe('no-store');
   });
 
   it('refuses an expired token', async () => {

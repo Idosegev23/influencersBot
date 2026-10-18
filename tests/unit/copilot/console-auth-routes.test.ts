@@ -51,12 +51,15 @@ describe('POST console/auth/request-code', () => {
     expect(known.body).toBe('{"ok":true}');
     expect(unknown.body).toBe(known.body);
     expect(unknown.headers).toEqual(known.headers);
+    expect(known.res.headers.get('cache-control')).toBe('no-store');
+    // Nothing is looked up or written before the response, for either address.
+    expect(db.log).toHaveLength(0);
     expect(known.ms).toBeGreaterThanOrEqual(MIN_RESPONSE_MS - 5);
     expect(unknown.ms).toBeGreaterThanOrEqual(MIN_RESPONSE_MS - 5);
     // The email is sent after the response, and only for the known address.
     expect(h.sent).toHaveLength(0);
-    expect(h.afters).toHaveLength(1);
-    await h.afters[0]();
+    expect(h.afters).toHaveLength(2);
+    for (const a of h.afters) await a();
     expect(h.sent).toHaveLength(1);
     expect(h.sent[0].to).toBe('owner@mv.test');
   });
@@ -67,6 +70,15 @@ describe('POST console/auth/request-code', () => {
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe('partner_host_required');
     expect(requireTenant).toHaveBeenCalledWith(expect.anything(), { association: false });
+    expect(res.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('a tenant refusal (bad key) is passed through uncacheable', async () => {
+    requireTenant.mockResolvedValue(Response.json({ error: 'invalid_key' }, { status: 401 }));
+    const res = await requestCode(req('request-code', { email: 'owner@mv.test' }));
+    expect(res.status).toBe(401);
+    expect((await res.json()).error).toBe('invalid_key');
+    expect(res.headers.get('cache-control')).toBe('no-store');
   });
 
   it('400 for a malformed email', async () => {
@@ -85,6 +97,7 @@ describe('POST console/auth/verify', () => {
   async function code(): Promise<string> {
     await requestCode(req('request-code', { email: 'owner@mv.test' }));
     await h.afters.pop()!();
+
     return /(\d{6})/.exec(h.sent[h.sent.length - 1].html)![1];
   }
 
@@ -105,6 +118,7 @@ describe('POST console/auth/verify', () => {
     const m = await timed(verify(req('verify', { email: 'bad', code: 'x' })));
     for (const r of [a, b, m]) {
       expect(r.res.status).toBe(401);
+      expect(r.res.headers.get('cache-control')).toBe('no-store');
       expect(r.body).toBe('{"error":"invalid_code"}');
       expect(r.ms).toBeGreaterThanOrEqual(MIN_RESPONSE_MS - 5);
     }

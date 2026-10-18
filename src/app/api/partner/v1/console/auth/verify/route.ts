@@ -1,5 +1,8 @@
-import { requirePartnerHost, verifyLoginCode, normalizeEmail, holdUntil } from '@/lib/copilot/console-auth';
-import { readJsonBody, bad } from '@/lib/copilot/http';
+import { noStore, requirePartnerHost, verifyLoginCode, normalizeEmail, holdUntil } from '@/lib/copilot/console-auth';
+import { readJsonBody } from '@/lib/copilot/http';
+
+const NO_STORE = { 'Cache-Control': 'no-store' };
+const bad = (status: number, error: string) => Response.json({ error }, { status, headers: NO_STORE });
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +12,7 @@ export async function POST(req: Request) {
   const t = await requirePartnerHost(req);
   if (t instanceof Response) return t;
   const parsed = await readJsonBody(req, 2048);
-  if (parsed instanceof Response) return parsed;
+  if (parsed instanceof Response) return noStore(parsed);
   const email = normalizeEmail(parsed.body?.email);
   const code = typeof parsed.body?.code === 'string' ? parsed.body.code.trim() : '';
 
@@ -23,5 +26,5 @@ export async function POST(req: Request) {
   }
   await holdUntil(startedAt);
   if (r.ok === false) return bad(r.status, r.error);
-  return Response.json({ token: r.token, user: r.user }, { headers: { 'Cache-Control': 'no-store' } });
+  return Response.json({ token: r.token, user: r.user }, { headers: NO_STORE });
 }
