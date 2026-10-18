@@ -18,6 +18,30 @@ describe('createVisibleTextSplitter', () => {
     const shown = s.push('a << b') + s.end().visible;
     expect(shown).toBe('a << b');
   });
+  it('drops a partial marker left by a truncated stream', () => {
+    for (const tail of ['<<META', '<<ME', '<<', '<<meta>']) {
+      const s = createVisibleTextSplitter();
+      const shown = s.push(`x ${tail}`) + s.end().visible;
+      expect(shown).not.toContain('<<');
+      expect(shown).toBe('x ');
+    }
+    const s = createVisibleTextSplitter();
+    expect(s.push('a <') + s.end().visible).toBe('a <');
+  });
+  it('strips a stray close marker from visible text', () => {
+    const s = createVisibleTextSplitter();
+    expect(s.push('done <</ME') + s.push('TA>> ok') + s.end().visible).toBe('done  ok');
+  });
+  it('is correct at every split offset', () => {
+    const full = 'Answer [1] a << b.\n<<META>>{"cited":[1]}<</META>> tail <<META>>{}';
+    for (let i = 0; i <= full.length; i++) {
+      const s = createVisibleTextSplitter();
+      const shown = s.push(full.slice(0, i)) + s.push(full.slice(i));
+      const end = s.end();
+      expect(shown + end.visible).toBe('Answer [1] a << b.\n');
+      expect(end.rawMeta).toBe('{"cited":[1]}');
+    }
+  });
   it('reports no meta when the model omits it', () => {
     const s = createVisibleTextSplitter();
     s.push('Plain answer.');
@@ -26,7 +50,7 @@ describe('createVisibleTextSplitter', () => {
 });
 
 describe('parseMeta', () => {
-  const ctx = { sourceCount: 3, eventIds: ['ev1'], allowedCtaUrls: ['https://buses.org/join'], topics: ['membership', 'events'] };
+  const ctx = { sourceCount: 3, eventIds: ['ev1'], ctaUrls: { join: ['https://buses.org/join'], renew: ['https://buses.org/renew'], event: ['https://buses.org/register'] }, topics: ['membership', 'events'] };
   it('keeps only valid references', () => {
     const m = parseMeta(JSON.stringify({ cited: [1, 3, 3, 9, 'x'], related: 2, eventId: 'ev1', cta: { kind: 'join', url: 'https://buses.org/join' }, askContact: true, topic: 'membership', membershipMentioned: true, renewalMentioned: false }), ctx);
     expect(m).toEqual({ cited: [1, 3], related: 2, eventId: 'ev1', cta: { kind: 'join', url: 'https://buses.org/join' }, askContact: true, topic: 'membership', membershipMentioned: true, renewalMentioned: false });
@@ -37,6 +61,23 @@ describe('parseMeta', () => {
   });
   it('a related item that is also cited is dropped', () => {
     expect(parseMeta(JSON.stringify({ cited: [1], related: 1 }), ctx).related).toBeNull();
+  });
+  it('rejects a cta whose kind does not match its url set', () => {
+    for (const cta of [{ kind: 'renew', url: 'https://buses.org/join' }, { kind: 'join', url: 'https://buses.org/register' }, { kind: 'event', url: 'https://buses.org/join' }]) {
+      expect(parseMeta(JSON.stringify({ cta }), ctx).cta).toBeNull();
+    }
+    expect(parseMeta(JSON.stringify({ cta: { kind: 'event', url: 'https://buses.org/register' } }), ctx).cta).toEqual({ kind: 'event', url: 'https://buses.org/register' });
+  });
+  it('accepts META wrapped in a code fence', () => {
+    expect(parseMeta('```json\n{"cited":[2]}\n```', ctx).cited).toEqual([2]);
+  });
+  it('returns fresh objects and never the shared empty meta', () => {
+    const a = parseMeta(null, ctx);
+    a.cited.push(1);
+    expect(parseMeta(null, ctx).cited).toEqual([]);
+    expect(parseMeta('nope', ctx)).not.toBe(EMPTY_META);
+    expect(EMPTY_META.cited).toEqual([]);
+    expect(Object.isFrozen(EMPTY_META)).toBe(true);
   });
   it('garbage yields the empty meta', () => {
     expect(parseMeta('not json', ctx)).toEqual(EMPTY_META);
