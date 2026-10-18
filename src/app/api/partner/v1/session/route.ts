@@ -2,6 +2,7 @@ import { requireTenant } from '@/lib/copilot/auth';
 import { loadAssociation } from '@/lib/copilot/association';
 import { getOrCreateVisitor, isValidAnonId } from '@/lib/copilot/visitors';
 import { recordEvents } from '@/lib/copilot/events';
+import { isVerifiedIdentity } from '@/lib/copilot/identity';
 import type { AssociationTenant } from '@/lib/copilot/tenant';
 import { supabase } from '@/lib/supabase';
 
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
     resumed,
     branding: assoc.branding,
     openingQuestions: assoc.openingQuestions,
-    identity: { identified: visitor.identity_source !== null, source: visitor.identity_source },
+    // Never reveal the source: after /contact it would tell the caller whether a typed email is a member's.
+    identity: { identified: isVerifiedIdentity(visitor.identity_source) },
   });
 }

@@ -52,7 +52,8 @@ describe('POST /session', () => {
     const res = await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa' }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ visitorId: 'v1', sessionId: 's1', resumed: false, openingQuestions: ['How do I join?'], identity: { identified: false, source: null } });
+    expect(body).toMatchObject({ visitorId: 'v1', sessionId: 's1', resumed: false, openingQuestions: ['How do I join?'], identity: { identified: false } });
+    expect(body.identity).not.toHaveProperty('source');
     expect(sessions[0]).toMatchObject({ account_id: 'acc', visitor_id: 'v1', anon_id: 'anon_aaaaaaaaaaaaaaaa', ref_source: 'copilot' });
     expect(recordEvents).toHaveBeenCalledWith(expect.objectContaining({ visitorId: 'v1' }), [expect.objectContaining({ type: 'session_started', sessionId: 's1' })]);
   });
@@ -69,6 +70,19 @@ describe('POST /session', () => {
     const body = await (await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa', sessionId: 'theirs' }))).json();
     expect(body.sessionId).not.toBe('theirs');
     expect(body.resumed).toBe(false);
+  });
+
+  it.each(['ams_email', 'email_domain', 'external'])('a %s visitor is not identified and the source is never returned', async (src) => {
+    getOrCreateVisitor.mockResolvedValue({ id: 'v1', identity_source: src });
+    const body = await (await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa' }))).json();
+    expect(body.identity).toEqual({ identified: false });
+    expect(body.identity).not.toHaveProperty('source');
+  });
+
+  it.each(['ams_login', 'newsletter'])('a %s visitor is identified, with no source key', async (src) => {
+    getOrCreateVisitor.mockResolvedValue({ id: 'v1', identity_source: src });
+    const body = await (await POST(req({ anonId: 'anon_aaaaaaaaaaaaaaaa' }))).json();
+    expect(body.identity).toEqual({ identified: true });
   });
 
   it('rejects a bad anon id with 400', async () => {

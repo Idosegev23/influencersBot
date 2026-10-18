@@ -12,6 +12,12 @@ export const IDENTITY_RANK: Record<IdentitySource, number> = {
   ams_login: 5, newsletter: 4, ams_email: 3, email_domain: 2, external: 1,
 };
 
+/** Only these sources are verified: they unlock member data and count as "identified". A typed email never does. */
+const VERIFIED_SOURCES: ReadonlySet<string> = new Set<IdentitySource>(['ams_login', 'newsletter']);
+export function isVerifiedIdentity(source: string | null | undefined): boolean {
+  return !!source && VERIFIED_SOURCES.has(source);
+}
+
 export interface IdentityUpdate {
   source: IdentitySource;
   memberRef?: string | null;

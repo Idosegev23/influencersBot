@@ -20,6 +20,7 @@ import { streamCopilotModel } from './model';
 import { escalateIfNeeded, type EscalationResult } from './escalate';
 import { readContactRules, shouldRequestContact } from './contact-trigger';
 import { recordEvents, type InteractionEventInput } from './events';
+import { isVerifiedIdentity } from './identity';
 
 export type TurnEvent =
   | { type: 'meta'; sessionId: string }
@@ -60,8 +61,6 @@ export function defaultTurnDeps(): TurnDeps {
 const HISTORY_LIMIT = 10;
 export const EMPTY_ANSWER = "I'm sorry, I don't have a good answer to that. Would you like me to connect you with a member of staff?";
 const DEFAULT_TZ = 'America/New_York';
-// Only a verified identity puts member data in the prompt. A typed email (ams_email) is never verified.
-const TRUSTED_IDENTITY = new Set(['ams_login', 'newsletter']);
 const SESSION_COLS = 'id, account_id, visitor_id, message_count, last_response_id, last_turn_at, created_at';
 
 const log = (...a: unknown[]) => console.error('[copilot/turn]', ...a);
@@ -251,7 +250,8 @@ export async function runCopilotTurn(
     .map((e) => (e.registrationUrl && isExcluded(e.registrationUrl, exclusions) ? { ...e, registrationUrl: null } : e));
 
   // 6. Prompt.
-  const identified = !!visitor.identity_source && TRUSTED_IDENTITY.has(visitor.identity_source);
+  // Only a verified identity puts member data in the prompt. A typed email (ams_email) is never verified.
+  const identified = isVerifiedIdentity(visitor.identity_source);
   const member = identified ? memberOf(visitor.membership) : null;
   const ctx: PromptContext = {
     associationName, websiteUrl, siteHosts, sources, events, member, identified,
