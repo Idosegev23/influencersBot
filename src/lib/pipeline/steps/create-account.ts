@@ -8,7 +8,7 @@ export async function createAccountStep(ctx: StepContext): Promise<StepResult> {
   const supabase = await createClient();
   const { data: existing } = await supabase
     .from('accounts')
-    .select('id, config, security_config')
+    .select('id, config, security_config, partner_id')
     .eq('id', ctx.accountId)
     .single();
   const baseConfig = existing?.config ?? {};
@@ -21,12 +21,15 @@ export async function createAccountStep(ctx: StepContext): Promise<StepResult> {
       return { status: 'failed', error: 'account_missing' };
     }
   }
+  // username doubles as the Instagram handle for the IG-based steps (daily scan, media
+  // refresh, ...), so an IG scan sets it to the handle. Keep the existing one when this
+  // is not an IG scan (ctx.username is then only the site-host anchor, possibly another
+  // account's), or when the account is a partner's (copilot), whose username is its slug.
+  const copilotOwned = !!(baseConfig as any).copilot || !!(existing as any)?.partner_id;
+  const keepUsername = !!baseConfig.username && (!ctx.state.options?.hasIg || copilotOwned);
   const mergedConfig = {
     ...baseConfig,
-    // Never replace an existing username: it is the account's public slug (a partner
-    // console sets it before the scan), and ctx.username is only the scan anchor (the
-    // website host when there is no Instagram handle), which may be another account's.
-    username: baseConfig.username || ctx.username,
+    username: keepUsername ? baseConfig.username : ctx.username,
     display_name: baseConfig.display_name || ctx.username,
     isDemo: ctx.state.options.isDemo,
   };

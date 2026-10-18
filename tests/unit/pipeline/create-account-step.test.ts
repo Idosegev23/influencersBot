@@ -57,4 +57,39 @@ describe('createAccountStep', () => {
     expect(await createAccountStep(ctx())).toEqual({ status: 'advance' });
     expect(db.tables.accounts[0].config.username).toBe('uma');
   });
+
+  describe('username on re-scan', () => {
+    const igCtx = (handle: string) => ctx({ username: handle, state: { currentStep: 'create-account', counts: {}, cursors: {}, options: { isDemo: false, hasIg: true } } });
+    const siteCtx = () => ctx({ username: 'brand.co.il', state: { currentStep: 'create-account', counts: {}, cursors: {}, options: { isDemo: false, hasIg: false } } });
+
+    it('a website-only account re-scanned with an Instagram handle switches to the handle', async () => {
+      db.tables.accounts.push({ id: ACC, config: { username: 'brand.co.il' }, security_config: { admin_password_hash: 'x' } });
+      await createAccountStep(igCtx('brand_official'));
+      expect(db.tables.accounts[0].config.username).toBe('brand_official');
+    });
+
+    it('a copilot account keeps its slug even on an IG scan', async () => {
+      db.tables.accounts.push({ id: ACC, config: { username: 'uma', copilot: {} }, security_config: { admin_password_hash: 'x' } });
+      await createAccountStep(igCtx('uma_ig'));
+      expect(db.tables.accounts[0].config.username).toBe('uma');
+    });
+
+    it('a partner-owned account keeps its slug even on an IG scan', async () => {
+      db.tables.accounts.push({ id: ACC, partner_id: 'p1', config: { username: 'uma' }, security_config: { admin_password_hash: 'x' } });
+      await createAccountStep(igCtx('uma_ig'));
+      expect(db.tables.accounts[0].config.username).toBe('uma');
+    });
+
+    it('a copilot account keeps its slug on a website re-scan', async () => {
+      db.tables.accounts.push({ id: ACC, config: { username: 'uma', copilot: {} }, security_config: { admin_password_hash: 'x' } });
+      await createAccountStep(siteCtx());
+      expect(db.tables.accounts[0].config.username).toBe('uma');
+    });
+
+    it('a website-only re-scan of an IG account keeps the handle', async () => {
+      db.tables.accounts.push({ id: ACC, config: { username: 'brand_official' }, security_config: { admin_password_hash: 'x' } });
+      await createAccountStep(siteCtx());
+      expect(db.tables.accounts[0].config.username).toBe('brand_official');
+    });
+  });
 });
