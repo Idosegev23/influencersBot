@@ -8,7 +8,7 @@ export const DEFAULT_CONTACT_RULES: ContactRule[] = [
   { kind: 'before_escalation' },
 ];
 
-function valid(r: any): ContactRule | null {
+export function validContactRule(r: any): ContactRule | null {
   if (r?.kind === 'after_n_questions' && Number.isInteger(r.n) && r.n > 0) return { kind: 'after_n_questions', n: r.n };
   if (r?.kind === 'on_intent' && Array.isArray(r.topics) && r.topics.every((t: unknown) => typeof t === 'string')) return { kind: 'on_intent', topics: r.topics };
   if (r?.kind === 'before_escalation') return { kind: 'before_escalation' };
@@ -18,7 +18,7 @@ function valid(r: any): ContactRule | null {
 export function readContactRules(config: unknown): ContactRule[] {
   const raw = (config as any)?.copilot?.contact_trigger;
   const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  const rules = list.map(valid).filter(Boolean) as ContactRule[];
+  const rules = list.map(validContactRule).filter(Boolean) as ContactRule[];
   return rules.length ? rules : DEFAULT_CONTACT_RULES;
 }
 

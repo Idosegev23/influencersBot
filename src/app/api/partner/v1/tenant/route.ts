@@ -2,6 +2,7 @@ import { requireTenant } from '@/lib/copilot/auth';
 import { loadAssociation } from '@/lib/copilot/association';
 import type { AssociationTenant } from '@/lib/copilot/tenant';
 import { supabase } from '@/lib/supabase';
+import { sanitizeBranding } from '@/lib/copilot/branding';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,47 +22,6 @@ function originOf(value: unknown): string | null {
   } catch {
     return null;
   }
-}
-
-function httpsUrl(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  try {
-    return new URL(value.trim()).protocol === 'https:' ? value.trim() : null;
-  } catch {
-    return null;
-  }
-}
-
-function shortString(value: unknown, max: number): string | null {
-  return typeof value === 'string' && value.length <= max ? value : null;
-}
-
-/** Only these keys ever leave the API; everything else stored in branding is dropped. */
-function sanitizeBranding(raw: unknown): Record<string, unknown> {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const b = raw as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const k of ['primary', 'primaryText', 'background', 'surface', 'text', 'font']) {
-    const v = shortString(b[k], 40);
-    if (v !== null) out[k] = v;
-  }
-  for (const k of ['logo', 'favicon']) {
-    const v = httpsUrl(b[k]);
-    if (v !== null) out[k] = v;
-  }
-  if (Array.isArray(b.header_links)) {
-    const links: { label: string; url: string }[] = [];
-    for (const l of b.header_links) {
-      if (links.length >= 8) break;
-      const label = shortString((l as any)?.label, 40);
-      const url = httpsUrl((l as any)?.url);
-      if (label !== null && url !== null) links.push({ label, url });
-    }
-    out.header_links = links;
-  }
-  const footer = shortString(b.footer_text, 300);
-  if (footer !== null) out.footer_text = footer;
-  return out;
 }
 
 function strings(value: unknown): string[] {
