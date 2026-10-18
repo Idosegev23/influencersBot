@@ -32,11 +32,17 @@ const checkChatLimits = vi.fn();
 vi.mock('@/lib/copilot/rate-limit', () => ({ checkChatLimits: (...a: any[]) => checkChatLimits(...a) }));
 const sendEmail = vi.fn();
 vi.mock('@/lib/email', () => ({ sendEmail: (...a: any[]) => sendEmail(...a) }));
+// The per-association staff-mail cap (src/lib/copilot/mail.ts) reads Redis.
+const mailLimiter = vi.fn();
+vi.mock('@/lib/redis', () => ({ redisSlidingWindowRateLimit: (a: any) => mailLimiter(a), isRedisAvailable: () => true }));
 
 let session: any = null;
 let messages: any[] = [];
+let priorNotified: any[] = [];
+let priorError: any = null;
 const mock = makeDb((c: Chain) => {
   if (c.table === 'chat_sessions') return { data: session, error: null };
+  if (c.table === 'interaction_events') return { data: priorError ? null : priorNotified, error: priorError };
   if (c.table === 'chat_messages') return { data: messages, error: null };
   return { data: null, error: null };
 });
@@ -58,6 +64,9 @@ beforeEach(() => {
   getVisitor.mockResolvedValue({ ...baseVisitor });
   checkChatLimits.mockResolvedValue({ allowed: true });
   sendEmail.mockResolvedValue({ success: true });
+  mailLimiter.mockResolvedValue({ allowed: true, remaining: 1, resetAt: 0, retryAfterMs: 0 });
+  priorNotified = [];
+  priorError = null;
   process.env.GMAIL_SEND_FROM = 'assistant@mail.test';
 });
 
@@ -71,7 +80,7 @@ describe('POST /contact', () => {
     expect(upd).toEqual({ source: 'ams_email', email: 'jane@acme.com', company: 'Acme', companyDomain: 'acme.com', name: 'Jane D' });
     expect(upd).not.toHaveProperty('memberRef');
     expect(upd).not.toHaveProperty('membership');
-    expect(recordEvents).toHaveBeenCalledWith(expect.objectContaining({ visitorId: VID, accountId: 'acc' }), [expect.objectContaining({ type: 'contact_captured', sessionId: SID, payload: { source: 'ams_email' } })]);
+    expect(recordEvents).toHaveBeenCalledWith(expect.objectContaining({ visitorId: VID, accountId: 'acc' }), [expect.objectContaining({ type: 'contact_captured', sessionId: SID, payload: { source: 'ams_email', staff_notified: true } })]);
     expect(checkChatLimits).toHaveBeenCalledWith({ accountId: 'acc', anonId: 'anon_aaaaaaaaaaaaaaaa' });
   });
 
@@ -141,7 +150,7 @@ describe('POST /contact', () => {
     expect(nameUp && hasOp(nameUp, 'is', 'name', null)).toBe(true);
     const coUp = ups.find((c) => hasOp(c, 'update', { company: 'Sam Co' }));
     expect(coUp && hasOp(coUp, 'is', 'company', null)).toBe(true);
-    expect(recordEvents).toHaveBeenCalledWith(expect.anything(), [expect.objectContaining({ type: 'contact_captured', payload: { source: 'email_only' } })]);
+    expect(recordEvents).toHaveBeenCalledWith(expect.anything(), [expect.objectContaining({ type: 'contact_captured', payload: { source: 'email_only', staff_notified: true } })]);
   });
 
   it('emails staff an escaped English note with the last messages, from the association name', async () => {
@@ -149,7 +158,8 @@ describe('POST /contact', () => {
     expect(sendEmail).toHaveBeenCalledTimes(1);
     const mail = sendEmail.mock.calls[0][0];
     expect(mail.to).toEqual(['staff@aba.org']);
-    expect(mail.from).toBe('ABA Assistant <assistant@mail.test>');
+    expect(mail.from).toBe('"ABA Assistant" <assistant@mail.test>');
+    expect(mail.replyTo).toBe('sam@gmail.com');
     expect(mail.subject).toContain('New contact from the website assistant');
     expect(mail.html).toContain('&lt;Sam&gt;');
     expect(mail.html).toContain('<b>Name (entered by the visitor, not verified):</b> &lt;Sam&gt;');
@@ -190,7 +200,7 @@ describe('POST /contact', () => {
     expect(await res.json()).toEqual({ ok: true });
     expect(recordEvents).toHaveBeenCalledWith(expect.anything(), [
       expect.objectContaining({ type: 'ams_unavailable', payload: { during: 'contact' } }),
-      expect.objectContaining({ type: 'contact_captured', payload: { source: 'email_domain' } }),
+      expect.objectContaining({ type: 'contact_captured', payload: { source: 'email_domain', staff_notified: true } }),
     ]);
   });
 
@@ -224,6 +234,70 @@ describe('POST /contact', () => {
     const res = await POST(req({ visitorId: VID, email: 'sam@gmail.com', consent: true }));
     expect(await res.json()).toEqual({ ok: true });
     expect(sendEmail).not.toHaveBeenCalled();
-    expect(recordEvents).toHaveBeenCalled();
+    expect(recordEvents).toHaveBeenCalledWith(expect.anything(), [expect.objectContaining({ type: 'contact_captured', payload: { source: 'email_only', staff_notified: false } })]);
+  });
+
+  it('Reply-To is the normalized typed email', async () => {
+    await POST(req({ visitorId: VID, email: '  Sam@GMail.com ', consent: true }));
+    expect(sendEmail.mock.calls[0][0].replyTo).toBe('sam@gmail.com');
+  });
+
+  it('emails staff at most once per visitor per 24h', async () => {
+    priorNotified = [{ id: 'e1' }];
+    const res = await POST(req({ visitorId: VID, email: 'sam@gmail.com', consent: true }));
+    expect(await res.json()).toEqual({ ok: true });
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(recordEvents).toHaveBeenCalledWith(expect.anything(), [expect.objectContaining({ type: 'contact_captured', payload: { source: 'email_only', staff_notified: false } })]);
+    const lookup = mock.calls.find((c) => c.table === 'interaction_events')!;
+    expect(hasOp(lookup, 'eq', 'account_id', 'acc')).toBe(true);
+    expect(hasOp(lookup, 'eq', 'visitor_id', VID)).toBe(true);
+    expect(hasOp(lookup, 'eq', 'type', 'contact_captured')).toBe(true);
+    expect(hasOp(lookup, 'eq', 'payload->>staff_notified', 'true')).toBe(true);
+    const gte = lookup.ops.find((o) => o[0] === 'gte')!;
+    expect(gte[1]).toBe('occurred_at');
+    const ageMs = Date.now() - new Date(String(gte[2])).getTime();
+    expect(ageMs).toBeGreaterThan(24 * 3600_000 - 60_000);
+    expect(ageMs).toBeLessThan(24 * 3600_000 + 60_000);
+    // Presence check: with no earlier notification the same request does email staff.
+    priorNotified = [];
+    await POST(req({ visitorId: VID, email: 'sam@gmail.com', consent: true }));
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed notification lookup sends nothing (fail closed) and logs', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    priorError = { message: 'db down' };
+    await POST(req({ visitorId: VID, email: 'sam@gmail.com', consent: true }));
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(err.mock.calls.some((c) => c[0] === '[copilot/contact]')).toBe(true);
+    err.mockRestore();
+  });
+
+  it('the association mail cap skips the staff email but still records the contact', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mailLimiter.mockResolvedValue({ allowed: false, remaining: 0, resetAt: 0, retryAfterMs: 1000 });
+    const res = await POST(req({ visitorId: VID, email: 'sam@gmail.com', consent: true }));
+    expect(await res.json()).toEqual({ ok: true });
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(mailLimiter).toHaveBeenCalledWith(expect.objectContaining({ key: 'rl:copilot:mail:acc', limit: 30 }));
+    expect(recordEvents).toHaveBeenCalledWith(expect.anything(), [expect.objectContaining({ type: 'contact_captured', payload: { source: 'email_only', staff_notified: false } })]);
+    expect(err.mock.calls.some((c) => c[0] === '[copilot/mail]')).toBe(true);
+    err.mockRestore();
+  });
+
+  it('a stuck email send does not hold the request past the timeout', async () => {
+    vi.useFakeTimers();
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      sendEmail.mockReturnValue(new Promise(() => {}));
+      const p = POST(req({ visitorId: VID, email: 'sam@gmail.com', consent: true }));
+      await vi.advanceTimersByTimeAsync(10_001);
+      const res = await p;
+      expect(await res.json()).toEqual({ ok: true });
+      expect(recordEvents).toHaveBeenCalledWith(expect.anything(), [expect.objectContaining({ type: 'contact_captured', payload: { source: 'email_only', staff_notified: false } })]);
+    } finally {
+      vi.useRealTimers();
+      err.mockRestore();
+    }
   });
 });

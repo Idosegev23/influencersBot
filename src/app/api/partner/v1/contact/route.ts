@@ -10,7 +10,7 @@ import { bad, isUuid, readJsonBody, limited, associationNameOf } from '@/lib/cop
 import type { IdentityUpdate } from '@/lib/copilot/identity';
 import type { AssociationTenant } from '@/lib/copilot/tenant';
 import { normalizeEmail } from '@/lib/support/email-deliverability';
-import { sendEmail } from '@/lib/email';
+import { sendCopilotMail } from '@/lib/copilot/mail';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +18,7 @@ export const dynamic = 'force-dynamic';
 const MAX_NAME = 100;
 const MAX_COMPANY = 200;
 const TRANSCRIPT_LIMIT = 12;
+const STAFF_NOTE_WINDOW_MS = 24 * 60 * 60 * 1000;
 // Visitors with a verified identity are never touched by what someone types into the chat.
 const VERIFIED = new Set(['ams_login', 'newsletter']);
 const UNVERIFIED = '(entered by the visitor, not verified)';
@@ -100,8 +101,25 @@ export async function POST(req: Request) {
     }
   }
 
+  // Staff hear about a visitor at most once a day: repeat submissions are recorded, not mailed.
+  let staffNotified = false;
   const recipients = staffRecipients(assoc.config);
+  let alreadyNotified = false;
   if (recipients.length) {
+    const since = new Date(Date.now() - STAFF_NOTE_WINDOW_MS).toISOString();
+    try {
+      const { data, error } = await supabase.from('interaction_events').select('id')
+        .eq('account_id', tenant.accountId).eq('visitor_id', current.id).eq('type', 'contact_captured')
+        .eq('payload->>staff_notified', 'true').gte('occurred_at', since).limit(1);
+      // Fail closed: when we cannot tell, do not mail.
+      if (error) { log('staff-note lookup failed, not mailing', tenant.accountId, error.message); alreadyNotified = true; }
+      else alreadyNotified = Array.isArray(data) && data.length > 0;
+    } catch (e) {
+      log('staff-note lookup threw, not mailing', tenant.accountId, e);
+      alreadyNotified = true;
+    }
+  }
+  if (recipients.length && !alreadyNotified) {
     const associationName = associationNameOf(assoc.config);
     let transcript: Array<{ role: string; content: string }> = [];
     if (sessionId) {
@@ -117,22 +135,21 @@ export async function POST(req: Request) {
       + (matched ? `<br><b>Company matched from the email address:</b> ${esc(matched)}` : '') + '</p>'
       + (lines ? `<hr><p><b>Recent conversation</b></p>${lines}` : '') + '</div>';
     const from = assistantFrom(associationName);
-    try {
-      const r = await sendEmail({
-        to: recipients,
-        subject: `[${associationName.replace(/[\r\n]+/g, ' ')}] New contact from the website assistant`,
-        html,
-        ...(from ? { from } : {}),
-      });
-      if (!r?.success) log('staff email failed', tenant.accountId, r?.error);
-    } catch (e) {
-      log('staff email threw', tenant.accountId, e);
-    }
+    // Capped per association, bounded by a timeout, never throws.
+    const r = await sendCopilotMail(tenant.accountId, {
+      to: recipients,
+      subject: `[${associationName.replace(/[\r\n]+/g, ' ')}] New contact from the website assistant`,
+      html,
+      replyTo: email,
+      ...(from ? { from } : {}),
+    });
+    staffNotified = !!r?.success;
+    if (!r?.success) log('staff email not sent', tenant.accountId, r?.error);
   }
 
   const events: InteractionEventInput[] = [];
   if (amsUnavailable) events.push({ type: 'ams_unavailable', sessionId, payload: { during: 'contact' } });
-  events.push({ type: 'contact_captured', sessionId, payload: { source: update?.source ?? 'email_only' } });
+  events.push({ type: 'contact_captured', sessionId, payload: { source: update?.source ?? 'email_only', staff_notified: staffNotified } });
   await recordEvents({ partnerId: tenant.partnerId, accountId: tenant.accountId, visitorId: current.id, industry: assoc.industry ?? null }, events);
 
   return Response.json({ ok: true });
