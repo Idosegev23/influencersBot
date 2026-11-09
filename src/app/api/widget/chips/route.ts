@@ -28,6 +28,7 @@ import { createClient } from '@/lib/supabase/server';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { containsCouponContent } from '@/lib/coupons/coupon-content-filter';
 import OpenAI from 'openai';
+import { describeAccountForChips } from '@/lib/widget/chips-context';
 
 // Same model as the widget chat (baseArchetype.CHAT_MODEL). Cache absorbs the
 // extra latency: typical hit rate ≥80% per (account, page-pattern, returning).
@@ -149,7 +150,7 @@ Page type: ${ctx.pagePattern}
 Last user message: ${ctx.lastUserMsg || ''}
 Last bot reply: ${ctx.lastBotMsg || ''}`
       : `Brand: ${ctx.brandName}
-${ctx.brandSummary ? `Description: ${ctx.brandSummary}\n` : ''}Page type: ${ctx.pagePattern}
+${ctx.brandSummary ? `${ctx.brandSummary}\n` : ''}Page type: ${ctx.pagePattern}
 Page title: ${ctx.pageTitle || ''}
 Returning visitor: ${ctx.isReturning}
 Last topic: ${ctx.lastTopic || 'none'}
@@ -307,7 +308,7 @@ export async function POST(req: NextRequest) {
   const brandFallback = effectiveLang.toLowerCase().startsWith('en') ? 'the brand' : 'המותג';
   const generated = await generateChips({
     brandName: config.display_name || config.username || brandFallback,
-    brandSummary: config.persona_summary || widgetConfig.welcomeMessage,
+    brandSummary: describeAccountForChips(config),
     pagePattern,
     pageTitle: body.pageTitle,
     isReturning,
