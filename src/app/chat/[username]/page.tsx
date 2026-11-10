@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import { linkifyBareUrls } from '@/lib/chat/linkify';
 import {
   MessageCircle,
   Copy,
@@ -1958,7 +1959,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                 {msg.role === 'user' ? (
                                   <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
                                 ) : (
-                                  <div className="text-sm markdown-content">
+                                  <div className="text-sm markdown-content break-words [overflow-wrap:anywhere]">
                                     {displayContent && (
                                       <ReactMarkdown
                                         components={{
@@ -1990,7 +1991,7 @@ export default function ChatbotPage({ params }: { params: Promise<{ username: st
                                           ),
                                         }}
                                       >
-                                        {displayContent}
+                                        {linkifyBareUrls(displayContent)}
                                       </ReactMarkdown>
                                     )}
                                     {/* Show cursor while streaming */}
